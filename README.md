@@ -17,7 +17,7 @@ Chapter_waste/
 │
 ├── 1prepare_chapter_data/
 │   ├── 1_prepare_chapter_data.py   # Step 1: clean & export harmonised layers
-│   ├── 2_prepare_osmnx_roads.py    # Step 2: OSMnx download + local vs OSMnx comparison
+│   ├── 2_prepare_osmnx_roads.py    # Step 1 (cont.): OSMnx roads + local vs OSMnx comparison
 │   ├── road_utils.py               # Shared road cleaning, noding, comparison
 │   ├── plot_maps.R                 # Step 1 layer preview maps (waste, SVI, slums…)
 │   ├── plot_road_figures.R         # Five numbered road network figures (01–05)
@@ -61,30 +61,38 @@ Raw inputs are read-only from `PhD_UCL/Data/Waste/`, `Shp/`, etc.
 Raw CSVs & shapefiles
         │
         ▼
-┌───────────────────────────────┐
-│ 1. 1_prepare_chapter_data     │  Clip, deduplicate, reproject → GeoPackages
-└───────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│ Step 1 — Data preparation (1prepare_chapter_data/)               │
+│  • Harmonise waste, SVI, boundary, slums → GeoPackages           │
+│  • Build local OSM & OSMnx road layers                           │
+│  • Compare sources & select road layer for downstream analysis   │
+└──────────────────────────────────────────────────────────────────┘
         │
         ▼
-┌───────────────────────────────┐
-│ 2. 2_prepare_osmnx_roads      │  OSMnx download + cleaned road layer
-└───────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│ Step 2 — Coverage analysis (2coverage_analysis/)                 │
+│  city → roads → SVI → waste                                      │
+└──────────────────────────────────────────────────────────────────┘
         │
-        ├──────────────────────────────────────────┐
-        ▼                                          ▼
-┌───────────────────┐              ┌────────────────────────────┐
-│ 2a. cityroad      │              │ 2b. roadsvi                │
-│ H3 grid metrics   │              │ Road-metre SVI coverage    │
-└───────────────────┘              └────────────────────────────┘
-                                              │
-                                              ▼
-                                   ┌────────────────────────────┐
-                                   │ 2c. sviwaste               │
-                                   │ Waste-positive SVI panoids │
-                                   └────────────────────────────┘
+        ▼
+┌───────────────────┐
+│ 2a. cityroad      │  H3 grid road metrics (city scale)
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│ 2b. roadsvi       │  Road-metre SVI coverage
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│ 2c. sviwaste      │  Waste-positive SVI panoids
+└───────────────────┘
 ```
 
 **Coverage hierarchy:** city (boundary) → roads → SVI sampling → waste detections
+
+The local vs OSMnx road comparison lives inside **Step 1** — it supports choosing which cleaned road layer to feed into Step 2, not a separate analysis track.
 
 ---
 
