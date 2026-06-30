@@ -398,8 +398,8 @@ load_zoom_data <- function(args, n_cells = args$n_cells, window_buffer_m = args$
     paste0("Nairobi_cityroad_grid_", sprintf("h3_res%d_buf%dm", args$h3_res, as.integer(args$road_buffer)), ".gpkg")
   ))
   roads <- read_layer(file.path(INPUT_DIR, ROAD_GPKG))
-  svi <- read_layer(file.path(INPUT_DIR, "Nairobi_SVI_point_32737.gpkg"))
-  waste <- read_layer(file.path(INPUT_DIR, "Nairobi_Waste_point_32737.gpkg"))
+  svi <- read_layer(file.path(INPUT_DIR, "Nairobi_SVI_point_gsvi_32737.gpkg"))
+  waste <- read_layer(file.path(INPUT_DIR, "Nairobi_Waste_point_gsvi_32737.gpkg"))
   slums <- read_layer(file.path(INPUT_DIR, "Nairobi_slum_polygon_32737.gpkg"))
   sviwaste <- read_layer(file.path(DATA_DIR, "Nairobi_sviwaste_points.gpkg"))
 

@@ -286,7 +286,7 @@ def main() -> None:
     print(f"SVI buffer: {args.svi_buffer_m} m")
 
     roads = gpd.read_file(INPUT_DIR / ROAD_GPKG)
-    svi = gpd.read_file(INPUT_DIR / "Nairobi_SVI_point_32737.gpkg")
+    svi = gpd.read_file(INPUT_DIR / "Nairobi_SVI_point_gsvi_32737.gpkg")
 
     print("Preparing road segments...")
     segments = prepare_road_segments(roads)

@@ -30,7 +30,7 @@ INPUT_DIR = DATA_ROOT / "Chapter_waste" / "1prepare_chapter_data"
 OUTPUT_DIR = INPUT_DIR
 
 BOUNDARY_GPKG = INPUT_DIR / "Nairobi_boundary_polygon_32737.gpkg"
-SVI_GPKG = INPUT_DIR / "Nairobi_SVI_point_32737.gpkg"
+SVI_GPKG = INPUT_DIR / "Nairobi_SVI_point_gsvi_32737.gpkg"
 LOCAL_CLEANED_GPKG = INPUT_DIR / ROAD_FILES["local_cleaned"]
 
 

@@ -63,8 +63,8 @@ def main() -> None:
     points_csv = OUTPUT_DIR / "Nairobi_sviwaste_points.csv"
     summary_csv = OUTPUT_DIR / "Nairobi_sviwaste_summary.csv"
 
-    svi = gpd.read_file(INPUT_DIR / "Nairobi_SVI_point_32737.gpkg")
-    waste = gpd.read_file(INPUT_DIR / "Nairobi_Waste_point_32737.gpkg")
+    svi = gpd.read_file(INPUT_DIR / "Nairobi_SVI_point_gsvi_32737.gpkg")
+    waste = gpd.read_file(INPUT_DIR / "Nairobi_Waste_point_gsvi_32737.gpkg")
 
     print("Labelling waste-positive SVI panoids...")
     points = label_waste_on_svi(svi, waste)

@@ -25,8 +25,8 @@ plot_and_save <- function(p, filename) {
 }
 
 boundary <- read_layer("Nairobi_boundary_polygon_32737.gpkg")
-waste <- read_layer("Nairobi_Waste_point_32737.gpkg")
-svi <- read_layer("Nairobi_SVI_point_32737.gpkg")
+waste <- read_layer("Nairobi_Waste_point_gsvi_32737.gpkg")
+svi <- read_layer("Nairobi_SVI_point_gsvi_32737.gpkg")
 slums <- read_layer("Nairobi_slum_polygon_32737.gpkg")
 slum_clusters <- read_layer("Nairobi_slum_cluster_polygon_32737.gpkg")
 
@@ -40,7 +40,7 @@ plot_and_save(
     caption = "Source: harmonised Correct_SVI.csv"
   ) +
     geom_sf(data = waste, color = "#cb181d", size = 0.45, alpha = 0.75),
-  "Nairobi_Waste_point_32737.png"
+  "Nairobi_Waste_point_gsvi_32737.png"
 )
 
 plot_and_save(
@@ -51,7 +51,7 @@ plot_and_save(
     caption = "Source: harmonised Combined_SVI.csv (unique by panoid)"
   ) +
     geom_sf(data = svi, color = "#2171b5", size = 0.03, alpha = 0.18),
-  "Nairobi_SVI_point_32737.png"
+  "Nairobi_SVI_point_gsvi_32737.png"
 )
 
 # Road maps: use plot_road_figures.R for the numbered 01–05 road figure set.

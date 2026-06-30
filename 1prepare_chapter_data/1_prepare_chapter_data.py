@@ -47,8 +47,10 @@ SVI_DROP_COLUMNS = [
 ]
 
 OUTPUT_FILES = {
-    "waste": "Nairobi_Waste_point_32737.gpkg",
-    "svi": "Nairobi_SVI_point_32737.gpkg",
+    "waste_gsvi": "Nairobi_Waste_point_gsvi_32737.gpkg",
+    "waste_gsvi_selfcollected": "Nairobi_Waste_point_gsvi_selfcollected_32737.gpkg",
+    "svi_gsvi": "Nairobi_SVI_point_gsvi_32737.gpkg",
+    "svi_gsvi_selfcollected": "Nairobi_SVI_point_gsvi_selfcollected_32737.gpkg",
     "road": "Nairobi_road_line_32737.gpkg",
     "boundary": "Nairobi_boundary_polygon_32737.gpkg",
     "slum": "Nairobi_slum_polygon_32737.gpkg",
@@ -77,18 +79,65 @@ def filter_and_dedup_svi(df: pd.DataFrame) -> pd.DataFrame:
     return filtered.drop_duplicates(subset=["panoid"], keep="first")
 
 
-def load_waste_points() -> gpd.GeoDataFrame:
+def classify_source(img_dir: str) -> str:
+    if img_dir == "Faith/":
+        return "Faith"
+    if img_dir == "ZWL/":
+        return "ZWL"
+    return "Google"
+
+
+def add_source_column(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    out["source"] = out["img_dir"].map(classify_source)
+    return out
+
+
+def filter_and_dedup_waste_all_sources(df: pd.DataFrame) -> pd.DataFrame:
+    return df.drop_duplicates(subset=["lat", "lon", "img_name"], keep="first")
+
+
+def filter_and_dedup_svi_all_sources(df: pd.DataFrame) -> pd.DataFrame:
+    """GSVI rows deduped by panoid; self-collected rows deduped by lat/lon/img_name."""
+    gsvi_df = df[~df["img_dir"].isin(EXCLUDED_IMG_DIRS)].copy()
+    gsvi_df = gsvi_df.dropna(subset=["panoid"])
+    gsvi_df = gsvi_df.drop_duplicates(subset=["panoid"], keep="first")
+
+    self_df = df[df["img_dir"].isin(EXCLUDED_IMG_DIRS)].copy()
+    self_df = self_df.drop_duplicates(subset=["lat", "lon", "img_name"], keep="first")
+
+    return pd.concat([gsvi_df, self_df], ignore_index=True)
+
+
+def load_waste_gsvi() -> gpd.GeoDataFrame:
     df = pd.read_csv(WASTE_CSV)
     df = filter_and_dedup_waste(df)
+    df = add_source_column(df)
     return csv_to_points(df)
 
 
-def load_svi_points() -> tuple[gpd.GeoDataFrame, int]:
+def load_waste_gsvi_selfcollected() -> gpd.GeoDataFrame:
+    df = pd.read_csv(WASTE_CSV)
+    df = filter_and_dedup_waste_all_sources(df)
+    df = add_source_column(df)
+    return csv_to_points(df)
+
+
+def load_svi_gsvi() -> tuple[gpd.GeoDataFrame, int]:
     raw = pd.read_csv(SVI_CSV, low_memory=False)
     raw_filtered = filter_excluded_dirs(raw)
     df = filter_and_dedup_svi(raw)
     df = df.drop(columns=[c for c in SVI_DROP_COLUMNS if c in df.columns])
+    df = add_source_column(df)
     return csv_to_points(df), len(raw_filtered)
+
+
+def load_svi_gsvi_selfcollected() -> gpd.GeoDataFrame:
+    raw = pd.read_csv(SVI_CSV, low_memory=False)
+    df = filter_and_dedup_svi_all_sources(raw)
+    df = df.drop(columns=[c for c in SVI_DROP_COLUMNS if c in df.columns])
+    df = add_source_column(df)
+    return csv_to_points(df)
 
 
 def cluster_slum_polygons(slums_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -120,18 +169,25 @@ def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     print("Loading raw inputs...")
-    waste = load_waste_points()
-    svi, svi_before_panoid_dedup = load_svi_points()
+    waste_gsvi = load_waste_gsvi()
+    waste_gsvi_selfcollected = load_waste_gsvi_selfcollected()
+    svi_gsvi, svi_before_panoid_dedup = load_svi_gsvi()
+    svi_gsvi_selfcollected = load_svi_gsvi_selfcollected()
     boundary = gpd.read_file(BOUNDARY_SHP)
     slums = gpd.read_file(SLUM_SHP)
     roads = gpd.read_file(ROAD_GPKG)
 
     print(f"  SVI rows after dir filter: {svi_before_panoid_dedup:,}")
-    print(f"  SVI unique panoids:        {len(svi):,}")
+    print(f"  SVI unique panoids (gsvi arm): {len(svi_gsvi):,}")
+    print(f"  SVI all sources:             {len(svi_gsvi_selfcollected):,}")
+    print(f"  Waste gsvi arm:              {len(waste_gsvi):,}")
+    print(f"  Waste gsvi+selfcollected:    {len(waste_gsvi_selfcollected):,}")
 
     print("Clipping to Nairobi boundary...")
-    waste_clipped = gpd.clip(waste, boundary)
-    svi_clipped = gpd.clip(svi, boundary)
+    waste_gsvi_clipped = gpd.clip(waste_gsvi, boundary)
+    waste_gsvi_selfcollected_clipped = gpd.clip(waste_gsvi_selfcollected, boundary)
+    svi_gsvi_clipped = gpd.clip(svi_gsvi, boundary)
+    svi_gsvi_selfcollected_clipped = gpd.clip(svi_gsvi_selfcollected, boundary)
     slums_clipped = gpd.clip(slums, boundary)
 
     print("Preparing local road layers (raw + cleaned + noded)...")
@@ -141,15 +197,19 @@ def main() -> None:
     roads_noded = node_road_segments(roads_clean)
 
     print("Reprojecting to EPSG:32737...")
-    waste_out = waste_clipped.to_crs(PROJECTED_CRS)
-    svi_out = svi_clipped.to_crs(PROJECTED_CRS)
+    waste_gsvi_out = waste_gsvi_clipped.to_crs(PROJECTED_CRS)
+    waste_gsvi_selfcollected_out = waste_gsvi_selfcollected_clipped.to_crs(PROJECTED_CRS)
+    svi_gsvi_out = svi_gsvi_clipped.to_crs(PROJECTED_CRS)
+    svi_gsvi_selfcollected_out = svi_gsvi_selfcollected_clipped.to_crs(PROJECTED_CRS)
     boundary_out = boundary.to_crs(PROJECTED_CRS)
     slums_out = slums_clipped.to_crs(PROJECTED_CRS)
     slum_clusters_out = cluster_slum_polygons(slums_clipped).to_crs(PROJECTED_CRS)
 
     datasets = {
-        "waste": waste_out,
-        "svi": svi_out,
+        "waste_gsvi": waste_gsvi_out,
+        "waste_gsvi_selfcollected": waste_gsvi_selfcollected_out,
+        "svi_gsvi": svi_gsvi_out,
+        "svi_gsvi_selfcollected": svi_gsvi_selfcollected_out,
         "boundary": boundary_out,
         "slum": slums_out,
         "slum_cluster": slum_clusters_out,
@@ -180,8 +240,22 @@ def main() -> None:
     print("\nSummary")
     print(f"  Boundary area: {boundary_km2:.2f} km²")
     print(f"  Slum area:     {slum_km2:.2f} km² ({slum_pct:.1f}% of boundary)")
-    print(f"  Waste points:  {len(waste_out):,}  (raw {len(waste):,})")
-    print(f"  SVI panoids:   {len(svi_out):,}  (raw images {svi_before_panoid_dedup:,}, unique panoids {len(svi):,})")
+    print(
+        f"  Waste gsvi:              {len(waste_gsvi_out):,}  "
+        f"(raw {len(waste_gsvi):,})"
+    )
+    print(
+        f"  Waste gsvi+selfcollected: {len(waste_gsvi_selfcollected_out):,}  "
+        f"(raw {len(waste_gsvi_selfcollected):,})"
+    )
+    print(
+        f"  SVI gsvi:                {len(svi_gsvi_out):,}  "
+        f"(raw images {svi_before_panoid_dedup:,}, unique panoids {len(svi_gsvi):,})"
+    )
+    print(
+        f"  SVI gsvi+selfcollected:  {len(svi_gsvi_selfcollected_out):,}  "
+        f"(raw {len(svi_gsvi_selfcollected):,})"
+    )
     print(
         f"  Road segments: {len(roads_noded):,} noded "
         f"({len(roads_clean):,} cleaned, {len(roads_raw):,} raw, "

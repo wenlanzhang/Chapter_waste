@@ -36,9 +36,23 @@ Chapter_waste/
 │   ├── 3plot_sviwaste_maps.R
 │   └── plot_process_zoom_map.R     # Zoomed pipeline schematic (panels + layers)
 │
+├── 3_cluster_mitigation/
+│   ├── 3_hdbscan_waste.py            # HDBSCAN clustering (both arms)
+│   ├── 4_mitigation_comparison.py    # Google SVI vs gsvi_selfcollected tables
+│   ├── 1_plot_svi_sources_map.R    # SVI imagery by source (Step 1 gpkgs)
+│   ├── 2_plot_waste_sources_map.R  # Waste detections by source (Step 1 gpkgs)
+│   ├── 3_plot_hdbscan_map.R        # HDBSCAN cluster maps
+│   ├── 4_plot_new_obs_stacked_bar.R  # New-obs inside vs new-hotspot bar
+│   ├── 5_plot_hotspot_difference_map.R  # Hotspot overlap vs additional area map
+│   └── robustness_kde/
+│       ├── 1_kde_hotspots.py         # KDE surfaces → hotspot polygons + metrics
+│       └── 2_plot_kde_comparison.R   # Two-panel + difference KDE maps
+│
 ├── Figure/                         # All map outputs (PNG)
 │   ├── 1prepare_chapter_data/
-│   └── 2coverage_analysis/
+│   ├── 2coverage_analysis/
+│   └── 3_cluster_mitigation/
+│       └── robustness_kde/
 │
 └── *.ipynb                         # Original Jupyter notebooks (legacy)
 ```
@@ -48,7 +62,9 @@ Chapter_waste/
 ```
 /Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste/
 ├── 1prepare_chapter_data/          # Harmonised GeoPackages
-└── 2coverage_analysis/             # Coverage CSVs & GeoPackages
+├── 2coverage_analysis/             # Coverage CSVs & GeoPackages
+└── 3_cluster_mitigation/           # HDBSCAN outputs, hotspot gpkgs, thesis_table/
+    └── robustness_kde/             # KDE robustness polygons, params, thesis_table/
 ```
 
 Raw inputs are read-only from `PhD_UCL/Data/Waste/`, `Shp/`, etc.
@@ -105,20 +121,28 @@ The local vs OSMnx road comparison lives inside **Step 1** — it supports choos
 Reads raw sources, applies consistent cleaning, clips to Nairobi boundary, reprojects to EPSG:32737, and writes GeoPackages.
 
 
-| Output                                    | Description                               | Approx. count |
-| ----------------------------------------- | ----------------------------------------- | ------------- |
-| `Nairobi_Waste_point_32737.gpkg`          | Fly-tipping / waste detections            | 3,236         |
-| `Nairobi_SVI_point_32737.gpkg`            | SVI sampling panoids (unique by `panoid`) | 76,605        |
-| `Nairobi_boundary_polygon_32737.gpkg`     | Study-area boundary                       | 1             |
-| `Nairobi_slum_polygon_32737.gpkg`         | Informal settlement polygons              | 1,988         |
-| `Nairobi_slum_cluster_polygon_32737.gpkg` | Merged touching slum clusters             | 101           |
+| Output | Description | Approx. count |
+| --- | --- | --- |
+| `Nairobi_Waste_point_gsvi_32737.gpkg` | Waste detections, **gsvi** arm (Google only) | 3,236 |
+| `Nairobi_Waste_point_gsvi_selfcollected_32737.gpkg` | Waste detections, **gsvi_selfcollected** arm (Google + Faith/ + ZWL/) | 3,385 |
+| `Nairobi_SVI_point_gsvi_32737.gpkg` | SVI panoids, **gsvi** arm (unique by `panoid`) | 76,605 |
+| `Nairobi_SVI_point_gsvi_selfcollected_32737.gpkg` | SVI panoids, **gsvi_selfcollected** arm | 79,584 |
+| `Nairobi_boundary_polygon_32737.gpkg` | Study-area boundary | 1 |
+| `Nairobi_slum_polygon_32737.gpkg` | Informal settlement polygons | 1,988 |
+| `Nairobi_slum_cluster_polygon_32737.gpkg` | Merged touching slum clusters | 101 |
 
+**Arm vocabulary** (used in filenames throughout the pipeline):
+
+| Slug | Meaning |
+| --- | --- |
+| `gsvi` | Google Street View only — excludes `Faith/` and `ZWL/` |
+| `gsvi_selfcollected` | Google + Faith/ + ZWL/ self-collected imagery |
 
 **Cleaning rules:**
 
-- Exclude image directories `ZWL/` and `Faith/`
-- Waste: deduplicate on `lat`, `lon`, `img_name`
-- SVI: **one row per `panoid`** (each panorama has up to 4 viewing angles)
+- **gsvi arm:** exclude `ZWL/` and `Faith/`; waste dedupe on `lat`, `lon`, `img_name`; SVI dedupe on `panoid`
+- **gsvi_selfcollected arm:** no dir filter; waste dedupe on `lat`, `lon`, `img_name`; SVI GSVI rows dedupe on `panoid`, self-collected rows dedupe on `lat`, `lon`, `img_name`
+- All point layers include a `source` column (`Google`, `Faith`, or `ZWL`)
 - Slum clusters: connected adjacent polygons merged
 
 ```bash
@@ -307,6 +331,176 @@ Rscript 2coverage_analysis/3plot_sviwaste_maps.R
 
 ---
 
+## Step 3 — Cluster analysis & mitigation
+
+Compares two **arms** from Step 1 waste GeoPackages using HDBSCAN and mitigation metrics:
+
+| Arm slug | Definition |
+| --- | --- |
+| `gsvi` | Google Street View waste detections only |
+| `gsvi_selfcollected` | Google + Faith/ + ZWL/ self-collected waste detections |
+
+Both arms use identical HDBSCAN settings on harmonised Step 1 inputs (EPSG:32737).
+
+### Run order
+
+```bash
+# Step 1 must be run first (creates gsvi / gsvi_selfcollected gpkgs)
+python 1prepare_chapter_data/1_prepare_chapter_data.py
+
+# Source maps (Step 1 gpkgs only — no HDBSCAN required)
+Rscript 3_cluster_mitigation/1_plot_svi_sources_map.R
+Rscript 3_cluster_mitigation/2_plot_waste_sources_map.R
+
+# Clustering + comparison tables
+python 3_cluster_mitigation/3_hdbscan_waste.py
+python 3_cluster_mitigation/4_mitigation_comparison.py
+
+# Cluster maps + stacked bar
+Rscript 3_cluster_mitigation/3_plot_hdbscan_map.R
+Rscript 3_cluster_mitigation/5_plot_hotspot_difference_map.R
+Rscript 3_cluster_mitigation/4_plot_new_obs_stacked_bar.R
+
+# KDE robustness (Step 1 gpkgs only — supplementary to HDBSCAN)
+python 3_cluster_mitigation/robustness_kde/1_kde_hotspots.py
+Rscript 3_cluster_mitigation/robustness_kde/2_plot_kde_comparison.R
+```
+
+### 3a. SVI source map
+
+**Script:** `3_cluster_mitigation/1_plot_svi_sources_map.R`
+
+All SVI panoids from `Nairobi_SVI_point_gsvi_selfcollected_32737.gpkg`. Light brown = GSVI; darker brown highlights self-collected panoids.
+
+**Figure:** `Figure/3_cluster_mitigation/SVI_sources_gsvi_selfcollected.png`
+
+### 3b. Waste source map
+
+**Script:** `3_cluster_mitigation/2_plot_waste_sources_map.R`
+
+Waste detections from Step 1 gpkgs, layered over all SVI panoids. Layer order: all SVI → GSVI waste → self-collected waste → urban-poor fill → city boundary.
+
+**Figure:** `Figure/3_cluster_mitigation/Waste_sources_gsvi_selfcollected.png`
+
+### 3c. HDBSCAN clustering
+
+**Script:** `3_cluster_mitigation/3_hdbscan_waste.py`
+
+| Parameter | Value |
+| --- | --- |
+| `min_cluster_size` | 25 |
+| `min_samples` | 6 |
+| Coordinate space | EPSG:32737 (projected easting/northing) |
+
+**Outputs (processed data):**
+
+- `Nairobi_waste_hdbscan_gsvi_32737.gpkg`, `Nairobi_waste_hdbscan_summary_gsvi.csv`
+- `Nairobi_waste_hdbscan_gsvi_selfcollected_32737.gpkg`, `Nairobi_waste_hdbscan_summary_gsvi_selfcollected.csv`
+- `Nairobi_waste_hdbscan_summary_comparison.csv`
+
+**Script:** `3_cluster_mitigation/3_plot_hdbscan_map.R`
+
+**Figures:**
+
+- `Waste_HDBSCAN_gsvi.png` — gsvi arm clusters
+- `Waste_HDBSCAN_gsvi_selfcollected.png` — gsvi_selfcollected arm clusters
+- `Waste_HDBSCAN_comparison.png` — side-by-side (A/B) comparison
+
+Map styling: chocolate-brown HDBSCAN clusters, grey noise points, black city boundary, repelled cluster ID labels, north arrow, scale bar, inside bottom-right legend.
+
+### 3d. Mitigation comparison
+
+**Script:** `3_cluster_mitigation/4_mitigation_comparison.py`
+
+Compares **gsvi** vs **gsvi_selfcollected**. Hotspot area = sum of per-cluster convex-hull polygon areas (km², EPSG:32737).
+
+**Outputs:**
+
+- `thesis_table/Nairobi_mitigation_comparison_table.csv`
+- `thesis_table/Nairobi_mitigation_new_observations_table.csv`
+- `Nairobi_waste_hotspot_polygons_gsvi_32737.gpkg`
+- `Nairobi_waste_hotspot_polygons_gsvi_selfcollected_32737.gpkg`
+
+### 3e. Hotspot area difference map
+
+**Script:** `3_cluster_mitigation/5_plot_hotspot_difference_map.R`
+
+Requires hotspot polygon GeoPackages from `4_mitigation_comparison.py`. Unions all cluster convex hulls per arm, then maps:
+
+- **Light grey-brown points** — all SVI panoids (`#D4CCC2`, bottom layer)
+- **Light fill** — overlapping hotspot footprint (shared between gsvi and gsvi_selfcollected)
+- **Dark fill** — additional footprint from adding self-collected imagery
+- **Medium fill** (if present) — GSVI-only footprint lost when clusters are re-fit
+- **Light brown points** — GSVI waste detections (`#C9A27F`, matches waste source map)
+- **Dark brown points** — self-collected waste detections (`#6B4226`)
+
+Legend shows km² per zone (union-based; matches the spatial +5.4 km² net change in the comparison table).
+
+```bash
+Rscript 3_cluster_mitigation/5_plot_hotspot_difference_map.R
+```
+
+**Figure:** `Figure/3_cluster_mitigation/Hotspot_area_difference_gsvi_selfcollected.png`
+
+### 3f. Stacked bar
+
+**Script:** `3_cluster_mitigation/4_plot_new_obs_stacked_bar.R`
+
+Reads `thesis_table/Nairobi_mitigation_new_observations_table.csv` — one horizontal stacked bar: inside existing hotspots vs forming new hotspots.
+
+**Figure:** `Figure/3_cluster_mitigation/Mitigation_new_obs_stacked_bar.png`
+
+### 3g. KDE robustness (supplementary)
+
+**Purpose:** Robustness check only — does the neighbourhood-scale hotspot pattern stay broadly similar when switching from discrete HDBSCAN clusters to a smooth KDE surface and adding supplementary self-collected observations? HDBSCAN remains the primary method; KDE does not replace it.
+
+**Scripts:**
+
+- `3_cluster_mitigation/robustness_kde/1_kde_hotspots.py` — KDE surfaces, shared threshold, union hotspot polygons, overlap metrics
+- `3_cluster_mitigation/robustness_kde/2_plot_kde_comparison.R` — two-panel comparison + difference map
+
+**Config constants** (top of `1_kde_hotspots.py`):
+
+| Constant | Default | Meaning |
+| --- | --- | --- |
+| Bandwidth | `KDE_BANDWIDTH_M = 400` | Fixed isotropic Gaussian sd (m); Scott on city-wide points over-smooths (~1.7 km) — same bandwidth for both arms |
+| `GRID_CELL_M` | 150 | Regular grid cell size (m, EPSG:32737) |
+| `KDE_HOTSPOT_PERCENTILE` | 2 | Top N% of gsvi density values → one shared absolute threshold for both arms (tune after inspecting test maps) |
+
+**Run order** (after Step 1 only):
+
+```bash
+python 3_cluster_mitigation/robustness_kde/1_kde_hotspots.py
+Rscript 3_cluster_mitigation/robustness_kde/2_plot_kde_comparison.R
+```
+
+**Outputs (processed data):**
+
+```
+3_cluster_mitigation/robustness_kde/
+├── thesis_table/Nairobi_kde_robustness_comparison.csv
+├── Nairobi_kde_hotspot_polygons_gsvi_32737.gpkg
+├── Nairobi_kde_hotspot_polygons_gsvi_selfcollected_32737.gpkg
+└── Nairobi_kde_params.csv
+```
+
+**Figures:**
+
+- `Figure/3_cluster_mitigation/robustness_kde/KDE_hotspot_gsvi.png`
+- `Figure/3_cluster_mitigation/robustness_kde/KDE_hotspot_gsvi_selfcollected.png`
+- `Figure/3_cluster_mitigation/robustness_kde/KDE_hotspot_comparison.png` — side-by-side (A/B)
+- `Figure/3_cluster_mitigation/robustness_kde/KDE_hotspot_difference.png` — overlap vs additional area
+
+**What to report in thesis** (three bullets only):
+
+- Main hotspot locations remain similar or shift when self-collected imagery is added
+- Hotspot footprint expands or contracts (union polygon area change)
+- Supplementary observations reinforce existing density peaks vs create new ones (difference map + waste point overlay)
+
+**What not to do:** no parameter-sweep narrative, no algorithm horse-race; KDE is supplementary to HDBSCAN.
+
+---
+
 ## Thesis summary tables
 
 Each coverage Python script writes a publication-style table (Variable / Value / Unit) to:
@@ -316,6 +510,13 @@ Chapter_waste/2coverage_analysis/thesis_table/
 ├── table_1_cityroad_h3_res8_buf50m.csv
 ├── table_2_roadsvi_buf50m.csv
 └── table_3_sviwaste.csv
+
+Chapter_waste/3_cluster_mitigation/thesis_table/
+├── Nairobi_mitigation_comparison_table.csv
+└── Nairobi_mitigation_new_observations_table.csv
+
+Chapter_waste/3_cluster_mitigation/robustness_kde/thesis_table/
+└── Nairobi_kde_robustness_comparison.csv
 ```
 
 Tables are generated alongside the analysis outputs (not a separate script), so re-running a step refreshes its table automatically. Formatting uses rounded values and comma-separated integers.
@@ -355,8 +556,8 @@ Hi-res exports (`*_hires.png`) are 12,000 × 12,000 px for zooming; standard PNG
 
 | Tool                                             | Environment                  |
 | ------------------------------------------------ | ---------------------------- |
-| Python (geopandas, h3, osmnx, networkx, shapely) | `conda activate geo_env_LLM` |
-| R (sf, ggplot2, ggspatial, dplyr, scales, patchwork) | system R (`Rscript`)         |
+| Python (geopandas, h3, osmnx, networkx, shapely, hdbscan) | `conda activate geo_env_LLM` |
+| R (sf, ggplot2, ggspatial, ggpattern, dplyr, scales, patchwork) | system R (`Rscript`)         |
 
 
 ---
