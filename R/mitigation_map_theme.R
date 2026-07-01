@@ -1,4 +1,4 @@
-# Shared styling for 3_cluster_mitigation figures
+# Shared styling for 4_compare and 5_cluster figures
 
 suppressPackageStartupMessages({
   library(ggplot2)
