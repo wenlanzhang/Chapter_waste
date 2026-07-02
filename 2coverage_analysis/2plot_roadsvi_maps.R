@@ -62,8 +62,8 @@ p <- ggplot() +
   scale_color_manual(
     name = NULL,
     values = c(
-      "All roads" = "#c8c8c8",
-      "Not covered by SVI" = "#cb181d"
+      "All roads" = ROAD_BASELINE_COLOUR,
+      "Not covered by SVI" = HIGHLIGHT_NEGATIVE_COLOUR
     )
   ) +
   guides(color = guide_legend(override.aes = list(linewidth = c(1.0, 1.6), alpha = 1))) +

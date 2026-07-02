@@ -71,15 +71,7 @@ plot_df <- bind_rows(
   )
 
 n_types <- nrow(plot_df)
-palette_cols <- c(
-  "#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3",
-  "#fdb462", "#b3de69", "#fccde5", "#d9d9d9", "#bc80bd",
-  "#ccebc5", "#ffed6f", "#a6cee3", "#1f78b4", "#b2df8a"
-)
-fill_colors <- setNames(
-  palette_cols[seq_len(n_types)],
-  levels(plot_df$type)
-)
+fill_colors <- chapter_pie_colours(as.character(plot_df$type), plot_df$pct_length)
 
 total_km <- sum(composition$length_km)
 total_segments <- sum(composition$segment_count)
@@ -113,8 +105,8 @@ p <- ggplot(plot_df, aes(x = 2, y = pct_length, fill = type)) +
   theme_void(base_size = 12) +
   theme(
     plot.title = element_text(face = "bold", size = 15, hjust = 0.5, margin = margin(b = 4)),
-    plot.subtitle = element_text(size = 11, hjust = 0.5, color = "grey35", margin = margin(b = 10)),
-    plot.caption = element_text(size = 8.5, color = "grey45", hjust = 0.5, margin = margin(t = 8)),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, color = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 10)),
+    plot.caption = element_text(size = 8.5, color = CHAPTER_CAPTION_COLOUR, hjust = 0.5, margin = margin(t = 8)),
     legend.position = c(0.98, 0.03),
     legend.justification = c(1, 0),
     legend.background = element_rect(fill = alpha("white", 0.9), color = NA),
@@ -146,7 +138,7 @@ road_map <- make_base_map(
   ),
   caption = "Source: OSMnx download, simplified and clipped to Nairobi boundary"
 ) +
-  geom_sf(data = roads, color = "#525252", linewidth = 0.06, alpha = 0.9)
+  geom_sf(data = roads, color = ROAD_COLOUR, linewidth = 0.06, alpha = 0.9)
 
 road_map_path <- file.path(FIG_DIR, "Nairobi_road_line_OSMnx_32737.png")
 save_map(road_map, road_map_path)

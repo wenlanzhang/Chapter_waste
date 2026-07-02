@@ -17,6 +17,7 @@ suppressPackageStartupMessages({
 args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
+source(file.path(script_dir, "..", "R", "chapter_colours.R"))
 
 DATA_DIR <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste/2coverage_analysis"
 FIG_DIR <- file.path(script_dir, "..", "Figure", "2coverage_analysis")
@@ -31,26 +32,26 @@ METRIC_CATALOG <- list(
     title = "Road length density",
     xlab = "Road density (km/km\u00B2)",
     hist_bins = 28,
-    color = "#69b3a2"
+    color = "#C9A27F"
   ),
   road_coverage_ratio = list(
     title = "Road coverage ratio",
     xlab = "Coverage ratio (0\u20131)",
     hist_bins = 28,
-    color = "#404080"
+    color = "#8B5A3C"
   ),
   road_intersection_density_per_km2 = list(
     title = "Intersection density",
     xlab = "Intersections per km\u00B2",
     hist_bins = 28,
-    color = "#E07A5F"
+    color = "#A67C52"
   ),
   road_type_count = list(
     title = "Road type count",
     xlab = "Distinct road types",
     hist_bins = NULL,
     discrete = TRUE,
-    color = "#8E6C8A"
+    color = "#6B4226"
   )
 )
 
@@ -59,9 +60,9 @@ DEFAULT_METRIC_COLUMNS <- c(
   "road_coverage_ratio"
 )
 
-MEDIAN_COLOR <- "#D1495B"
-MEAN_LINE_COLOR <- "#B8860B"
-MEAN_POINT_COLOR <- "#1F1F1F"
+MEDIAN_COLOR <- MEDIAN_COLOUR
+MEAN_LINE_COLOR <- MEAN_COLOUR
+MEAN_POINT_COLOR <- MEAN_POINT_COLOUR
 
 parse_args <- function() {
   defaults <- list(
@@ -106,12 +107,12 @@ panel_theme <- function() {
     theme(
       plot.background = element_rect(fill = "white", color = NA),
       panel.background = element_rect(fill = "#FCFCFC", color = NA),
-      plot.title = element_text(face = "bold", size = 12.5, hjust = 0, color = "#222222"),
-      plot.subtitle = element_text(size = 8.5, hjust = 0, color = "#666666", margin = margin(b = 6)),
-      plot.tag = element_text(size = 12, face = "bold", color = "#222222"),
+      plot.title = element_text(face = "bold", size = 12.5, hjust = 0, color = CHAPTER_TITLE_COLOUR),
+      plot.subtitle = element_text(size = 8.5, hjust = 0, color = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 6)),
+      plot.tag = element_text(size = 12, face = "bold", color = CHAPTER_TITLE_COLOUR),
       plot.tag.position = c(0.02, 0.98),
-      axis.title = element_text(size = 10, color = "#333333"),
-      axis.text = element_text(size = 9, color = "#444444"),
+      axis.title = element_text(size = 10, color = CHAPTER_AXIS_COLOUR),
+      axis.text = element_text(size = 9, color = CHAPTER_SUBTITLE_COLOUR),
       plot.margin = margin(10, 14, 8, 12)
     )
 }
@@ -317,10 +318,10 @@ fig_height <- max(7, 3.6 * n_metrics + 2.4)
 
 col_header <- wrap_plots(
   ggplot() +
-    annotate("text", x = 0.5, y = 0.5, label = "Distribution", fontface = "bold", size = 4.5, color = "#333333") +
+    annotate("text", x = 0.5, y = 0.5, label = "Distribution", fontface = "bold", size = 4.5, color = CHAPTER_AXIS_COLOUR) +
     theme_void(),
   ggplot() +
-    annotate("text", x = 0.5, y = 0.5, label = "Frequency", fontface = "bold", size = 4.5, color = "#333333") +
+    annotate("text", x = 0.5, y = 0.5, label = "Frequency", fontface = "bold", size = 4.5, color = CHAPTER_AXIS_COLOUR) +
     theme_void(),
   ncol = 2
 )
@@ -336,12 +337,12 @@ combined <- wrap_plots(row_plots, ncol = 1) +
     ),
     caption = paste(
       "Left: violin + boxplot + jitter  |  Right: histogram",
-      "\nRed solid = median  |  Gold dashed = mean  |  \u25C6 = mean  |  \u25CB = median"
+      "\nDark brown solid = median  |  Tan dashed = mean  |  \u25C6 = mean  |  \u25CB = median"
     ),
     theme = theme(
-      plot.title = element_text(face = "bold", size = 17, hjust = 0.5, color = "#222222", margin = margin(b = 4)),
-      plot.subtitle = element_text(size = 10.5, hjust = 0.5, color = "#666666", margin = margin(b = 10)),
-      plot.caption = element_text(size = 9, hjust = 0.5, color = "#777777", margin = margin(t = 8))
+      plot.title = element_text(face = "bold", size = 17, hjust = 0.5, color = CHAPTER_TITLE_COLOUR, margin = margin(b = 4)),
+      plot.subtitle = element_text(size = 10.5, hjust = 0.5, color = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 10)),
+      plot.caption = element_text(size = 9, hjust = 0.5, color = CHAPTER_CAPTION_COLOUR, margin = margin(t = 8))
     )
   ) +
   plot_layout(heights = rep(1, n_metrics))

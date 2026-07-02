@@ -51,13 +51,13 @@ plot_single_road <- function(boundary, roads, title, caption, linewidth = 0.08) 
     subtitle = road_stats(roads),
     caption = caption
   ) +
-    geom_sf(data = roads, color = "#4d4d4d", linewidth = linewidth, alpha = 0.92)
+    geom_sf(data = roads, color = ROAD_COLOUR, linewidth = linewidth, alpha = 0.92)
 }
 
 COMPARISON_COLORS <- c(
-  overlap = "#525252",
-  local_only = "#d73027",
-  osmnx_only = "#4575b4"
+  overlap = COMPARISON_OVERLAP_COLOUR,
+  local_only = COMPARISON_LOCAL_ONLY_COLOUR,
+  osmnx_only = COMPARISON_OSMNX_ONLY_COLOUR
 )
 
 COMPARISON_LABELS <- c(

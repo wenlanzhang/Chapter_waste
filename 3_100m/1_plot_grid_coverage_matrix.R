@@ -29,8 +29,6 @@ CONTEXT_ORDER <- c(
   "Waste (>=1 detection)"
 )
 
-CHOCOLATE_PALETTE <- c("#fafafa", "#E5C8A9", "#C9A27F", "#8B5E3C", "#6B4226")
-
 FIGURE_CAPTION <- paste0(
   "IDEAMaps 100 m grid, Nairobi (GSVI arm). ",
   "Road: >=25 m per cell | SVI: >=1 image | Waste: >=1 detection.\n",
@@ -69,7 +67,8 @@ read_matrix <- function(path) {
       row_context = factor(row_context, levels = CONTEXT_ORDER),
       col_context = factor(col_context, levels = CONTEXT_ORDER),
       pct_of_col = as.numeric(pct_of_col),
-      label = sprintf("%.1f%%", pct_of_col)
+      label = sprintf("%.1f%%", pct_of_col),
+      text_colour = chocolate_label_colour(pct_of_col, limits = c(0, 100))
     )
 }
 
@@ -107,7 +106,8 @@ build_matrix_panel <- function(matrix_long) {
     aes(x = col_context, y = row_context, fill = pct_of_col)
   ) +
     geom_tile(colour = "white", linewidth = 1.0) +
-    geom_text(aes(label = label), size = 3.6, fontface = "bold", colour = "#2f2f2f") +
+    geom_text(aes(label = label, colour = text_colour), size = 3.6, fontface = "bold") +
+    scale_colour_identity() +
     scale_fill_gradientn(
       colours = CHOCOLATE_PALETTE,
       limits = c(0, 100),

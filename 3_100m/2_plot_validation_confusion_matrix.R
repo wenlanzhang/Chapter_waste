@@ -31,7 +31,6 @@ SEVERITY_LABELS <- c(
 BINARY_LEVELS <- c("0", "1")
 BINARY_LABELS <- c("0" = "No waste", "1" = "Waste present")
 
-CHOCOLATE_PALETTE <- c("#fafafa", "#E5C8A9", "#C9A27F", "#8B5E3C", "#6B4226")
 FILL_LABEL <- "Count"
 
 read_confusion <- function(path, levels, labels) {
@@ -45,7 +44,8 @@ read_confusion <- function(path, levels, labels) {
         "%s\n(%.1f%% row)",
         format(n, big.mark = ",", trim = TRUE),
         pct_of_truth_row
-      )
+      ),
+      text_colour = chocolate_label_colour(n, trans = "sqrt")
     )
 }
 
@@ -55,7 +55,8 @@ build_confusion_panel <- function(cm, title, show_legend = FALSE) {
 
   p <- ggplot(cm, aes(x = pred, y = truth, fill = n)) +
     geom_tile(colour = "white", linewidth = 1.0) +
-    geom_text(aes(label = cell_label), size = 3.5, fontface = "bold", colour = "#2f2f2f") +
+    geom_text(aes(label = cell_label, colour = text_colour), size = 3.5, fontface = "bold") +
+    scale_colour_identity() +
     scale_x_discrete(limits = pred_levels) +
     scale_y_discrete(limits = truth_levels) +
     scale_fill_gradientn(

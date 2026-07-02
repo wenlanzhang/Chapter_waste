@@ -42,8 +42,8 @@ p <- ggplot() +
   scale_color_manual(
     name = NULL,
     values = c(
-      "SVI sampling" = "#9ecae1",
-      "Waste positive" = "#cb181d"
+      "SVI sampling" = SVI_LIGHT_COLOUR,
+      "Waste positive" = WASTE_COLOUR
     )
   ) +
   guides(color = guide_legend(override.aes = list(size = c(2.0, 2.8), alpha = 1))) +

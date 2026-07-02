@@ -3,6 +3,14 @@
 library(ggplot2)
 library(ggspatial)
 
+get_repo_root <- function(script_dir) {
+  normalizePath(file.path(script_dir, ".."))
+}
+
+source_chapter_colours <- function(script_dir) {
+  source(file.path(get_repo_root(script_dir), "R", "chapter_colours.R"))
+}
+
 get_script_dir <- function() {
   args <- commandArgs(trailingOnly = FALSE)
   file_arg <- grep("^--file=", args, value = TRUE)
@@ -12,6 +20,11 @@ get_script_dir <- function() {
   "."
 }
 
+.chapter_colours_path <- file.path(get_script_dir(), "..", "R", "chapter_colours.R")
+if (file.exists(.chapter_colours_path) && !exists("CHAPTER_AXIS_COLOUR")) {
+  source(.chapter_colours_path)
+}
+
 map_theme <- function() {
   theme_minimal(base_size = 12, base_family = "sans") +
     theme(
@@ -19,10 +32,10 @@ map_theme <- function() {
       panel.grid.minor = element_blank(),
       panel.border = element_rect(color = "grey70", fill = NA, linewidth = 0.4),
       plot.title = element_text(face = "bold", size = 14, hjust = 0.5, margin = margin(b = 6)),
-      plot.subtitle = element_text(size = 10, hjust = 0.5, color = "grey35", margin = margin(b = 8)),
-      plot.caption = element_text(size = 8, color = "grey45", hjust = 1),
-      axis.text = element_text(size = 8, color = "grey25"),
-      axis.title = element_text(size = 10),
+      plot.subtitle = element_text(size = 10, hjust = 0.5, color = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 8)),
+      plot.caption = element_text(size = 8, color = CHAPTER_CAPTION_COLOUR, hjust = 1),
+      axis.text = element_text(size = 8, color = CHAPTER_AXIS_COLOUR),
+      axis.title = element_text(size = 10, color = CHAPTER_AXIS_COLOUR),
       legend.title = element_text(size = 9, face = "bold"),
       legend.text = element_text(size = 8),
       legend.key.height = unit(0.45, "cm"),

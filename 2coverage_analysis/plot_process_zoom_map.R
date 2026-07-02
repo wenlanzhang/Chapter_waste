@@ -36,7 +36,8 @@ parse_args <- function() {
     layers_waste_max = 5L,
     svi_buffer_examples = 4L,
     interior_min_ratio = 0.98,
-    layout = "both"
+    layout = "both",
+    zoom_palette = "sage"
   )
   for (arg in commandArgs(trailingOnly = TRUE)) {
     if (grepl("^--h3-res=", arg)) defaults$h3_res <- as.integer(sub("^--h3-res=", "", arg))
@@ -53,9 +54,16 @@ parse_args <- function() {
     if (grepl("^--svi-buffer-examples=", arg)) defaults$svi_buffer_examples <- as.integer(sub("^--svi-buffer-examples=", "", arg))
     if (grepl("^--interior-min-ratio=", arg)) defaults$interior_min_ratio <- as.numeric(sub("^--interior-min-ratio=", "", arg))
     if (grepl("^--layout=", arg)) defaults$layout <- sub("^--layout=", "", arg)
+    if (grepl("^--zoom-palette=", arg)) defaults$zoom_palette <- sub("^--zoom-palette=", "", arg)
   }
   if (!defaults$layout %in% c("panel", "layers", "both")) {
     stop("--layout must be one of: panel, layers, both")
+  }
+  if (!defaults$zoom_palette %in% ZOOM_PALETTE_CHOICES) {
+    stop(
+      "--zoom-palette must be one of: ",
+      paste(ZOOM_PALETTE_CHOICES, collapse = ", ")
+    )
   }
   defaults
 }
@@ -370,7 +378,7 @@ panel_theme <- function(show_legend = FALSE) {
       panel.grid.minor = element_blank(),
       panel.border = element_rect(color = "grey75", fill = NA, linewidth = 0.3),
       plot.title = element_text(size = 11, face = "bold", hjust = 0, margin = margin(b = 2)),
-      plot.subtitle = element_text(size = 8, hjust = 0, color = "grey35", margin = margin(b = 4)),
+      plot.subtitle = element_text(size = 8, hjust = 0, color = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 4)),
       plot.tag = element_text(size = 12, face = "bold", hjust = 0, vjust = 1),
       plot.margin = margin(2, 2, 2, 2),
       axis.text = element_text(size = 7, color = "grey25"),
@@ -479,7 +487,7 @@ load_zoom_data <- function(args, n_cells = args$n_cells, window_buffer_m = args$
   )
 }
 
-build_panel_figure <- function(d, args) {
+build_panel_figure <- function(d, args, pal) {
   main_subtitle <- sprintf(
     "%d focus H3 cells (res %d) | road density %s | %s road segments in view",
     d$focus_summary$n_cells,
@@ -494,28 +502,27 @@ build_panel_figure <- function(d, args) {
   p_city <- ggplot() +
     geom_sf(
       data = d$context |> filter(.data$cell_role == "Context H3 cell"),
-      fill = "grey96",
-      color = "grey82",
+      fill = pal$context_fill,
+      color = pal$context_edge,
       linewidth = 0.15
     ) +
     geom_sf(
       data = d$context |> filter(.data$cell_role == "Focus H3 cell"),
       aes(fill = .data$road_length_density_km_per_km2),
-      color = "#252525",
+      color = pal$focus_edge,
       linewidth = 0.55
     ) +
-    geom_sf(data = d$slums_clip, fill = alpha("#756bb1", 0.18), color = NA) +
-    geom_sf(data = d$focus, fill = NA, color = "#252525", linewidth = 0.75) +
+    geom_sf(data = d$slums_clip, fill = alpha(pal$slum, SLUM_ALPHA), color = NA) +
+    geom_sf(data = d$focus, fill = NA, color = pal$focus_edge, linewidth = 0.75) +
     geom_sf_text(
       data = d$focus_labels,
       aes(label = .data$label),
       size = 2.8,
-      color = "grey10",
+      color = pal$hex_label,
       fontface = "bold"
     ) +
-    scale_fill_viridis_c(
-      option = "C",
-      name = "Road density\n(km/km²)",
+    scale_fill_zoom_density(
+      pal,
       labels = label_number(accuracy = 0.1),
       guide = guide_colorbar(
         barwidth = unit(0.35, "cm"),
@@ -534,8 +541,8 @@ build_panel_figure <- function(d, args) {
     panel_theme(show_legend = TRUE)
 
   p_roads <- ggplot() +
-    geom_sf(data = d$focus, fill = alpha("#fee0d2", 0.35), color = "#636363", linewidth = 0.45) +
-    geom_sf(data = d$roads_clip, color = "#252525", linewidth = 0.35, alpha = 0.92) +
+    geom_sf(data = d$focus, fill = alpha(pal$focus_fill, 0.55), color = pal$focus_edge, linewidth = 0.45) +
+    geom_sf(data = d$roads_clip, color = pal$road, linewidth = 0.35, alpha = 0.92) +
     panel_coords(d$bbox) +
     labs(
       title = "City → Roads",
@@ -544,31 +551,31 @@ build_panel_figure <- function(d, args) {
     panel_theme()
 
   p_svi <- ggplot() +
-    geom_sf(data = d$focus, fill = NA, color = "grey55", linewidth = 0.35) +
-    geom_sf(data = d$roads_clip, color = "#ececec", linewidth = 0.22, alpha = 0.85) +
-    geom_sf(data = d$covered_clip, color = "#bdbdbd", linewidth = 0.32, alpha = 0.95) +
-    geom_sf(data = d$uncovered_clip, color = "#ef3b2c", linewidth = 0.55, alpha = 0.95) +
-    geom_sf(data = d$svi_clip, color = "#2171b5", size = 0.45, alpha = 0.65) +
+    geom_sf(data = d$focus, fill = NA, color = pal$context_edge, linewidth = 0.35) +
+    geom_sf(data = d$roads_clip, color = pal$road_faint, linewidth = 0.22, alpha = 0.85) +
+    geom_sf(data = d$covered_clip, color = pal$road_covered, linewidth = 0.32, alpha = 0.95) +
+    geom_sf(data = d$uncovered_clip, color = pal$road_uncovered, linewidth = 0.55, alpha = 0.95) +
+    geom_sf(data = d$svi_clip, color = pal$svi, size = 0.45, alpha = 0.65) +
     panel_coords(d$bbox) +
     labs(
       title = "Road → SVI coverage",
       subtitle = sprintf(
-        "Blue = SVI panoid | Grey = covered metres | Red = road metres outside %dm SVI buffer",
+        "Mauve/peach = SVI panoid | Teal/green = covered | Red = gaps outside %dm buffer",
         as.integer(args$svi_buffer)
       )
     ) +
     panel_theme()
 
   p_waste <- ggplot() +
-    geom_sf(data = d$focus, fill = NA, color = "grey55", linewidth = 0.35) +
-    geom_sf(data = d$roads_clip, color = "#e0e0e0", linewidth = 0.18, alpha = 0.8) +
-    geom_sf(data = d$svi_clip, color = "#9ecae1", size = 0.4, alpha = 0.45) +
-    geom_sf(data = d$waste_pos_clip, color = "#cb181d", size = 0.9, alpha = 0.95) +
-    geom_sf(data = d$waste_clip, color = "#99000d", size = 0.55, alpha = 0.85, shape = 17) +
+    geom_sf(data = d$focus, fill = NA, color = pal$context_edge, linewidth = 0.35) +
+    geom_sf(data = d$roads_clip, color = pal$road_faint, linewidth = 0.18, alpha = 0.8) +
+    geom_sf(data = d$svi_clip, color = pal$svi_light, size = 0.4, alpha = 0.45) +
+    geom_sf(data = d$waste_pos_clip, color = pal$waste_pos, size = 1.15, alpha = 0.95) +
+    geom_sf(data = d$waste_clip, color = pal$waste_det, size = 0.55, alpha = 0.85, shape = 17) +
     panel_coords(d$bbox) +
     labs(
       title = "SVI → Waste",
-      subtitle = "Red = waste-positive panoid | Triangles = waste detections"
+      subtitle = "Dark brown = waste-positive panoid | Triangles = waste detections"
     ) +
     panel_theme()
 
@@ -590,20 +597,29 @@ build_panel_figure <- function(d, args) {
         plot.tag = element_text(size = 12, face = "bold", hjust = 0, vjust = 1),
         plot.tag.position = c(0.02, 0.98),
         plot.title = element_text(face = "bold", size = 15, hjust = 0.5),
-        plot.subtitle = element_text(size = 10, hjust = 0.5, color = "grey35"),
+        plot.subtitle = element_text(size = 10, hjust = 0.5, color = CHAPTER_SUBTITLE_COLOUR),
         plot.caption = element_text(size = 8, color = "grey45", hjust = 1)
       )
     )
 }
 
-build_layers_figure <- function(d, args) {
+build_layers_figure <- function(d, args, pal) {
   cell_label <- if (d$n_cells == 1L) "focus H3 cell" else "focus H3 cells"
+  if (d$focus_summary$n_cells == 1L) {
+    density_label <- sprintf("%.1f km/km2", d$focus$road_length_density_km_per_km2[[1]])
+  } else {
+    density_label <- sprintf(
+      "%.1f-%.1f km/km2",
+      min(d$focus$road_length_density_km_per_km2),
+      max(d$focus$road_length_density_km_per_km2)
+    )
+  }
   main_subtitle <- sprintf(
-    "%d %s (res %d) | road density %s | all pipeline layers combined",
+    "%d %s | H3 resolution %d | road density %s",
     d$focus_summary$n_cells,
     cell_label,
     args$h3_res,
-    d$focus_summary$density_range
+    density_label
   )
 
   roads_ok <- if (nrow(d$covered_clip)) {
@@ -634,12 +650,7 @@ build_layers_figure <- function(d, args) {
     "SVI panoid",
     "Waste-positive panoid"
   )
-  color_values <- c(
-    "Road (SVI covered)" = "#bdbdbd",
-    "Road (no SVI cover)" = "#ef3b2c",
-    "SVI panoid" = "#2171b5",
-    "Waste-positive panoid" = "#cb181d"
-  )
+  color_values <- zoom_layer_colours(pal)
   shape_values <- c(
     "Road (SVI covered)" = 15,
     "Road (no SVI cover)" = 15,
@@ -674,13 +685,13 @@ build_layers_figure <- function(d, args) {
     shape = ifelse(is_line, NA_real_, shape_values[active_layers]),
     size = ifelse(
       active_layers == "SVI panoid", 3.0,
-      ifelse(active_layers == "Waste-positive panoid", 4.2, NA_real_)
+      ifelse(active_layers == "Waste-positive panoid", 5.5, NA_real_)
     ),
     alpha = rep(1, length(active_layers))
   )
 
   p <- ggplot() +
-    geom_sf(data = d$slums_clip, fill = alpha("#756bb1", 0.10), color = NA)
+    geom_sf(data = d$slums_clip, fill = alpha(pal$slum, SLUM_ALPHA * 0.45), color = NA)
 
   if (nrow(line_layers)) {
     p <- p +
@@ -697,7 +708,7 @@ build_layers_figure <- function(d, args) {
       geom_sf(
         data = d$context,
         fill = NA,
-        color = "#666666",
+        color = pal$road,
         linewidth = 0.55,
         linetype = "solid"
       )
@@ -707,8 +718,8 @@ build_layers_figure <- function(d, args) {
     p <- p +
       geom_sf(
         data = svi_buffers,
-        fill = alpha("#9ecae1", 0.10),
-        color = alpha("#2171b5", 0.55),
+        fill = alpha(pal$svi_buffer_fill, 0.10),
+        color = alpha(pal$svi_buffer_edge, 0.55),
         linewidth = 0.35,
         linetype = "3313"
       )
@@ -728,7 +739,7 @@ build_layers_figure <- function(d, args) {
       geom_sf(
         data = waste_pos,
         aes(color = .data$layer, shape = .data$layer),
-        size = 3.2,
+        size = 4.6,
         alpha = 0.95
       )
   }
@@ -736,7 +747,7 @@ build_layers_figure <- function(d, args) {
     geom_sf(
       data = d$focus,
       fill = NA,
-      color = "#111111",
+      color = pal$focus_outline,
       linewidth = 1.25
     ) +
     scale_color_manual(
@@ -760,12 +771,9 @@ build_layers_figure <- function(d, args) {
     labs(
       title = "Nairobi coverage pipeline (zoomed exemplar, all layers)",
       subtitle = main_subtitle,
-      caption = paste0(
-        "Bold hex = focus H3 cell (", args$density_min, "–", args$density_max,
-        " km/km² road density); faint hex = neighbours clipped at view | Interior H3 cells only (ratio >= ",
-        args$interior_min_ratio, ") | Dashed circles = ",
-        as.integer(args$svi_buffer), " m SVI buffer examples | Road cover recomputed in view | EPSG:", CRS_EA,
-        " | Hierarchy: H3 → roads → SVI → waste"
+      caption = sprintf(
+        "Dashed circles = %d m SVI buffer examples",
+        as.integer(args$svi_buffer)
       ),
       x = "Easting (m)",
       y = "Northing (m)"
@@ -774,48 +782,65 @@ build_layers_figure <- function(d, args) {
     layers_legend_theme() +
     theme(
       plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
-      plot.subtitle = element_text(size = 11, hjust = 0.5, color = "grey35"),
-      plot.caption = element_text(size = 9, color = "grey45", hjust = 1),
-      axis.title = element_text(size = 11),
-      axis.text = element_text(size = 9, color = "grey25")
+      plot.subtitle = element_text(size = 11, hjust = 0.5, color = CHAPTER_SUBTITLE_COLOUR),
+      plot.caption = element_text(size = 9, color = CHAPTER_CAPTION_COLOUR, hjust = 0.5, margin = margin(t = 6)),
+      axis.title = element_text(size = 11, color = CHAPTER_AXIS_COLOUR),
+      axis.text = element_text(size = 9, color = CHAPTER_AXIS_COLOUR)
     )
 
   p
 }
 
+save_zoom_maps <- function(args, palette_name) {
+  pal <- get_zoom_palette(palette_name)
+  tag <- file_tag(args$h3_res, args$road_buffer, args$svi_buffer)
+  suffix <- if (palette_name == "sage") "" else paste0("_", palette_name)
+
+  message("Palette: ", palette_name, " — ", pal$label)
+
+  if (args$layout %in% c("panel", "both")) {
+    d_panel <- load_zoom_data(args, n_cells = args$n_cells, window_buffer_m = args$window_buffer_m)
+    message("Panel focus H3 cells: ", paste(d_panel$focus$h3_index, collapse = ", "))
+    save_map(
+      build_panel_figure(d_panel, args, pal),
+      file.path(FIG_DIR, paste0("Nairobi_process_zoom_", tag, "_panels", suffix, ".png")),
+      width = 14,
+      height = 12,
+      dpi = 300
+    )
+  }
+
+  if (args$layout %in% c("layers", "both")) {
+    d_layers <- load_zoom_data(
+      args,
+      n_cells = args$layers_n_cells,
+      window_buffer_m = args$layers_window_buffer_m,
+      include_buffer_examples = TRUE
+    )
+    message("Layers focus H3 cell: ", paste(d_layers$focus$h3_index, collapse = ", "))
+    save_map(
+      build_layers_figure(d_layers, args, pal),
+      file.path(FIG_DIR, paste0("Nairobi_process_zoom_", tag, "_layers", suffix, ".png")),
+      width = 10,
+      height = 10,
+      dpi = 300
+    )
+  }
+}
+
 args <- parse_args()
-tag <- file_tag(args$h3_res, args$road_buffer, args$svi_buffer)
 
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 message("Writing process zoom maps to ", FIG_DIR)
 
-if (args$layout %in% c("panel", "both")) {
-  d_panel <- load_zoom_data(args, n_cells = args$n_cells, window_buffer_m = args$window_buffer_m)
-  message("Panel focus H3 cells: ", paste(d_panel$focus$h3_index, collapse = ", "))
-  save_map(
-    build_panel_figure(d_panel, args),
-    file.path(FIG_DIR, paste0("Nairobi_process_zoom_", tag, "_panels.png")),
-    width = 14,
-    height = 12,
-    dpi = 300
-  )
+palette_names <- if (args$zoom_palette == "all") {
+  c("sage", "mixed", "earth")
+} else {
+  args$zoom_palette
 }
 
-if (args$layout %in% c("layers", "both")) {
-  d_layers <- load_zoom_data(
-    args,
-    n_cells = args$layers_n_cells,
-    window_buffer_m = args$layers_window_buffer_m,
-    include_buffer_examples = TRUE
-  )
-  message("Layers focus H3 cell: ", paste(d_layers$focus$h3_index, collapse = ", "))
-  save_map(
-    build_layers_figure(d_layers, args),
-    file.path(FIG_DIR, paste0("Nairobi_process_zoom_", tag, "_layers.png")),
-    width = 10,
-    height = 10,
-    dpi = 300
-  )
+for (palette_name in palette_names) {
+  save_zoom_maps(args, palette_name)
 }
 
 message("Done.")

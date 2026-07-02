@@ -39,7 +39,7 @@ plot_and_save(
     subtitle = paste0(comma(nrow(waste)), " points | EPSG:", CRS_EA),
     caption = "Source: harmonised Correct_SVI.csv"
   ) +
-    geom_sf(data = waste, color = "#cb181d", size = 0.45, alpha = 0.75),
+    geom_sf(data = waste, color = WASTE_COLOUR, size = 0.45, alpha = 0.75),
   "Nairobi_Waste_point_gsvi_32737.png"
 )
 
@@ -50,7 +50,7 @@ plot_and_save(
     subtitle = paste0(comma(nrow(svi)), " panoids | EPSG:", CRS_EA),
     caption = "Source: harmonised Combined_SVI.csv (unique by panoid)"
   ) +
-    geom_sf(data = svi, color = "#2171b5", size = 0.03, alpha = 0.18),
+    geom_sf(data = svi, color = SVI_LIGHT_COLOUR, size = 0.03, alpha = 0.18),
   "Nairobi_SVI_point_gsvi_32737.png"
 )
 
@@ -58,7 +58,7 @@ plot_and_save(
 
 plot_and_save(
   ggplot(boundary) +
-    geom_sf(fill = "#f5f5f5", color = "black", linewidth = 0.6) +
+    geom_sf(fill = CHAPTER_SEQ_LOW, color = "black", linewidth = 0.6) +
     coord_sf(crs = map_crs(), datum = NA, expand = FALSE) +
     labs(
       title = "Nairobi study-area boundary",
@@ -78,7 +78,13 @@ plot_and_save(
     subtitle = paste0(comma(nrow(slums)), " polygons | EPSG:", CRS_EA),
     caption = "Source: slumaps_nairobi_sett.shp"
   ) +
-    geom_sf(data = slums, fill = "#bdbdbd", color = "#737373", linewidth = 0.08, alpha = 0.85),
+    geom_sf(
+      data = slums,
+      fill = alpha(SLUM_FILL, SLUM_ALPHA + 0.55),
+      color = SLUM_EDGE,
+      linewidth = 0.08,
+      alpha = 0.85
+    ),
   "Nairobi_slum_polygon_32737.png"
 )
 
@@ -89,8 +95,8 @@ plot_and_save(
     subtitle = paste0(comma(nrow(slum_clusters)), " clusters | EPSG:", CRS_EA),
     caption = "Connected slum polygons merged by adjacency"
   ) +
-    geom_sf(data = slum_clusters, aes(fill = area_km2), color = "#4d4d4d", linewidth = 0.12) +
-    scale_fill_viridis_c(option = "C", name = "Area (km²)", labels = label_number(accuracy = 0.01)),
+    geom_sf(data = slum_clusters, aes(fill = area_km2), color = ROAD_COLOUR, linewidth = 0.12) +
+    scale_fill_chapter_c(name = "Area (km²)", labels = label_number(accuracy = 0.01)),
   "Nairobi_slum_cluster_polygon_32737.png"
 )
 

@@ -54,7 +54,7 @@ plot_continuous <- function(grid, boundary, column, title, filename, label = NUL
     subtitle = sprintf("H3 res %d | road buffer %dm", args$h3_res, as.integer(args$road_buffer))
   ) +
     geom_sf(data = grid, aes(fill = .data[[column]]), color = NA) +
-    scale_fill_viridis_c(option = "C", name = label %||% column, labels = label_number(accuracy = 0.01))
+    scale_fill_chapter_c(name = label %||% column, labels = label_number(accuracy = 0.01))
 
   save_map(p, file.path(FIG_DIR, filename))
 }
@@ -101,7 +101,10 @@ plot_spearman_heatmap <- function(corr_mat, tag, n_cells) {
         .data$cell_type == "diag" ~ labels[.data$row_idx],
         TRUE ~ ""
       ),
-      text_color = if_else(.data$fill_rho >= 0.88, "white", "#1F3340")
+      text_color = chocolate_label_colour(
+        .data$fill_rho,
+        limits = c(fill_low, fill_high)
+      )
     )
 
   rho_range <- range(corr_long$rho[corr_long$cell_type == "lower"], na.rm = TRUE)
@@ -114,14 +117,14 @@ plot_spearman_heatmap <- function(corr_mat, tag, n_cells) {
   tile_base <- ggplot(corr_long) +
     geom_tile(
       aes(x = .data$var_col, y = .data$var_row),
-      fill = "#F4F6F9",
-      color = "#FFFFFF",
-      linewidth = 1.4
+      fill = CHOCOLATE_EMPTY,
+      color = "white",
+      linewidth = 1.0
     ) +
     geom_tile(
       aes(x = .data$var_col, y = .data$var_row, fill = .data$fill_rho),
-      color = "#FFFFFF",
-      linewidth = 1.4
+      color = "white",
+      linewidth = 1.0
     ) +
     geom_text(
       data = lower_cells,
@@ -133,12 +136,11 @@ plot_spearman_heatmap <- function(corr_mat, tag, n_cells) {
       data = diag_cells,
       aes(x = .data$var_col, y = .data$var_row, label = .data$label),
       size = 3.1,
-      color = "#5C6B7A",
+      color = CHAPTER_AXIS_COLOUR,
       fontface = "plain"
     ) +
-    scale_fill_gradient(
-      low = "#E8EEF4",
-      high = "#2F5D7A",
+    scale_fill_gradientn(
+      colours = CHOCOLATE_PALETTE,
       limits = c(fill_low, fill_high),
       na.value = NA,
       name = expression(Spearman~rho),
@@ -147,7 +149,7 @@ plot_spearman_heatmap <- function(corr_mat, tag, n_cells) {
       guide = guide_colorbar(
         barwidth = unit(0.55, "cm"),
         barheight = unit(3.2, "cm"),
-        frame.colour = "#D5DCE6",
+        frame.colour = "grey78",
         frame.linewidth = 0.35,
         title.position = "top",
         title.hjust = 0.5
@@ -175,25 +177,25 @@ plot_spearman_heatmap <- function(corr_mat, tag, n_cells) {
     theme_minimal(base_size = 11, base_family = "sans") +
     theme(
       plot.background = element_rect(fill = "white", color = NA),
-      panel.background = element_rect(fill = "#FAFBFC", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
       panel.grid = element_blank(),
-      plot.title = element_text(face = "bold", size = 15, hjust = 0.5, color = "#1F2933", margin = margin(b = 4)),
-      plot.subtitle = element_text(size = 10, hjust = 0.5, color = "#5C6B7A", margin = margin(b = 12)),
-      plot.caption = element_text(size = 8.5, hjust = 0.5, color = "#7B8794", margin = margin(t = 10)),
+      plot.title = element_text(face = "bold", size = 15, hjust = 0.5, color = CHAPTER_TITLE_COLOUR, margin = margin(b = 4)),
+      plot.subtitle = element_text(size = 10, hjust = 0.5, color = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 12)),
+      plot.caption = element_text(size = 8.5, hjust = 0.5, color = CHAPTER_CAPTION_COLOUR, margin = margin(t = 10)),
       axis.text.x = element_text(
         angle = 30,
         hjust = 0,
         vjust = 0,
-        color = "#3D4F5F",
+        color = CHAPTER_AXIS_COLOUR,
         size = 10,
         face = "bold",
         margin = margin(b = 4)
       ),
-      axis.text.y = element_text(color = "#3D4F5F", size = 10, face = "bold", margin = margin(r = 4)),
+      axis.text.y = element_text(color = CHAPTER_AXIS_COLOUR, size = 10, face = "bold", margin = margin(r = 4)),
       axis.ticks = element_blank(),
       legend.position = "right",
-      legend.title = element_text(face = "bold", size = 9.5, color = "#3D4F5F"),
-      legend.text = element_text(size = 8.5, color = "#4B5B6A"),
+      legend.title = element_text(face = "bold", size = 9.5, color = CHAPTER_AXIS_COLOUR),
+      legend.text = element_text(size = 8.5, color = CHAPTER_SUBTITLE_COLOUR),
       plot.margin = margin(16, 18, 14, 14)
     )
 
@@ -211,8 +213,8 @@ plot_spearman_scatter_matrix <- function(grid_df, corr_mat, tag, n_cells) {
         panel.grid.major = element_line(color = "#E6EAF0", linewidth = 0.3),
         panel.grid.minor = element_blank(),
         panel.border = element_rect(color = "#D5DCE6", fill = NA, linewidth = 0.35),
-        axis.title = element_text(size = 9, color = "#3D4F5F"),
-        axis.text = element_text(size = 8, color = "#4B5B6A"),
+        axis.title = element_text(size = 9, color = CHAPTER_AXIS_COLOUR),
+        axis.text = element_text(size = 8, color = CHAPTER_SUBTITLE_COLOUR),
         plot.margin = margin(4, 4, 4, 4),
         axis.title.x = if (show_x) element_text(margin = margin(t = 6)) else element_blank(),
         axis.title.y = if (show_y) element_text(margin = margin(r = 6)) else element_blank(),
@@ -230,7 +232,7 @@ plot_spearman_scatter_matrix <- function(grid_df, corr_mat, tag, n_cells) {
     y_lab <- CORR_LABELS[[y_col]]
 
     ggplot(grid_df, aes(x = .data[[x_col]], y = .data[[y_col]])) +
-      geom_point(alpha = 0.38, size = 1.3, color = "#3D6B8C") +
+      geom_point(alpha = 0.38, size = 1.3, color = GSVI_COLOUR) +
       annotate(
         "label",
         x = -Inf,
@@ -242,7 +244,7 @@ plot_spearman_scatter_matrix <- function(grid_df, corr_mat, tag, n_cells) {
         fontface = "bold",
         fill = alpha("white", 0.92),
         linewidth = 0.2,
-        color = "#1F2933"
+        color = CHAPTER_TITLE_COLOUR
       ) +
       scale_x_continuous(labels = label_number(accuracy = 0.1)) +
       scale_y_continuous(labels = label_number(accuracy = 0.1)) +
@@ -276,8 +278,8 @@ plot_spearman_scatter_matrix <- function(grid_df, corr_mat, tag, n_cells) {
         comma(n_cells)
       ),
       theme = theme(
-        plot.title = element_text(face = "bold", size = 14, hjust = 0.5, color = "#1F2933"),
-        plot.subtitle = element_text(size = 9.5, hjust = 0.5, color = "#5C6B7A", margin = margin(b = 8))
+        plot.title = element_text(face = "bold", size = 14, hjust = 0.5, color = CHAPTER_TITLE_COLOUR),
+        plot.subtitle = element_text(size = 9.5, hjust = 0.5, color = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 8))
       )
     )
 
