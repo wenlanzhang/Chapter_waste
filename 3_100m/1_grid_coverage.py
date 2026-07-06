@@ -14,20 +14,17 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-DATA_ROOT = Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data")
-INPUT_DIR = DATA_ROOT / "Chapter_waste" / "1prepare_chapter_data"
-OUTPUT_DIR = DATA_ROOT / "Chapter_waste" / "3_100m"
-TABLE_DIR = OUTPUT_DIR / "thesis_table"
+from output_paths import GRID_DIR, INPUT_DIR
 
 GRID_GPKG = INPUT_DIR / "Nairobi_grid_100m_32737.gpkg"
 ROAD_GPKG = INPUT_DIR / "Nairobi_road_line_32737.gpkg"
 SVI_GPKG = INPUT_DIR / "Nairobi_SVI_image_gsvi_32737.gpkg"
 WASTE_GPKG = INPUT_DIR / "Nairobi_Waste_point_gsvi_32737.gpkg"
 
-COVERAGE_GPKG = OUTPUT_DIR / "Nairobi_grid_coverage_32737.gpkg"
-CELL_COUNTS_CSV = TABLE_DIR / "Nairobi_grid_coverage_cell_counts.csv"
-MATRIX_CSV = TABLE_DIR / "Nairobi_grid_coverage_matrix_pct.csv"
-MATRIX_LONG_CSV = OUTPUT_DIR / "Nairobi_grid_coverage_matrix_long.csv"
+COVERAGE_GPKG = GRID_DIR / "Nairobi_grid_coverage_32737.gpkg"
+CELL_COUNTS_CSV = GRID_DIR / "Nairobi_grid_coverage_cell_counts.csv"
+MATRIX_CSV = GRID_DIR / "Nairobi_grid_coverage_matrix_pct.csv"
+MATRIX_LONG_CSV = GRID_DIR / "Nairobi_grid_coverage_matrix_long.csv"
 
 ROAD_MIN_M = 25.0
 
@@ -130,8 +127,7 @@ def build_coverage_matrix(grid: gpd.GeoDataFrame) -> tuple[pd.DataFrame, pd.Data
 
 
 def main() -> None:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    TABLE_DIR.mkdir(parents=True, exist_ok=True)
+    GRID_DIR.mkdir(parents=True, exist_ok=True)
 
     grid = gpd.read_file(GRID_GPKG)
     if "cell_id" not in grid.columns:

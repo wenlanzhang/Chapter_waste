@@ -24,10 +24,7 @@ from ideamaps_grid_pipeline import (
     run_ideamaps_grid_pipeline,
 )
 
-DATA_ROOT = Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data")
-INPUT_DIR = DATA_ROOT / "Chapter_waste" / "1prepare_chapter_data"
-OUTPUT_DIR = DATA_ROOT / "Chapter_waste" / "3_100m"
-TABLE_DIR = OUTPUT_DIR / "thesis_table"
+from output_paths import INPUT_DIR, MITIGATION_DIR
 
 GRID_GPKG = INPUT_DIR / "Nairobi_grid_100m_32737.gpkg"
 VALIDATION_GRID_GPKG = INPUT_DIR / "Nairobi_validation_grid_32737.gpkg"
@@ -261,15 +258,14 @@ def build_summary_note(overlap: pd.DataFrame, comparison: pd.DataFrame, df: pd.D
 
 
 def main() -> None:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    TABLE_DIR.mkdir(parents=True, exist_ok=True)
+    MITIGATION_DIR.mkdir(parents=True, exist_ok=True)
 
     grid = gpd.read_file(GRID_GPKG)
     validation = attach_cell_keys(gpd.read_file(VALIDATION_GRID_GPKG))
     gsvi_breaks = load_gsvi_submission_jenks_breaks()
 
     overlap = self_collected_overlap(grid, validation)
-    overlap_path = TABLE_DIR / "Nairobi_validation_selfcollected_overlap.csv"
+    overlap_path = MITIGATION_DIR / "Nairobi_validation_selfcollected_overlap.csv"
     overlap.to_csv(overlap_path, index=False)
 
     gsvi_nairobi = attach_cell_keys(
@@ -338,10 +334,10 @@ def main() -> None:
     summary = build_summary_note(overlap, comparison, df)
     method_table = build_method_table(gsvi_breaks)
 
-    cells_path = TABLE_DIR / "Nairobi_validation_mitigation_cells.csv"
-    comparison_path = TABLE_DIR / "Nairobi_validation_mitigation_comparison.csv"
-    summary_path = TABLE_DIR / "Nairobi_validation_mitigation_summary.csv"
-    method_path = TABLE_DIR / "Nairobi_validation_mitigation_method.csv"
+    cells_path = MITIGATION_DIR / "Nairobi_validation_mitigation_cells.csv"
+    comparison_path = MITIGATION_DIR / "Nairobi_validation_mitigation_comparison.csv"
+    summary_path = MITIGATION_DIR / "Nairobi_validation_mitigation_summary.csv"
+    method_path = MITIGATION_DIR / "Nairobi_validation_mitigation_method.csv"
 
     df.to_csv(cells_path, index=False)
     comparison.to_csv(comparison_path, index=False)

@@ -3,5 +3,9 @@
 .AppleDouble
 .LSOverride
 
+# Python
+__pycache__/
+*.py[cod]
+
 # Thumbnails
 ._*

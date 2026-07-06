@@ -17,10 +17,10 @@ source(file.path(script_dir, "..", "R", "map_theme.R"))
 DATA_ROOT <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste"
 GRID_DIR <- file.path(DATA_ROOT, "3_100m")
 FIG_DIR <- file.path(script_dir, "..", "Figure", "3_100m")
-TABLE_DIR <- file.path(GRID_DIR, "thesis_table")
+GRID_TABLE_DIR <- file.path(GRID_DIR, "grid")
 
-CELL_COUNTS_CSV <- file.path(TABLE_DIR, "Nairobi_grid_coverage_cell_counts.csv")
-MATRIX_CSV <- file.path(TABLE_DIR, "Nairobi_grid_coverage_matrix_pct.csv")
+CELL_COUNTS_CSV <- file.path(GRID_TABLE_DIR, "Nairobi_grid_coverage_cell_counts.csv")
+MATRIX_CSV <- file.path(GRID_TABLE_DIR, "Nairobi_grid_coverage_matrix_pct.csv")
 
 CONTEXT_ORDER <- c(
   "City",

@@ -47,15 +47,15 @@ p <- ggplot() +
     )
   ) +
   guides(color = guide_legend(override.aes = list(size = c(2.0, 2.8), alpha = 1))) +
-  coord_sf(crs = map_crs(), datum = NA, expand = FALSE) +
+  coord_map_limits(boundary) +
   labs(
-    title = "Spatial distribution of Street View observations and waste-positive locations",
+    title = "SVI sampling and waste-positive panoids",
     subtitle = subtitle,
     caption = "SVI = unique panoids | Waste positive = panoid in waste dataset",
-    x = "Easting (m)",
-    y = "Northing (m)"
+    x = "Longitude",
+    y = "Latitude"
   ) +
-  map_theme() +
+  map_theme(transparent_bg = TRUE) +
   map_elements()
 
 message("Writing figures to ", FIG_DIR)
@@ -63,7 +63,7 @@ message("Writing figures to ", FIG_DIR)
 report_path <- file.path(FIG_DIR, "Nairobi_sviwaste_positive.png")
 hires_path <- file.path(FIG_DIR, "Nairobi_sviwaste_positive_hires.png")
 
-save_map(p, report_path, width = 10, height = 10, dpi = 300)
-save_map(p, hires_path, width = 20, height = 20, dpi = 600)
+save_map(p, report_path, limits = boundary, base_size = 10, dpi = 300, bg = "transparent")
+save_map(p, hires_path, limits = boundary, base_size = 20, dpi = 600, bg = "transparent")
 
 message("Done.")

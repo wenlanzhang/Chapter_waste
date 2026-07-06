@@ -17,10 +17,10 @@ source(file.path(script_dir, "..", "R", "map_theme.R"))
 DATA_ROOT <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste"
 GRID_DIR <- file.path(DATA_ROOT, "3_100m")
 FIG_DIR <- file.path(script_dir, "..", "Figure", "3_100m")
-TABLE_DIR <- file.path(GRID_DIR, "thesis_table")
+MITIGATION_TABLE_DIR <- file.path(GRID_DIR, "mitigation")
 
-COMPARISON_CSV <- file.path(TABLE_DIR, "Nairobi_validation_mitigation_comparison.csv")
-SUMMARY_CSV <- file.path(TABLE_DIR, "Nairobi_validation_mitigation_summary.csv")
+COMPARISON_CSV <- file.path(MITIGATION_TABLE_DIR, "Nairobi_validation_mitigation_comparison.csv")
+SUMMARY_CSV <- file.path(MITIGATION_TABLE_DIR, "Nairobi_validation_mitigation_summary.csv")
 
 GSVI_COLOUR <- "#C9A27F"
 GSC_COLOUR <- "#6B4226"
@@ -128,6 +128,29 @@ if (length(n_changed_note) == 0) {
 p_all <- build_combined_panel(all_cells, "(A)", "All validated cells")
 p_self <- build_combined_panel(self_cells, "(B)", "Self-collected overlap")
 
+panel_b_caption <- paste0(
+  "Binary task: waste present vs absent. Light tan = Google Street View only; ",
+  "dark brown = Google plus Faith/ZWL self-collected imagery. ",
+  n_changed_note, "."
+)
+
+panel_b_standalone <- p_self +
+  labs(
+    title = sprintf(
+      "Self-collected overlap (n = %s)",
+      comma(unique(self_cells$n_cells))
+    ),
+    caption = panel_b_caption
+  ) +
+  theme(
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5, colour = "#2f2f2f"),
+    legend.position = "bottom",
+    legend.title = element_text(size = 9.5, face = "bold", colour = "#4D2D18"),
+    legend.text = element_text(size = 9, colour = "#4D2D18"),
+    legend.margin = margin(t = 4),
+    plot.caption = element_text(size = 8.5, hjust = 0, colour = "#7A6A5C", lineheight = 1.25, margin = margin(t = 8))
+  )
+
 panel <- p_all / p_self +
   plot_layout(guides = "collect") &
   theme(
@@ -160,4 +183,8 @@ dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 out_path <- file.path(FIG_DIR, "Validation_mitigation_accuracy.png")
 ggsave(out_path, plot = panel, width = 9, height = 9.5, dpi = 600, bg = "white")
 message("Wrote ", out_path)
+
+out_path_b <- file.path(FIG_DIR, "Validation_mitigation_accuracy_self_overlap.png")
+ggsave(out_path_b, plot = panel_b_standalone, width = 7.5, height = 5.5, dpi = 600, bg = "white")
+message("Wrote ", out_path_b)
 message("Done.")

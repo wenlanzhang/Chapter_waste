@@ -18,6 +18,7 @@ source(file.path(script_dir, "..", "R", "map_theme.R"))
 DATA_DIR <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste/2coverage_analysis"
 INPUT_DIR <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste/1prepare_chapter_data"
 ROAD_GPKG <- "Nairobi_road_03_local_cleaned_32737.gpkg"
+GRID_100M_GPKG <- "Nairobi_grid_100m_32737.gpkg"
 FIG_DIR <- file.path(script_dir, "..", "Figure", "2coverage_analysis")
 CRS_EA <- 32737
 
@@ -374,6 +375,8 @@ layers_legend_theme <- function() {
 panel_theme <- function(show_legend = FALSE) {
   base <- theme_minimal(base_size = 10) +
     theme(
+      plot.background = element_rect(fill = NA, color = NA),
+      panel.background = element_rect(fill = NA, color = NA),
       panel.grid.major = element_line(color = "grey92", linewidth = 0.2),
       panel.grid.minor = element_blank(),
       panel.border = element_rect(color = "grey75", fill = NA, linewidth = 0.3),
@@ -409,6 +412,8 @@ load_zoom_data <- function(args, n_cells = args$n_cells, window_buffer_m = args$
   svi <- read_layer(file.path(INPUT_DIR, "Nairobi_SVI_point_gsvi_32737.gpkg"))
   waste <- read_layer(file.path(INPUT_DIR, "Nairobi_Waste_point_gsvi_32737.gpkg"))
   slums <- read_layer(file.path(INPUT_DIR, "Nairobi_slum_polygon_32737.gpkg"))
+  grid_100m <- read_layer(file.path(INPUT_DIR, GRID_100M_GPKG))
+  boundary <- read_layer(file.path(INPUT_DIR, "Nairobi_boundary_polygon_32737.gpkg"))
   sviwaste <- read_layer(file.path(DATA_DIR, "Nairobi_sviwaste_points.gpkg"))
 
   if (include_buffer_examples && n_cells == 1L) {
@@ -451,6 +456,7 @@ load_zoom_data <- function(args, n_cells = args$n_cells, window_buffer_m = args$
 
   roads_clip <- clip_lines(roads, window)
   local_coverage <- compute_window_roadsvi_coverage(roads, svi, window, args$svi_buffer)
+  grid_100m_clip <- grid_100m[st_intersects(grid_100m, window, sparse = FALSE)[, 1], ]
 
   list(
     focus = focus,
@@ -482,6 +488,9 @@ load_zoom_data <- function(args, n_cells = args$n_cells, window_buffer_m = args$
     waste_clip = clip_points(waste, window),
     waste_pos_clip = sviwaste |> filter(.data$waste_positive == 1) |> clip_points(window),
     slums_clip = st_intersection(st_make_valid(slums), window),
+    grid_100m_clip = grid_100m_clip,
+    city_grid = grid,
+    boundary = boundary,
     svi_buffer_examples = buffer_examples$buffers,
     svi_buffer_points = buffer_examples$points
   )
@@ -603,7 +612,8 @@ build_panel_figure <- function(d, args, pal) {
     )
 }
 
-build_layers_figure <- function(d, args, pal) {
+build_layers_figure <- function(d, args, pal, show_grid_100m = FALSE) {
+  show_h3 <- !show_grid_100m
   cell_label <- if (d$n_cells == 1L) "focus H3 cell" else "focus H3 cells"
   if (d$focus_summary$n_cells == 1L) {
     density_label <- sprintf("%.1f km/km2", d$focus$road_length_density_km_per_km2[[1]])
@@ -614,13 +624,22 @@ build_layers_figure <- function(d, args, pal) {
       max(d$focus$road_length_density_km_per_km2)
     )
   }
-  main_subtitle <- sprintf(
-    "%d %s | H3 resolution %d | road density %s",
-    d$focus_summary$n_cells,
-    cell_label,
-    args$h3_res,
-    density_label
-  )
+  main_subtitle <- if (show_grid_100m) {
+    sprintf("100 m grid exemplar | road density %s", density_label)
+  } else {
+    sprintf(
+      "%d %s | H3 resolution %d | road density %s",
+      d$focus_summary$n_cells,
+      cell_label,
+      args$h3_res,
+      density_label
+    )
+  }
+  legend_title <- if (show_grid_100m) {
+    "Coverage layers"
+  } else {
+    sprintf("Focus H3 cell\n%s", d$focus$h3_index[[1]])
+  }
 
   roads_ok <- if (nrow(d$covered_clip)) {
     d$covered_clip |> mutate(layer = "Road (SVI covered)")
@@ -693,6 +712,16 @@ build_layers_figure <- function(d, args, pal) {
   p <- ggplot() +
     geom_sf(data = d$slums_clip, fill = alpha(pal$slum, SLUM_ALPHA * 0.45), color = NA)
 
+  if (show_grid_100m && nrow(d$grid_100m_clip) > 0) {
+    p <- p +
+      geom_sf(
+        data = d$grid_100m_clip,
+        fill = NA,
+        color = alpha(pal$context_edge, 0.85),
+        linewidth = 0.18
+      )
+  }
+
   if (nrow(line_layers)) {
     p <- p +
       geom_sf(
@@ -703,7 +732,7 @@ build_layers_figure <- function(d, args, pal) {
       )
   }
 
-  if (nrow(d$context) > 0) {
+  if (show_h3 && nrow(d$context) > 0) {
     p <- p +
       geom_sf(
         data = d$context,
@@ -743,15 +772,18 @@ build_layers_figure <- function(d, args, pal) {
         alpha = 0.95
       )
   }
+  if (show_h3) {
+    p <- p +
+      geom_sf(
+        data = d$focus,
+        fill = NA,
+        color = pal$focus_outline,
+        linewidth = 1.25
+      )
+  }
   p <- p +
-    geom_sf(
-      data = d$focus,
-      fill = NA,
-      color = pal$focus_outline,
-      linewidth = 1.25
-    ) +
     scale_color_manual(
-      name = sprintf("Focus H3 cell\n%s", d$focus$h3_index[[1]]),
+      name = legend_title,
       values = color_values[active_layers],
       drop = FALSE
     ) +
@@ -771,14 +803,14 @@ build_layers_figure <- function(d, args, pal) {
     labs(
       title = "Nairobi coverage pipeline (zoomed exemplar, all layers)",
       subtitle = main_subtitle,
-      caption = sprintf(
-        "Dashed circles = %d m SVI buffer examples",
-        as.integer(args$svi_buffer)
+      caption = paste0(
+        if (show_grid_100m) "Fine lines = 100 m Angela grid | " else "",
+        sprintf("Dashed circles = %d m SVI buffer examples", as.integer(args$svi_buffer))
       ),
       x = "Easting (m)",
       y = "Northing (m)"
     ) +
-    map_theme() +
+    map_theme(transparent_bg = TRUE) +
     layers_legend_theme() +
     theme(
       plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
@@ -789,6 +821,53 @@ build_layers_figure <- function(d, args, pal) {
     )
 
   p
+}
+
+build_overview_inset <- function(d, pal) {
+  focus_ids <- d$focus$h3_index
+  city_grid <- d$city_grid |>
+    mutate(is_focus = .data$h3_index %in% focus_ids)
+  zoom_box <- st_as_sfc(st_bbox(d$window), crs = st_crs(d$boundary))
+
+  ggplot() +
+    geom_sf(
+      data = d$boundary,
+      fill = alpha(pal$context_fill, 0.45),
+      color = pal$focus_edge,
+      linewidth = 0.35
+    ) +
+    geom_sf(
+      data = city_grid |> filter(!.data$is_focus),
+      fill = alpha(pal$context_fill, 0.85),
+      color = alpha(pal$context_edge, 0.55),
+      linewidth = 0.06
+    ) +
+    geom_sf(
+      data = city_grid |> filter(.data$is_focus),
+      fill = alpha(pal$focus_edge, 0.45),
+      color = pal$focus_outline,
+      linewidth = 0.45
+    ) +
+    geom_sf(
+      data = zoom_box,
+      fill = NA,
+      color = pal$focus_outline,
+      linewidth = 0.55
+    ) +
+    coord_map_limits(d$boundary) +
+    theme_void() +
+    theme(
+      plot.background = element_rect(fill = alpha("white", 0.93), color = "grey70", linewidth = 0.35),
+      plot.margin = margin(1, 1, 1, 1),
+      plot.title = element_text(size = 7.5, face = "bold", hjust = 0.5, colour = "#2f2f2f", margin = margin(b = 0, t = 2))
+    ) +
+    labs(title = "Study area")
+}
+
+build_layers_figure_with_inset <- function(d, args, pal) {
+  main <- build_layers_figure(d, args, pal, show_grid_100m = FALSE)
+  inset <- build_overview_inset(d, pal)
+  main + inset_element(inset, left = 0.03, bottom = 0.68, right = 0.32, top = 0.97, clip = TRUE)
 }
 
 save_zoom_maps <- function(args, palette_name) {
@@ -806,7 +885,8 @@ save_zoom_maps <- function(args, palette_name) {
       file.path(FIG_DIR, paste0("Nairobi_process_zoom_", tag, "_panels", suffix, ".png")),
       width = 14,
       height = 12,
-      dpi = 300
+      dpi = 300,
+      bg = "transparent"
     )
   }
 
@@ -823,7 +903,24 @@ save_zoom_maps <- function(args, palette_name) {
       file.path(FIG_DIR, paste0("Nairobi_process_zoom_", tag, "_layers", suffix, ".png")),
       width = 10,
       height = 10,
-      dpi = 300
+      dpi = 300,
+      bg = "transparent"
+    )
+    save_map(
+      build_layers_figure(d_layers, args, pal, show_grid_100m = TRUE),
+      file.path(FIG_DIR, paste0("Nairobi_process_zoom_", tag, "_layers_grid100m", suffix, ".png")),
+      width = 10,
+      height = 10,
+      dpi = 300,
+      bg = "transparent"
+    )
+    save_map(
+      build_layers_figure_with_inset(d_layers, args, pal),
+      file.path(FIG_DIR, paste0("Nairobi_process_zoom_", tag, "_layers_inset", suffix, ".png")),
+      width = 10,
+      height = 10,
+      dpi = 300,
+      bg = "transparent"
     )
   }
 }

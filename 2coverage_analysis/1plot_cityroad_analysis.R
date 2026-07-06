@@ -105,8 +105,8 @@ resolve_metric_specs <- function(columns) {
 panel_theme <- function() {
   theme_ipsum(base_size = 11) +
     theme(
-      plot.background = element_rect(fill = "white", color = NA),
-      panel.background = element_rect(fill = "#FCFCFC", color = NA),
+      plot.background = element_rect(fill = NA, color = NA),
+      panel.background = element_rect(fill = NA, color = NA),
       plot.title = element_text(face = "bold", size = 12.5, hjust = 0, color = CHAPTER_TITLE_COLOUR),
       plot.subtitle = element_text(size = 8.5, hjust = 0, color = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 6)),
       plot.tag = element_text(size = 12, face = "bold", color = CHAPTER_TITLE_COLOUR),
@@ -358,7 +358,7 @@ ggsave(
   width = 11,
   height = fig_height,
   dpi = 320,
-  bg = "white"
+  bg = "transparent"
 )
 
 message("Wrote ", out_path)

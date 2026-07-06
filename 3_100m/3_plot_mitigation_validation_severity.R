@@ -17,10 +17,10 @@ source(file.path(script_dir, "..", "R", "map_theme.R"))
 DATA_ROOT <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste"
 GRID_DIR <- file.path(DATA_ROOT, "3_100m")
 FIG_DIR <- file.path(script_dir, "..", "Figure", "3_100m")
-TABLE_DIR <- file.path(GRID_DIR, "thesis_table")
+MITIGATION_TABLE_DIR <- file.path(GRID_DIR, "mitigation")
 
-COMPARISON_CSV <- file.path(TABLE_DIR, "Nairobi_validation_mitigation_comparison.csv")
-SUMMARY_CSV <- file.path(TABLE_DIR, "Nairobi_validation_mitigation_summary.csv")
+COMPARISON_CSV <- file.path(MITIGATION_TABLE_DIR, "Nairobi_validation_mitigation_comparison.csv")
+SUMMARY_CSV <- file.path(MITIGATION_TABLE_DIR, "Nairobi_validation_mitigation_summary.csv")
 
 GSVI_COLOUR <- "#C9A27F"
 GSC_COLOUR <- "#6B4226"

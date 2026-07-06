@@ -12,13 +12,10 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-DATA_ROOT = Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data")
-INPUT_DIR = DATA_ROOT / "Chapter_waste" / "1prepare_chapter_data"
-OUTPUT_DIR = DATA_ROOT / "Chapter_waste" / "3_100m"
-TABLE_DIR = OUTPUT_DIR / "thesis_table"
+from output_paths import INPUT_DIR, VALIDATION_DIR
 
 VALIDATION_GRID_GPKG = INPUT_DIR / "Nairobi_validation_grid_32737.gpkg"
-VALIDATION_GRID_CSV = OUTPUT_DIR / "Nairobi_validation_grid.csv"
+VALIDATION_GRID_CSV = VALIDATION_DIR / "Nairobi_validation_grid.csv"
 
 SEVERITY_LEVELS = [0, 1, 2]
 SEVERITY_LABELS = {
@@ -127,8 +124,7 @@ def build_summary_table(
 
 
 def main() -> None:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    TABLE_DIR.mkdir(parents=True, exist_ok=True)
+    VALIDATION_DIR.mkdir(parents=True, exist_ok=True)
 
     grid = gpd.read_file(VALIDATION_GRID_GPKG)
     attrs = grid.drop(columns="geometry").copy()
@@ -157,10 +153,10 @@ def main() -> None:
     binary_metrics = classification_metrics(attrs, "is_waste", "model_is_waste")
     summary = build_summary_table(severity_metrics, binary_metrics, grid)
 
-    severity_cm_path = TABLE_DIR / "Nairobi_validation_confusion_severity.csv"
-    binary_cm_path = TABLE_DIR / "Nairobi_validation_confusion_binary.csv"
-    metrics_path = TABLE_DIR / "Nairobi_validation_metrics.csv"
-    summary_path = TABLE_DIR / "Nairobi_validation_summary.csv"
+    severity_cm_path = VALIDATION_DIR / "Nairobi_validation_confusion_severity.csv"
+    binary_cm_path = VALIDATION_DIR / "Nairobi_validation_confusion_binary.csv"
+    metrics_path = VALIDATION_DIR / "Nairobi_validation_metrics.csv"
+    summary_path = VALIDATION_DIR / "Nairobi_validation_summary.csv"
 
     severity_cm.to_csv(severity_cm_path, index=False)
     binary_cm.to_csv(binary_cm_path, index=False)

@@ -17,9 +17,9 @@ source(file.path(script_dir, "..", "R", "map_theme.R"))
 DATA_ROOT <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste"
 GRID_DIR <- file.path(DATA_ROOT, "3_100m")
 FIG_DIR <- file.path(script_dir, "..", "Figure", "3_100m")
-TABLE_DIR <- file.path(GRID_DIR, "thesis_table")
+MITIGATION_TABLE_DIR <- file.path(GRID_DIR, "mitigation")
 
-COMPARISON_CSV <- file.path(TABLE_DIR, "Nairobi_validation_mitigation_comparison.csv")
+COMPARISON_CSV <- file.path(MITIGATION_TABLE_DIR, "Nairobi_validation_mitigation_comparison.csv")
 
 BINARY_KEYS <- c("binary_accuracy", "binary_precision", "binary_recall", "binary_f1")
 SEVERITY_KEYS <- c("severity_accuracy", "severity_precision", "severity_recall", "severity_f1")

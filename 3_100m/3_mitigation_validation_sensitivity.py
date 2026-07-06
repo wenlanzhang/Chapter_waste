@@ -15,16 +15,12 @@ import numpy as np
 import pandas as pd
 
 from ideamaps_grid_pipeline import (
-    FIXED_BREAKS_METHOD_LABEL,
-    RAW_RATIO_METHOD_LABEL,
     attach_cell_keys,
     load_gsvi_submission_jenks_breaks,
     run_ideamaps_grid_pipeline,
 )
 
-DATA_ROOT = Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data")
-INPUT_DIR = DATA_ROOT / "Chapter_waste" / "1prepare_chapter_data"
-TABLE_DIR = DATA_ROOT / "Chapter_waste" / "3_100m" / "thesis_table"
+from output_paths import INPUT_DIR, MITIGATION_DIR
 
 GRID_GPKG = INPUT_DIR / "Nairobi_grid_100m_32737.gpkg"
 VALIDATION_GRID_GPKG = INPUT_DIR / "Nairobi_validation_grid_32737.gpkg"
@@ -124,7 +120,7 @@ def spillover_stats(df: pd.DataFrame) -> dict:
 
 
 def main() -> None:
-    TABLE_DIR.mkdir(parents=True, exist_ok=True)
+    MITIGATION_DIR.mkdir(parents=True, exist_ok=True)
     grid = gpd.read_file(GRID_GPKG)
     svi_self = gpd.read_file(ARMS["gsvi_selfcollected"]["svi_gpkg"])
     svi_self = svi_self[svi_self["source"].isin(SELF_SOURCES)]
@@ -140,38 +136,21 @@ def main() -> None:
         gsvi, gsc = run_pipeline(raw=raw)
         df = build_validation_df(gsvi, gsc, has_self)
         rows.extend(comparison_rows(df, label))
-        s = spillover_stats(df)
-        spill_rows.append({"pipeline": label, **s})
+        spill_rows.append({"pipeline": label, **spillover_stats(df)})
 
     comparison = pd.DataFrame(rows)
     spill = pd.DataFrame(spill_rows)
-    method = pd.DataFrame(
-        [
-            {"Item": "Primary pipeline", "Value": FIXED_BREAKS_METHOD_LABEL},
-            {"Item": "Sensitivity pipeline", "Value": RAW_RATIO_METHOD_LABEL},
-            {"Item": "Shared settings", "Value": "Nairobi grid; same Jenks breaks; GSVI vs G+Self"},
-            {"Item": "Raw ratio rule", "Value": "waste_points / total_svi_images; no SVI → ratio 0"},
-        ]
-    )
 
-    out_cmp = TABLE_DIR / "Nairobi_validation_mitigation_sensitivity_comparison.csv"
-    out_spill = TABLE_DIR / "Nairobi_validation_mitigation_sensitivity_spillover.csv"
-    out_method = TABLE_DIR / "Nairobi_validation_mitigation_sensitivity_method.csv"
+    out_cmp = MITIGATION_DIR / "Nairobi_validation_mitigation_sensitivity_comparison.csv"
     comparison.to_csv(out_cmp, index=False)
-    spill.to_csv(out_spill, index=False)
-    method.to_csv(out_method, index=False)
 
-    print("Method note:")
-    print(method.to_string(index=False))
-    print()
     print("Accuracy comparison:")
     print(comparison.to_string(index=False))
     print()
-    print("Spillover (why city-wide accuracy can move without local new data):")
+    print("Spillover (console only — why city-wide accuracy can move without local new data):")
     print(spill.to_string(index=False))
     print()
     print(f"Wrote {out_cmp}")
-    print(f"Wrote {out_spill}")
 
 
 if __name__ == "__main__":

@@ -100,7 +100,7 @@ Chapter_waste/
 ├── 5_cluster/                      # HDBSCAN outputs, hotspot gpkgs, thesis_table/
 │   ├── HDBSCAN/
 │   └── KDE/                        # KDE robustness polygons, params, thesis_table/
-└── 3_100m/                         # Grid coverage, validation & mitigation tables (thesis_table/)
+└── 3_100m/                         # Grid coverage, validation & mitigation tables (grid/, validation/, mitigation/)
 ```
 
 Previous waste-ratio scripts and figures are archived in `3_100m_backup/` and `Figure/3_100m_backup/`. Previous processed outputs (tables, GeoPackages, CSVs) are archived in `Data/Chapter_waste/3_100m_backup/`.
@@ -639,7 +639,7 @@ Rscript 3_100m/3_plot_mitigation_validation_overlap.R
 
 One row per context; single column `Grid cells` (comma-formatted integers).
 
-**Output:** `3_100m/thesis_table/Nairobi_grid_coverage_cell_counts.csv`
+**Output:** `3_100m/grid/Nairobi_grid_coverage_cell_counts.csv`
 
 Example (current run):
 
@@ -662,9 +662,9 @@ Diagonal entries are 100%. Off-diagonal entries show how much of each column con
 
 **Outputs:**
 
-- `3_100m/thesis_table/Nairobi_grid_coverage_matrix_pct.csv` — wide matrix (thesis)
-- `3_100m/Nairobi_grid_coverage_matrix_long.csv` — long format (plotting / QA)
-- `3_100m/Nairobi_grid_coverage_32737.gpkg` — grid geometry + per-cell counts and flags
+- `3_100m/grid/Nairobi_grid_coverage_matrix_pct.csv` — wide matrix (thesis)
+- `3_100m/grid/Nairobi_grid_coverage_matrix_long.csv` — long format (plotting / QA)
+- `3_100m/grid/Nairobi_grid_coverage_32737.gpkg` — grid geometry + per-cell counts and flags
 
 ### Figure
 
@@ -687,11 +687,11 @@ Baseline check on validated grid cells: compares crowd `validation_result` again
 
 **Outputs:**
 
-- `3_100m/Nairobi_validation_grid.csv` — validated cells (attributes only)
-- `3_100m/thesis_table/Nairobi_validation_confusion_severity.csv`
-- `3_100m/thesis_table/Nairobi_validation_confusion_binary.csv`
-- `3_100m/thesis_table/Nairobi_validation_metrics.csv`
-- `3_100m/thesis_table/Nairobi_validation_summary.csv`
+- `3_100m/validation/Nairobi_validation_grid.csv` — validated cells (attributes only)
+- `3_100m/validation/Nairobi_validation_confusion_severity.csv`
+- `3_100m/validation/Nairobi_validation_confusion_binary.csv`
+- `3_100m/validation/Nairobi_validation_metrics.csv`
+- `3_100m/validation/Nairobi_validation_summary.csv`
 
 **Figure (`2_plot_validation_confusion_matrix.R`):** two-panel confusion heatmap (3-class + binary).
 
@@ -733,11 +733,11 @@ Metrics per subset × arm: binary and 3-class accuracy, precision, recall, F1. T
 
 **Outputs:**
 
-- `3_100m/thesis_table/Nairobi_validation_selfcollected_overlap.csv`
-- `3_100m/thesis_table/Nairobi_validation_mitigation_method.csv`
-- `3_100m/thesis_table/Nairobi_validation_mitigation_cells.csv`
-- `3_100m/thesis_table/Nairobi_validation_mitigation_comparison.csv`
-- `3_100m/thesis_table/Nairobi_validation_mitigation_summary.csv`
+- `3_100m/mitigation/Nairobi_validation_selfcollected_overlap.csv`
+- `3_100m/mitigation/Nairobi_validation_mitigation_method.csv`
+- `3_100m/mitigation/Nairobi_validation_mitigation_cells.csv`
+- `3_100m/mitigation/Nairobi_validation_mitigation_comparison.csv`
+- `3_100m/mitigation/Nairobi_validation_mitigation_summary.csv`
 
 **Figures:**
 
@@ -758,7 +758,7 @@ Rscript 3_100m/3_plot_mitigation_validation_overlap.R
 Rscript 3_100m/3_plot_mitigation_validation_overlap_pattern.R   # optional
 ```
 
-**Sensitivity (optional):** `3_mitigation_validation_sensitivity.py` repeats the comparison using raw cell waste/SVI ratios (no Empirical Bayes, no spatial fill) with the same fixed Jenks breaks. Writes `Nairobi_validation_mitigation_sensitivity_comparison.csv`.
+**Sensitivity (optional):** `3_mitigation_validation_sensitivity.py` repeats the comparison using raw cell waste/SVI ratios (no Empirical Bayes, no spatial fill) with the same fixed Jenks breaks. Writes `3_100m/mitigation/Nairobi_validation_mitigation_sensitivity_comparison.csv`.
 
 ---
 
@@ -788,18 +788,25 @@ Chapter_waste/5_cluster/HDBSCAN/thesis_table/
 Chapter_waste/5_cluster/KDE/thesis_table/
 └── Nairobi_kde_robustness_comparison.csv
 
-Chapter_waste/3_100m/thesis_table/
-├── Nairobi_grid_coverage_cell_counts.csv
-├── Nairobi_grid_coverage_matrix_pct.csv
-├── Nairobi_validation_confusion_severity.csv
-├── Nairobi_validation_confusion_binary.csv
-├── Nairobi_validation_metrics.csv
-├── Nairobi_validation_summary.csv
-├── Nairobi_validation_selfcollected_overlap.csv
-├── Nairobi_validation_mitigation_method.csv
-├── Nairobi_validation_mitigation_cells.csv
-├── Nairobi_validation_mitigation_comparison.csv
-└── Nairobi_validation_mitigation_summary.csv
+Chapter_waste/3_100m/
+├── grid/
+│   ├── Nairobi_grid_coverage_cell_counts.csv
+│   ├── Nairobi_grid_coverage_matrix_pct.csv
+│   ├── Nairobi_grid_coverage_matrix_long.csv
+│   └── Nairobi_grid_coverage_32737.gpkg
+├── validation/
+│   ├── Nairobi_validation_grid.csv
+│   ├── Nairobi_validation_confusion_severity.csv
+│   ├── Nairobi_validation_confusion_binary.csv
+│   ├── Nairobi_validation_metrics.csv
+│   └── Nairobi_validation_summary.csv
+└── mitigation/
+    ├── Nairobi_validation_selfcollected_overlap.csv
+    ├── Nairobi_validation_mitigation_method.csv
+    ├── Nairobi_validation_mitigation_cells.csv
+    ├── Nairobi_validation_mitigation_comparison.csv
+    ├── Nairobi_validation_mitigation_summary.csv
+    └── Nairobi_validation_mitigation_sensitivity_*.csv
 ```
 
 Tables are generated alongside the analysis outputs (not a separate script), so re-running a step refreshes its table automatically. Formatting uses rounded values and comma-separated integers.

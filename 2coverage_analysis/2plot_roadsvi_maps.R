@@ -67,7 +67,7 @@ p <- ggplot() +
     )
   ) +
   guides(color = guide_legend(override.aes = list(linewidth = c(1.0, 1.6), alpha = 1))) +
-  coord_sf(crs = map_crs(), datum = NA, expand = FALSE) +
+  coord_map_limits(boundary) +
   labs(
     title = "Road metres not covered by SVI",
     subtitle = subtitle,
@@ -75,10 +75,10 @@ p <- ggplot() +
       "SVI coverage = road metres outside ", as.integer(args$svi_buffer),
       " m panoid buffer union (partial gaps shown)"
     ),
-    x = "Easting (m)",
-    y = "Northing (m)"
+    x = "Longitude",
+    y = "Latitude"
   ) +
-  map_theme() +
+  map_theme(transparent_bg = TRUE) +
   map_elements()
 
 message("Writing figures to ", FIG_DIR)
@@ -86,10 +86,7 @@ message("Writing figures to ", FIG_DIR)
 report_path <- file.path(FIG_DIR, paste0("Nairobi_roadsvi_uncovered_", tag, ".png"))
 hires_path <- file.path(FIG_DIR, paste0("Nairobi_roadsvi_uncovered_", tag, "_hires.png"))
 
-# Report quality (~3000 x 3000 px)
-save_map(p, report_path, width = 10, height = 10, dpi = 300)
-
-# High resolution for zooming (~12000 x 12000 px)
-save_map(p, hires_path, width = 20, height = 20, dpi = 600)
+save_map(p, report_path, limits = boundary, base_size = 10, dpi = 300, bg = "transparent")
+save_map(p, hires_path, limits = boundary, base_size = 20, dpi = 600, bg = "transparent")
 
 message("Done.")

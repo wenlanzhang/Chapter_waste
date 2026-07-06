@@ -51,12 +51,13 @@ plot_continuous <- function(grid, boundary, column, title, filename, label = NUL
   p <- make_base_map(
     boundary,
     title = title,
-    subtitle = sprintf("H3 res %d | road buffer %dm", args$h3_res, as.integer(args$road_buffer))
+    subtitle = sprintf("H3 res %d | road buffer %dm", args$h3_res, as.integer(args$road_buffer)),
+    transparent_bg = TRUE
   ) +
     geom_sf(data = grid, aes(fill = .data[[column]]), color = NA) +
     scale_fill_chapter_c(name = label %||% column, labels = label_number(accuracy = 0.01))
 
-  save_map(p, file.path(FIG_DIR, filename))
+  save_map(p, file.path(FIG_DIR, filename), limits = boundary, base_size = 10, bg = "transparent")
 }
 
 compute_spearman_matrix <- function(grid_df, tag) {
@@ -176,8 +177,8 @@ plot_spearman_heatmap <- function(corr_mat, tag, n_cells) {
     ) +
     theme_minimal(base_size = 11, base_family = "sans") +
     theme(
-      plot.background = element_rect(fill = "white", color = NA),
-      panel.background = element_rect(fill = "white", color = NA),
+      plot.background = element_rect(fill = NA, color = NA),
+      panel.background = element_rect(fill = NA, color = NA),
       panel.grid = element_blank(),
       plot.title = element_text(face = "bold", size = 15, hjust = 0.5, color = CHAPTER_TITLE_COLOUR, margin = margin(b = 4)),
       plot.subtitle = element_text(size = 10, hjust = 0.5, color = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 12)),
@@ -200,7 +201,7 @@ plot_spearman_heatmap <- function(corr_mat, tag, n_cells) {
     )
 
   out_path <- file.path(FIG_DIR, paste0("Nairobi_cityroad_correlation_spearman_", tag, ".png"))
-  ggsave(out_path, plot = tile_base, width = 8.2, height = 7.4, dpi = 320, bg = "white")
+  ggsave(out_path, plot = tile_base, width = 8.2, height = 7.4, dpi = 320, bg = "transparent")
   message("  ", basename(out_path))
 }
 
@@ -208,8 +209,8 @@ plot_spearman_scatter_matrix <- function(grid_df, corr_mat, tag, n_cells) {
   pair_theme <- function(show_x = TRUE, show_y = TRUE) {
     theme_minimal(base_size = 10, base_family = "sans") +
       theme(
-        plot.background = element_rect(fill = "white", color = NA),
-        panel.background = element_rect(fill = "#F8F9FB", color = NA),
+        plot.background = element_rect(fill = NA, color = NA),
+        panel.background = element_rect(fill = NA, color = NA),
         panel.grid.major = element_line(color = "#E6EAF0", linewidth = 0.3),
         panel.grid.minor = element_blank(),
         panel.border = element_rect(color = "#D5DCE6", fill = NA, linewidth = 0.35),
@@ -284,7 +285,7 @@ plot_spearman_scatter_matrix <- function(grid_df, corr_mat, tag, n_cells) {
     )
 
   out_path <- file.path(FIG_DIR, paste0("Nairobi_cityroad_correlation_spearman_", tag, "_scatter.png"))
-  ggsave(out_path, plot = p, width = 10, height = 9.5, dpi = 320, bg = "white")
+  ggsave(out_path, plot = p, width = 10, height = 9.5, dpi = 320, bg = "transparent")
   message("  ", basename(out_path))
 }
 
@@ -308,9 +309,9 @@ message("Writing figures to ", FIG_DIR)
 
 plot_continuous(
   grid, boundary, "road_length_density_km_per_km2",
-  "Road length density (km/km²)",
+  "Road length density (km/km2)",
   paste0("Nairobi_cityroad_density_", tag, ".png"),
-  "km/km²"
+  "km/km2"
 )
 
 plot_continuous(
@@ -322,9 +323,9 @@ plot_continuous(
 
 plot_continuous(
   grid, boundary, "road_intersection_density_per_km2",
-  "Road intersection density (per km²)",
+  "Road intersection density (per km2)",
   paste0("Nairobi_cityroad_intersections_", tag, ".png"),
-  "Count/km²"
+  "Count/km2"
 )
 
 plot_continuous(
