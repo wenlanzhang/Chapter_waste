@@ -9,3 +9,6 @@ __pycache__/
 
 # Thumbnails
 ._*
+
+# Local archive (not synced to remote)
+del/
