@@ -1,4 +1,4 @@
-# Shared brown-ish chapter palette (aligned with 4_compare / 5_cluster figures)
+# Shared brown-ish chapter palette (aligned with 4_compare / 5_spatial_pattern figures)
 
 CHAPTER_AXIS_COLOUR <- "#4D2D18"
 
@@ -198,10 +198,13 @@ get_zoom_palette <- function(name = "mixed") {
       focus_fill = "#D7C9BE",
       road_covered = "#9AA582",
       road_uncovered = "#cb181d",
+      # Muted variant for the 4-panel schematic, where gap segments are dense
+      road_uncovered_soft = "#C05A4E",
       svi = "#D7C9BE",
       svi_light = "#F1E4DB",
       svi_buffer_fill = "#9AA582",
       svi_buffer_edge = "#657359",
+      svi_buffer_edge_strong = "#3F4A35",
       waste_pos = "#4D2D18",
       waste_det = "#cb181d"
     ),
@@ -247,11 +250,20 @@ scale_fill_zoom_density <- function(pal, name = "Road density\n(km/km²)", ...) 
   )
 }
 
-zoom_layer_colours <- function(pal) {
+zoom_layer_colours <- function(pal, svi_buffer_m = 50L) {
+  buf <- as.integer(svi_buffer_m)
+  # Darker than fill edge so dashed buffer rings read clearly on white/transparent maps
+  buffer_edge <- if (!is.null(pal$svi_buffer_edge_strong)) {
+    pal$svi_buffer_edge_strong
+  } else {
+    "#3F4A35"
+  }
   c(
-    "Road (SVI covered)" = pal$road_covered,
-    "Road (no SVI cover)" = pal$road_uncovered,
-    "SVI panoid" = pal$svi,
-    "Waste-positive panoid" = pal$waste_pos
+    "Focus H3 cell boundary" = pal$focus_outline,
+    setNames(pal$road_covered, sprintf("Road within %d m of GSVI", buf)),
+    "Road without GSVI support" = pal$road_uncovered,
+    "GSVI panorama" = pal$svi,
+    "Waste-positive panorama" = pal$waste_pos,
+    setNames(buffer_edge, sprintf("%d m GSVI buffer", buf))
   )
 }

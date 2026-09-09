@@ -20,9 +20,8 @@ from ideamaps_grid_pipeline import (
     run_ideamaps_grid_pipeline,
 )
 
-from output_paths import INPUT_DIR, MITIGATION_DIR
+from output_paths import GRID_GPKG, INPUT_DIR, MITIGATION_DIR
 
-GRID_GPKG = INPUT_DIR / "Nairobi_grid_100m_32737.gpkg"
 VALIDATION_GRID_GPKG = INPUT_DIR / "Nairobi_validation_grid_32737.gpkg"
 
 ARMS = {

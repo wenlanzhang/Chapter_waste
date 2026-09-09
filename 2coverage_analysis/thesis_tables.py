@@ -61,15 +61,22 @@ def build_cityroad_table(
 
 
 def build_roadsvi_table(summary: pd.Series) -> pd.DataFrame:
-    return _table(
-        [
-            ("Total road length", _fmt_int(summary["total_road_length_km"]), "km"),
-            ("Covered road length", _fmt_int(summary["covered_road_length_km"]), "km"),
-            ("Uncovered road length", _fmt_int(summary["uncovered_road_length_km"]), "km"),
-            ("Coverage", _fmt_float(summary["pct_road_length_covered"]), "%"),
-            ("Number of SVI panoids", _fmt_int(summary["svi_panoid_count"]), ""),
-        ]
-    )
+    rows = [
+        ("Total road length", _fmt_int(summary["total_road_length_km"]), "km"),
+        ("Covered road length", _fmt_int(summary["covered_road_length_km"]), "km"),
+        ("Uncovered road length", _fmt_int(summary["uncovered_road_length_km"]), "km"),
+        ("Coverage", _fmt_float(summary["pct_road_length_covered"]), "%"),
+        ("Number of SVI panoids", _fmt_int(summary["svi_panoid_count"]), ""),
+    ]
+    if "mean_h3_svi_coverage_ratio" in summary.index and pd.notna(summary["mean_h3_svi_coverage_ratio"]):
+        rows.append(
+            (
+                "Mean H3 SVI coverage",
+                _fmt_float(100 * summary["mean_h3_svi_coverage_ratio"]),
+                "%",
+            )
+        )
+    return _table(rows)
 
 
 def build_sviwaste_table(summary: pd.Series) -> pd.DataFrame:
@@ -81,3 +88,41 @@ def build_sviwaste_table(summary: pd.Series) -> pd.DataFrame:
             ("Detection rate", _fmt_float(summary["pct_svi_with_waste"]), "%"),
         ]
     )
+
+
+def build_roadwaste_table(summary: pd.Series) -> pd.DataFrame:
+    """Road-metre coverage by waste-positive panoid buffers (Step 2d)."""
+    rows = [
+        ("Total road length", _fmt_int(summary["total_road_length_km"]), "km"),
+        ("Covered road length", _fmt_int(summary["covered_road_length_km"]), "km"),
+        ("Uncovered road length", _fmt_int(summary["uncovered_road_length_km"]), "km"),
+        ("Coverage", _fmt_float(summary["pct_road_length_covered"]), "%"),
+        (
+            "Waste-positive panoids",
+            _fmt_int(summary["waste_positive_panoid_count"]),
+            "",
+        ),
+    ]
+    if (
+        "pct_road_length_covered_all_gsvi" in summary.index
+        and pd.notna(summary["pct_road_length_covered_all_gsvi"])
+    ):
+        rows.append(
+            (
+                "All-GSVI road coverage (ref.)",
+                _fmt_float(summary["pct_road_length_covered_all_gsvi"]),
+                "%",
+            )
+        )
+    if (
+        "mean_h3_waste_coverage_ratio" in summary.index
+        and pd.notna(summary["mean_h3_waste_coverage_ratio"])
+    ):
+        rows.append(
+            (
+                "Mean H3 waste+ coverage",
+                _fmt_float(100 * summary["mean_h3_waste_coverage_ratio"]),
+                "%",
+            )
+        )
+    return _table(rows)

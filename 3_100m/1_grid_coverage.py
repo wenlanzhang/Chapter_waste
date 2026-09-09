@@ -14,9 +14,8 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from output_paths import GRID_DIR, INPUT_DIR
+from output_paths import GRID_DIR, GRID_GPKG, INPUT_DIR
 
-GRID_GPKG = INPUT_DIR / "Nairobi_grid_100m_32737.gpkg"
 ROAD_GPKG = INPUT_DIR / "Nairobi_road_line_32737.gpkg"
 SVI_GPKG = INPUT_DIR / "Nairobi_SVI_image_gsvi_32737.gpkg"
 WASTE_GPKG = INPUT_DIR / "Nairobi_Waste_point_gsvi_32737.gpkg"

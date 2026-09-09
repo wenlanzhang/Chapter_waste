@@ -1,4 +1,4 @@
-# Shared styling for 4_compare and 5_cluster figures
+# Shared styling for 4_compare and 5_spatial_pattern figures
 
 suppressPackageStartupMessages({
   library(ggplot2)
@@ -8,15 +8,29 @@ suppressPackageStartupMessages({
 
 MITIGATION_AXIS_COLOUR <- "#4D2D18"
 
-make_source_legend <- function(n_all_svi, n_gsvi, n_self) {
+make_source_legend <- function(
+  n_all_svi,
+  n_gsvi,
+  n_self,
+  kind = c("imagery", "waste")
+) {
+  kind <- match.arg(kind)
+  n_all_fmt <- format(n_all_svi, big.mark = ",", trim = TRUE)
+  n_gsvi_fmt <- format(n_gsvi, big.mark = ",", trim = TRUE)
+  n_self_fmt <- format(n_self, big.mark = ",", trim = TRUE)
+
+  if (kind == "imagery") {
+    mid_label <- paste0("GSVI observations (", n_gsvi_fmt, ")")
+    self_label <- paste0("Self-collected observations (", n_self_fmt, ")")
+  } else {
+    mid_label <- paste0("GSVI waste detections (", n_gsvi_fmt, ")")
+    self_label <- paste0("Self-collected waste detections (", n_self_fmt, ")")
+  }
+
   labels <- c(
-    paste0("All SVI (", format(n_all_svi, big.mark = ",", trim = TRUE), ")"),
-    paste0("GSVI waste (", format(n_gsvi, big.mark = ",", trim = TRUE), ")"),
-    paste0(
-      "Self-collected SVI waste (",
-      format(n_self, big.mark = ",", trim = TRUE),
-      ")"
-    ),
+    paste0("All imagery locations (", n_all_fmt, ")"),
+    mid_label,
+    self_label,
     "City Boundary",
     "Urban Poor Settlements"
   )
@@ -199,12 +213,12 @@ mitigation_map_theme <- function(base_size = 11) {
 hdbscan_legend_labels <- function(n_clustered_points, n_noise) {
   c(
     paste0(
-      "Clustered waste points (",
+      "Clustered waste-positive panoramas (",
       format(n_clustered_points, big.mark = ",", trim = TRUE),
       ")"
     ),
     paste0(
-      "Noise waste points (",
+      "Unclustered waste-positive panoramas (",
       format(n_noise, big.mark = ",", trim = TRUE),
       ")"
     ),

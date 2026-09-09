@@ -41,7 +41,8 @@ build_svi_sources_map <- function(
   legend_info <- make_source_legend(
     n_all_svi = nrow(all_svi),
     n_gsvi = nrow(gsvi_svi),
-    n_self = nrow(self_svi)
+    n_self = nrow(self_svi),
+    kind = "imagery"
   )
   legend_labels <- legend_info$labels
   legend_df <- make_source_legend_df(legend_labels)
@@ -54,7 +55,7 @@ build_svi_sources_map <- function(
   )
 
   title <- if (is.null(panel_title)) {
-    "Street View Imagery by Source in Nairobi"
+    "Street-Level Imagery by Source in Nairobi"
   } else {
     panel_title
   }
@@ -129,7 +130,8 @@ build_waste_sources_map <- function(
   legend_info <- make_source_legend(
     n_all_svi = nrow(all_svi),
     n_gsvi = nrow(gsvi_waste),
-    n_self = nrow(self_waste)
+    n_self = nrow(self_waste),
+    kind = "waste"
   )
   legend_labels <- legend_info$labels
   legend_df <- make_source_legend_df(legend_labels)
@@ -142,7 +144,7 @@ build_waste_sources_map <- function(
   )
 
   title <- if (is.null(panel_title)) {
-    "Waste Detections by Source in Nairobi"
+    "Verified Waste Detections by Source in Nairobi"
   } else {
     panel_title
   }

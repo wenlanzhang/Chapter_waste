@@ -18,8 +18,17 @@ source(file.path(script_dir, "..", "R", "map_theme.R"))
 DATA_DIR <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste/2coverage_analysis"
 INPUT_DIR <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste/1prepare_chapter_data"
 ROAD_GPKG <- "Nairobi_road_03_local_cleaned_32737.gpkg"
-GRID_100M_GPKG <- "Nairobi_grid_100m_32737.gpkg"
-FIG_DIR <- file.path(script_dir, "..", "Figure", "2coverage_analysis")
+FIG_DIR_ROOT <- file.path(script_dir, "..", "Figure", "2coverage_analysis")
+MAIN_SVI_BUFFER_M <- 50L
+
+# Main SVI buffer (50 m) stays in FIG_DIR_ROOT; sensitivity buffers go under buffer/
+fig_out_dir <- function(svi_buffer) {
+  if (as.integer(svi_buffer) == MAIN_SVI_BUFFER_M) {
+    FIG_DIR_ROOT
+  } else {
+    file.path(FIG_DIR_ROOT, "buffer")
+  }
+}
 CRS_EA <- 32737
 
 parse_args <- function() {
@@ -384,16 +393,17 @@ panel_theme <- function(show_legend = FALSE) {
       plot.subtitle = element_text(size = 8, hjust = 0, color = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 4)),
       plot.tag = element_text(size = 12, face = "bold", hjust = 0, vjust = 1),
       plot.margin = margin(2, 2, 2, 2),
-      axis.text = element_text(size = 7, color = "grey25"),
-      axis.title = element_text(size = 8),
+      axis.text = element_blank(),
+      axis.title = element_blank(),
+      axis.ticks = element_blank(),
       legend.position = "none"
     )
   if (!show_legend) return(base)
 
   base +
     theme(
-      legend.position = c(0.8, 0.05),
-      legend.justification = c(0, 0),
+      legend.position = c(0.975, 0.03),
+      legend.justification = c(1, 0),
       legend.title = element_text(size = 7.5, face = "bold"),
       legend.text = element_text(size = 6.5),
       legend.key.height = unit(0.35, "cm"),
@@ -412,7 +422,6 @@ load_zoom_data <- function(args, n_cells = args$n_cells, window_buffer_m = args$
   svi <- read_layer(file.path(INPUT_DIR, "Nairobi_SVI_point_gsvi_32737.gpkg"))
   waste <- read_layer(file.path(INPUT_DIR, "Nairobi_Waste_point_gsvi_32737.gpkg"))
   slums <- read_layer(file.path(INPUT_DIR, "Nairobi_slum_polygon_32737.gpkg"))
-  grid_100m <- read_layer(file.path(INPUT_DIR, GRID_100M_GPKG))
   boundary <- read_layer(file.path(INPUT_DIR, "Nairobi_boundary_polygon_32737.gpkg"))
   sviwaste <- read_layer(file.path(DATA_DIR, "Nairobi_sviwaste_points.gpkg"))
 
@@ -456,7 +465,6 @@ load_zoom_data <- function(args, n_cells = args$n_cells, window_buffer_m = args$
 
   roads_clip <- clip_lines(roads, window)
   local_coverage <- compute_window_roadsvi_coverage(roads, svi, window, args$svi_buffer)
-  grid_100m_clip <- grid_100m[st_intersects(grid_100m, window, sparse = FALSE)[, 1], ]
 
   list(
     focus = focus,
@@ -488,7 +496,6 @@ load_zoom_data <- function(args, n_cells = args$n_cells, window_buffer_m = args$
     waste_clip = clip_points(waste, window),
     waste_pos_clip = sviwaste |> filter(.data$waste_positive == 1) |> clip_points(window),
     slums_clip = st_intersection(st_make_valid(slums), window),
-    grid_100m_clip = grid_100m_clip,
     city_grid = grid,
     boundary = boundary,
     svi_buffer_examples = buffer_examples$buffers,
@@ -497,16 +504,18 @@ load_zoom_data <- function(args, n_cells = args$n_cells, window_buffer_m = args$
 }
 
 build_panel_figure <- function(d, args, pal) {
-  main_subtitle <- sprintf(
-    "%d focus H3 cells (res %d) | road density %s | %s road segments in view",
-    d$focus_summary$n_cells,
-    args$h3_res,
-    d$focus_summary$density_range,
-    comma(d$n_roads_in_view)
-  )
+  svi_buf <- as.integer(args$svi_buffer)
+  gap_colour <- if (!is.null(pal$road_uncovered_soft)) pal$road_uncovered_soft else pal$road_uncovered
+  density_unit <- "km km\u207b\u00b2"
 
-  dens_min <- min(d$focus$road_length_density_km_per_km2)
-  dens_max <- max(d$focus$road_length_density_km_per_km2)
+  # Dark hexagon fills need a light label; the gradient spans the focus cells only
+  dens <- d$focus_labels$road_length_density_km_per_km2
+  dens_rel <- if (diff(range(dens)) > 0) {
+    (dens - min(dens)) / diff(range(dens))
+  } else {
+    rep(0, length(dens))
+  }
+  label_colours <- ifelse(dens_rel > 0.55, pal$density_low, pal$hex_label)
 
   p_city <- ggplot() +
     geom_sf(
@@ -521,17 +530,17 @@ build_panel_figure <- function(d, args, pal) {
       color = pal$focus_edge,
       linewidth = 0.55
     ) +
-    geom_sf(data = d$slums_clip, fill = alpha(pal$slum, SLUM_ALPHA), color = NA) +
     geom_sf(data = d$focus, fill = NA, color = pal$focus_edge, linewidth = 0.75) +
     geom_sf_text(
       data = d$focus_labels,
       aes(label = .data$label),
       size = 2.8,
-      color = pal$hex_label,
+      color = label_colours,
       fontface = "bold"
     ) +
     scale_fill_zoom_density(
       pal,
+      name = paste0("Road density\n(", density_unit, ")"),
       labels = label_number(accuracy = 0.1),
       guide = guide_colorbar(
         barwidth = unit(0.35, "cm"),
@@ -544,8 +553,8 @@ build_panel_figure <- function(d, args, pal) {
     ) +
     panel_coords(d$bbox) +
     labs(
-      title = "City → H3 grid",
-      subtitle = "Hex = cityroad unit; fill = road length density"
+      title = "A. H3 analytical grid",
+      subtitle = "Hexagon = analytical unit; fill = road length density"
     ) +
     panel_theme(show_legend = TRUE)
 
@@ -554,23 +563,23 @@ build_panel_figure <- function(d, args, pal) {
     geom_sf(data = d$roads_clip, color = pal$road, linewidth = 0.35, alpha = 0.92) +
     panel_coords(d$bbox) +
     labs(
-      title = "City → Roads",
-      subtitle = "Local cleaned OSM road segments"
+      title = "B. Mapped-road network",
+      subtitle = "Cleaned OpenStreetMap road segments"
     ) +
     panel_theme()
 
   p_svi <- ggplot() +
     geom_sf(data = d$focus, fill = NA, color = pal$context_edge, linewidth = 0.35) +
     geom_sf(data = d$roads_clip, color = pal$road_faint, linewidth = 0.22, alpha = 0.85) +
-    geom_sf(data = d$covered_clip, color = pal$road_covered, linewidth = 0.32, alpha = 0.95) +
-    geom_sf(data = d$uncovered_clip, color = pal$road_uncovered, linewidth = 0.55, alpha = 0.95) +
-    geom_sf(data = d$svi_clip, color = pal$svi, size = 0.45, alpha = 0.65) +
+    geom_sf(data = d$covered_clip, color = pal$road_covered, linewidth = 0.36, alpha = 0.95) +
+    geom_sf(data = d$uncovered_clip, color = gap_colour, linewidth = 0.4, alpha = 0.85) +
+    geom_sf(data = d$svi_clip, color = pal$svi, size = 0.4, alpha = 0.5) +
     panel_coords(d$bbox) +
     labs(
-      title = "Road → SVI coverage",
+      title = "C. GSVI-supported road network",
       subtitle = sprintf(
-        "Mauve/peach = SVI panoid | Teal/green = covered | Red = gaps outside %dm buffer",
-        as.integer(args$svi_buffer)
+        "Green = road within %d m of a GSVI panorama; red = road without GSVI support",
+        svi_buf
       )
     ) +
     panel_theme()
@@ -579,150 +588,148 @@ build_panel_figure <- function(d, args, pal) {
     geom_sf(data = d$focus, fill = NA, color = pal$context_edge, linewidth = 0.35) +
     geom_sf(data = d$roads_clip, color = pal$road_faint, linewidth = 0.18, alpha = 0.8) +
     geom_sf(data = d$svi_clip, color = pal$svi_light, size = 0.4, alpha = 0.45) +
-    geom_sf(data = d$waste_pos_clip, color = pal$waste_pos, size = 1.15, alpha = 0.95) +
-    geom_sf(data = d$waste_clip, color = pal$waste_det, size = 0.55, alpha = 0.85, shape = 17) +
+    geom_sf(data = d$waste_pos_clip, color = pal$waste_pos, size = 1.5, alpha = 0.95, shape = 17) +
     panel_coords(d$bbox) +
     labs(
-      title = "SVI → Waste",
-      subtitle = "Dark brown = waste-positive panoid | Triangles = waste detections"
+      title = "D. Waste-positive observations",
+      subtitle = "Triangles = GSVI panoramas with at least one waste detection"
     ) +
     panel_theme()
+
+  n_word <- c("one", "two", "three", "four", "five")
+  cell_count <- d$focus_summary$n_cells
+  cell_count_label <- if (cell_count <= length(n_word)) n_word[[cell_count]] else as.character(cell_count)
+  observed_range <- sprintf(
+    "%.1f\u2013%.1f",
+    min(d$focus$road_length_density_km_per_km2),
+    max(d$focus$road_length_density_km_per_km2)
+  )
 
   (p_city | p_roads) / (p_svi | p_waste) +
     plot_layout(guides = "keep", widths = c(1, 1), heights = c(1, 1)) +
     plot_annotation(
-      tag_levels = "A",
-      tag_prefix = "",
-      tag_suffix = "",
-      title = "Nairobi coverage pipeline (zoomed exemplar)",
-      subtitle = main_subtitle,
+      title = "Zoomed exemplar of the Nairobi observation pipeline",
       caption = paste0(
-        "Focus cells selected by road_length_density_km_per_km2 in ",
-        args$density_min, "–", args$density_max,
-        " km/km² | EPSG:", CRS_EA,
-        " | Hierarchy: boundary → H3 → roads → SVI → waste"
+        "Note: The ", cell_count_label, " adjacent cells were selected from the ",
+        args$density_min, "\u2013", args$density_max, " ", density_unit,
+        " mapped-road-density range (observed range: ", observed_range, " ", density_unit, ").\n",
+        "Road sections within ", svi_buf, " m of an available GSVI panorama were classified as GSVI-supported. ",
+        "The exemplar was selected for visual clarity and is not representative of Nairobi."
       ),
       theme = theme(
-        plot.tag = element_text(size = 12, face = "bold", hjust = 0, vjust = 1),
-        plot.tag.position = c(0.02, 0.98),
-        plot.title = element_text(face = "bold", size = 15, hjust = 0.5),
-        plot.subtitle = element_text(size = 10, hjust = 0.5, color = CHAPTER_SUBTITLE_COLOUR),
-        plot.caption = element_text(size = 8, color = "grey45", hjust = 1)
+        plot.title = element_text(face = "bold", size = 15, hjust = 0.5, margin = margin(b = 8)),
+        plot.caption = element_text(
+          size = 8.5,
+          color = "grey35",
+          hjust = 0.5,
+          lineheight = 1.25,
+          margin = margin(t = 10)
+        )
       )
     )
 }
 
-build_layers_figure <- function(d, args, pal, show_grid_100m = FALSE) {
-  show_h3 <- !show_grid_100m
-  cell_label <- if (d$n_cells == 1L) "focus H3 cell" else "focus H3 cells"
-  if (d$focus_summary$n_cells == 1L) {
-    density_label <- sprintf("%.1f km/km2", d$focus$road_length_density_km_per_km2[[1]])
-  } else {
-    density_label <- sprintf(
-      "%.1f-%.1f km/km2",
-      min(d$focus$road_length_density_km_per_km2),
-      max(d$focus$road_length_density_km_per_km2)
-    )
-  }
-  main_subtitle <- if (show_grid_100m) {
-    sprintf("100 m grid exemplar | road density %s", density_label)
-  } else {
-    sprintf(
-      "%d %s | H3 resolution %d | road density %s",
-      d$focus_summary$n_cells,
-      cell_label,
-      args$h3_res,
-      density_label
-    )
-  }
-  legend_title <- if (show_grid_100m) {
-    "Coverage layers"
-  } else {
-    sprintf("Focus H3 cell\n%s", d$focus$h3_index[[1]])
-  }
+build_layers_figure <- function(d, args, pal) {
+  svi_buf <- as.integer(args$svi_buffer)
+  road_covered_label <- sprintf("Road within %d m of GSVI", svi_buf)
+  road_gap_label <- "Road without GSVI support"
+  svi_label <- "GSVI panorama"
+  waste_label <- "Waste-positive panorama"
+  focus_label <- "Focus H3 cell boundary"
+  buffer_label <- sprintf("%d m GSVI buffer", svi_buf)
 
   roads_ok <- if (nrow(d$covered_clip)) {
-    d$covered_clip |> mutate(layer = "Road (SVI covered)")
+    d$covered_clip |> mutate(layer = road_covered_label)
   } else {
     NULL
   }
   roads_gap <- if (nrow(d$uncovered_clip)) {
-    d$uncovered_clip |> mutate(layer = "Road (no SVI cover)")
+    d$uncovered_clip |> mutate(layer = road_gap_label)
   } else {
     NULL
   }
   svi_pts <- if (nrow(d$svi_clip)) {
-    d$svi_clip |> mutate(layer = "SVI panoid")
+    d$svi_clip |> mutate(layer = svi_label)
   } else {
     NULL
   }
   waste_pos <- if (nrow(d$waste_pos_clip)) {
-    d$waste_pos_clip |> mutate(layer = "Waste-positive panoid")
+    d$waste_pos_clip |> mutate(layer = waste_label)
   } else {
     NULL
   }
   svi_buffers <- d$svi_buffer_examples
+  focus_boundary <- if (nrow(d$focus) > 0) {
+    d$focus |> mutate(layer = focus_label)
+  } else {
+    NULL
+  }
+  buffer_layer <- if (nrow(svi_buffers) > 0) {
+    svi_buffers |> mutate(layer = buffer_label)
+  } else {
+    NULL
+  }
 
   layer_order <- c(
-    "Road (SVI covered)",
-    "Road (no SVI cover)",
-    "SVI panoid",
-    "Waste-positive panoid"
+    focus_label,
+    road_covered_label,
+    road_gap_label,
+    svi_label,
+    waste_label,
+    buffer_label
   )
-  color_values <- zoom_layer_colours(pal)
-  shape_values <- c(
-    "Road (SVI covered)" = 15,
-    "Road (no SVI cover)" = 15,
-    "SVI panoid" = 16,
-    "Waste-positive panoid" = 17
+  color_values <- zoom_layer_colours(pal, svi_buf)
+  shape_values <- setNames(
+    c(NA_real_, 15, 15, 16, 17, NA_real_),
+    layer_order
   )
 
   line_layers <- bind_rows(roads_ok, roads_gap)
   active_layers <- intersect(
     layer_order,
     c(
+      if (!is.null(focus_boundary)) focus_label,
       if (nrow(line_layers)) unique(line_layers$layer) else character(),
-      if (!is.null(svi_pts)) "SVI panoid",
-      if (!is.null(waste_pos)) "Waste-positive panoid"
+      if (!is.null(svi_pts)) svi_label,
+      if (!is.null(waste_pos)) waste_label,
+      if (!is.null(buffer_layer)) buffer_label
     )
   )
 
-  if (nrow(line_layers)) {
-    line_layers <- line_layers |> mutate(layer = factor(.data$layer, levels = active_layers))
+  factorise <- function(x) {
+    if (is.null(x) || !nrow(x)) return(x)
+    x |> mutate(layer = factor(.data$layer, levels = active_layers))
   }
-  if (!is.null(svi_pts)) {
-    svi_pts <- svi_pts |> mutate(layer = factor(.data$layer, levels = active_layers))
-  }
-  if (!is.null(waste_pos)) {
-    waste_pos <- waste_pos |> mutate(layer = factor(.data$layer, levels = active_layers))
-  }
+  line_layers <- factorise(line_layers)
+  svi_pts <- factorise(svi_pts)
+  waste_pos <- factorise(waste_pos)
+  focus_boundary <- factorise(focus_boundary)
+  buffer_layer <- factorise(buffer_layer)
 
-  is_line <- active_layers %in% c("Road (SVI covered)", "Road (no SVI cover)")
+  is_line <- active_layers %in% c(focus_label, road_covered_label, road_gap_label, buffer_label)
+  is_buffer <- active_layers == buffer_label
+  is_focus <- active_layers == focus_label
   legend_override <- list(
-    linewidth = ifelse(is_line, 1.1, NA_real_),
-    linetype = ifelse(is_line, "solid", NA_character_),
+    linewidth = ifelse(
+      is_focus, 1.35,
+      ifelse(is_buffer, 0.85, ifelse(is_line, 1.1, NA_real_))
+    ),
+    linetype = ifelse(
+      is_buffer, "3313",
+      ifelse(is_line, "solid", NA_character_)
+    ),
     shape = ifelse(is_line, NA_real_, shape_values[active_layers]),
     size = ifelse(
-      active_layers == "SVI panoid", 3.0,
-      ifelse(active_layers == "Waste-positive panoid", 5.5, NA_real_)
+      active_layers == svi_label, 2.0,
+      ifelse(active_layers == waste_label, 5.5, NA_real_)
     ),
-    alpha = rep(1, length(active_layers))
+    alpha = ifelse(active_layers == svi_label, 0.55, 1)
   )
 
   p <- ggplot() +
     geom_sf(data = d$slums_clip, fill = alpha(pal$slum, SLUM_ALPHA * 0.45), color = NA)
 
-  if (show_grid_100m && nrow(d$grid_100m_clip) > 0) {
-    p <- p +
-      geom_sf(
-        data = d$grid_100m_clip,
-        fill = NA,
-        color = alpha(pal$context_edge, 0.85),
-        linewidth = 0.18
-      )
-  }
-
-  if (nrow(line_layers)) {
+  if (!is.null(line_layers) && nrow(line_layers)) {
     p <- p +
       geom_sf(
         data = line_layers,
@@ -732,24 +739,13 @@ build_layers_figure <- function(d, args, pal, show_grid_100m = FALSE) {
       )
   }
 
-  if (show_h3 && nrow(d$context) > 0) {
+  if (!is.null(buffer_layer)) {
     p <- p +
       geom_sf(
-        data = d$context,
-        fill = NA,
-        color = pal$road,
-        linewidth = 0.55,
-        linetype = "solid"
-      )
-  }
-
-  if (nrow(svi_buffers) > 0) {
-    p <- p +
-      geom_sf(
-        data = svi_buffers,
-        fill = alpha(pal$svi_buffer_fill, 0.10),
-        color = alpha(pal$svi_buffer_edge, 0.55),
-        linewidth = 0.35,
+        data = buffer_layer,
+        aes(color = .data$layer),
+        fill = alpha(pal$svi_buffer_fill, 0.08),
+        linewidth = 0.6,
         linetype = "3313"
       )
   }
@@ -759,8 +755,8 @@ build_layers_figure <- function(d, args, pal, show_grid_100m = FALSE) {
       geom_sf(
         data = svi_pts,
         aes(color = .data$layer, shape = .data$layer),
-        size = 1.9,
-        alpha = 0.92
+        size = 1.15,
+        alpha = 0.48
       )
   }
   if (!is.null(waste_pos)) {
@@ -772,25 +768,27 @@ build_layers_figure <- function(d, args, pal, show_grid_100m = FALSE) {
         alpha = 0.95
       )
   }
-  if (show_h3) {
+  if (!is.null(focus_boundary)) {
     p <- p +
       geom_sf(
-        data = d$focus,
+        data = focus_boundary,
+        aes(color = .data$layer),
         fill = NA,
-        color = pal$focus_outline,
         linewidth = 1.25
       )
   }
   p <- p +
     scale_color_manual(
-      name = legend_title,
+      name = NULL,
       values = color_values[active_layers],
-      drop = FALSE
+      drop = FALSE,
+      breaks = active_layers
     ) +
     scale_shape_manual(
       name = NULL,
       values = shape_values[active_layers],
-      drop = FALSE
+      drop = FALSE,
+      breaks = active_layers
     ) +
     guides(
       color = guide_legend(
@@ -800,24 +798,29 @@ build_layers_figure <- function(d, args, pal, show_grid_100m = FALSE) {
       shape = "none"
     ) +
     panel_coords(d$bbox) +
-    labs(
-      title = "Nairobi coverage pipeline (zoomed exemplar, all layers)",
-      subtitle = main_subtitle,
-      caption = paste0(
-        if (show_grid_100m) "Fine lines = 100 m Angela grid | " else "",
-        sprintf("Dashed circles = %d m SVI buffer examples", as.integer(args$svi_buffer))
-      ),
-      x = "Easting (m)",
-      y = "Northing (m)"
+    annotation_scale(
+      location = "br",
+      width_hint = 0.18,
+      style = "ticks",
+      line_width = 0.45,
+      text_cex = 0.8,
+      pad_x = unit(0.25, "cm"),
+      pad_y = unit(0.25, "cm")
     ) +
-    map_theme(transparent_bg = TRUE) +
+    labs(
+      title = "Zoomed illustration of the observation pipeline",
+      x = NULL,
+      y = NULL
+    ) +
+    map_theme(transparent_bg = TRUE, show_grid = FALSE) +
     layers_legend_theme() +
     theme(
       plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
       plot.subtitle = element_text(size = 11, hjust = 0.5, color = CHAPTER_SUBTITLE_COLOUR),
       plot.caption = element_text(size = 9, color = CHAPTER_CAPTION_COLOUR, hjust = 0.5, margin = margin(t = 6)),
-      axis.title = element_text(size = 11, color = CHAPTER_AXIS_COLOUR),
-      axis.text = element_text(size = 9, color = CHAPTER_AXIS_COLOUR)
+      axis.title = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank()
     )
 
   p
@@ -865,12 +868,12 @@ build_overview_inset <- function(d, pal) {
 }
 
 build_layers_figure_with_inset <- function(d, args, pal) {
-  main <- build_layers_figure(d, args, pal, show_grid_100m = FALSE)
+  main <- build_layers_figure(d, args, pal)
   inset <- build_overview_inset(d, pal)
   main + inset_element(inset, left = 0.03, bottom = 0.68, right = 0.32, top = 0.97, clip = TRUE)
 }
 
-save_zoom_maps <- function(args, palette_name) {
+save_zoom_maps <- function(args, palette_name, out_dir) {
   pal <- get_zoom_palette(palette_name)
   tag <- file_tag(args$h3_res, args$road_buffer, args$svi_buffer)
   suffix <- if (palette_name == "sage") "" else paste0("_", palette_name)
@@ -882,7 +885,7 @@ save_zoom_maps <- function(args, palette_name) {
     message("Panel focus H3 cells: ", paste(d_panel$focus$h3_index, collapse = ", "))
     save_map(
       build_panel_figure(d_panel, args, pal),
-      file.path(FIG_DIR, paste0("Nairobi_process_zoom_", tag, "_panels", suffix, ".png")),
+      file.path(out_dir, paste0("Nairobi_process_zoom_", tag, "_panels", suffix, ".png")),
       width = 14,
       height = 12,
       dpi = 300,
@@ -900,15 +903,7 @@ save_zoom_maps <- function(args, palette_name) {
     message("Layers focus H3 cell: ", paste(d_layers$focus$h3_index, collapse = ", "))
     save_map(
       build_layers_figure(d_layers, args, pal),
-      file.path(FIG_DIR, paste0("Nairobi_process_zoom_", tag, "_layers", suffix, ".png")),
-      width = 10,
-      height = 10,
-      dpi = 300,
-      bg = "transparent"
-    )
-    save_map(
-      build_layers_figure(d_layers, args, pal, show_grid_100m = TRUE),
-      file.path(FIG_DIR, paste0("Nairobi_process_zoom_", tag, "_layers_grid100m", suffix, ".png")),
+      file.path(out_dir, paste0("Nairobi_process_zoom_", tag, "_layers", suffix, ".png")),
       width = 10,
       height = 10,
       dpi = 300,
@@ -916,7 +911,7 @@ save_zoom_maps <- function(args, palette_name) {
     )
     save_map(
       build_layers_figure_with_inset(d_layers, args, pal),
-      file.path(FIG_DIR, paste0("Nairobi_process_zoom_", tag, "_layers_inset", suffix, ".png")),
+      file.path(out_dir, paste0("Nairobi_process_zoom_", tag, "_layers_inset", suffix, ".png")),
       width = 10,
       height = 10,
       dpi = 300,
@@ -927,8 +922,9 @@ save_zoom_maps <- function(args, palette_name) {
 
 args <- parse_args()
 
-dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
-message("Writing process zoom maps to ", FIG_DIR)
+out_dir <- fig_out_dir(args$svi_buffer)
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+message("Writing process zoom maps to ", out_dir)
 
 palette_names <- if (args$zoom_palette == "all") {
   c("sage", "mixed", "earth")
@@ -937,7 +933,7 @@ palette_names <- if (args$zoom_palette == "all") {
 }
 
 for (palette_name in palette_names) {
-  save_zoom_maps(args, palette_name)
+  save_zoom_maps(args, palette_name, out_dir)
 }
 
 message("Done.")

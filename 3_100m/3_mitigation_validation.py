@@ -24,10 +24,11 @@ from ideamaps_grid_pipeline import (
     run_ideamaps_grid_pipeline,
 )
 
-from output_paths import INPUT_DIR, MITIGATION_DIR
+from output_paths import GRID_GPKG, INPUT_DIR, MITIGATION_DIR, OUTPUT_DIR
 
-GRID_GPKG = INPUT_DIR / "Nairobi_grid_100m_32737.gpkg"
 VALIDATION_GRID_GPKG = INPUT_DIR / "Nairobi_validation_grid_32737.gpkg"
+THESIS_DIR = OUTPUT_DIR / "thesis_table"
+THESIS_TABLE_PATH = THESIS_DIR / "table_waste_observation_mitigation.csv"
 
 GSVI_PREDICTOR = "GSVI (Nairobi grid)"
 GSC_PREDICTOR = "G+Self (Nairobi grid)"
@@ -179,12 +180,48 @@ def build_comparison_table(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def build_thesis_mitigation_table(comparison: pd.DataFrame) -> pd.DataFrame:
+    """
+    Thesis-ready binary crowd-agreement table (matches tab:waste_observation_mitigation).
+
+    Subsets: all validated cells; directly supplemented cells (self-collected SVI overlap).
+    """
+    subset_map = {
+        "All validated cells": "All validated cells",
+        "Self-collected SVI overlap": "Directly supplemented cells",
+    }
+    indicator_map = {
+        GSVI_PREDICTOR: "GSVI only",
+        GSC_PREDICTOR: "GSVI + self-collected",
+    }
+
+    rows = []
+    for subset_key, subset_label in subset_map.items():
+        for pred_key, pred_label in indicator_map.items():
+            row = comparison[
+                (comparison["subset"] == subset_key)
+                & (comparison["predictor"] == pred_key)
+            ].iloc[0]
+            n = int(row["n_cells"])
+            rows.append(
+                {
+                    "Validation subset": f"{subset_label} (n = {n:,})",
+                    "Indicator": pred_label,
+                    "Accuracy (%)": f"{100.0 * row['binary_accuracy']:.1f}",
+                    "Precision (%)": f"{100.0 * row['binary_precision']:.1f}",
+                    "Recall (%)": f"{100.0 * row['binary_recall']:.1f}",
+                    "F1": f"{row['binary_f1']:.3f}",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 def build_method_table(gsvi_breaks: np.ndarray) -> pd.DataFrame:
     break_str = ", ".join(f"{b:.6f}" for b in gsvi_breaks)
     classification = FIXED_BREAKS_METHOD_LABEL
     return pd.DataFrame(
         [
-            {"Item": "Grid extent", "Value": "Nairobi constituency clip (Step 1 Nairobi_grid_100m_32737.gpkg)"},
+            {"Item": "Grid extent", "Value": "Nairobi constituency + Mollweide 100 m fill (0_extend_grid)"},
             {"Item": "Ratio pipeline", "Value": METHOD_LABEL.split(" + ")[0] + " + linear spatial fill"},
             {"Item": "GSVI inputs", "Value": "Step 1 Google SVI image + waste gpkgs"},
             {"Item": "G+Self inputs", "Value": "Step 1 gsvi_selfcollected SVI image + waste gpkgs"},
@@ -333,22 +370,29 @@ def main() -> None:
     comparison = build_comparison_table(df)
     summary = build_summary_note(overlap, comparison, df)
     method_table = build_method_table(gsvi_breaks)
+    thesis_table = build_thesis_mitigation_table(comparison)
 
     cells_path = MITIGATION_DIR / "Nairobi_validation_mitigation_cells.csv"
     comparison_path = MITIGATION_DIR / "Nairobi_validation_mitigation_comparison.csv"
     summary_path = MITIGATION_DIR / "Nairobi_validation_mitigation_summary.csv"
     method_path = MITIGATION_DIR / "Nairobi_validation_mitigation_method.csv"
 
+    THESIS_DIR.mkdir(parents=True, exist_ok=True)
     df.to_csv(cells_path, index=False)
     comparison.to_csv(comparison_path, index=False)
     summary.to_csv(summary_path, index=False)
     method_table.to_csv(method_path, index=False)
+    thesis_table.to_csv(THESIS_TABLE_PATH, index=False)
 
     print(f"Wrote {overlap_path}")
     print(f"Wrote {method_path}")
     print(f"Wrote {cells_path}")
     print(f"Wrote {comparison_path}")
     print(f"Wrote {summary_path}")
+    print(f"Wrote {THESIS_TABLE_PATH}")
+    print()
+    print("Thesis table (binary crowd-agreement):")
+    print(thesis_table.to_string(index=False))
     print()
     print("Method:")
     print(method_table.to_string(index=False))

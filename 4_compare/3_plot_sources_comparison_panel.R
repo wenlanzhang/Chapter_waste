@@ -32,7 +32,7 @@ panel_svi <- build_svi_sources_map(
   self_svi = layers$svi_layers$self_collected,
   boundary = layers$boundary,
   slums_union = layers$slums_union,
-  panel_title = "(A) Street View Imagery by Source",
+  panel_title = "(A) Street-Level Imagery by Source",
   base_size = 9.5
 )
 
@@ -42,15 +42,15 @@ panel_waste <- build_waste_sources_map(
   self_waste = layers$waste_layers$self_collected,
   boundary = layers$boundary,
   slums_union = layers$slums_union,
-  panel_title = "(B) Waste Detections by Source",
+  panel_title = "(B) Verified Waste Detections by Source",
   base_size = 9.5
 )
 
 message("Building comparison panel...")
 comparison <- wrap_plots(panel_svi, panel_waste, ncol = 2) +
   plot_annotation(
-    title = "GSVI and Self-Collected Imagery in Nairobi",
-    subtitle = "Google Street View (GSVI) vs supplementary field imagery (Faith/ + ZWL/)",
+    title = "GSVI and Self-Collected Street-Level Imagery in Nairobi",
+    subtitle = "Google Street View imagery and supplementary field-collected imagery",
     theme = theme(
       plot.title = element_text(face = "bold", size = 14, hjust = 0.5, colour = "#2f2f2f"),
       plot.subtitle = element_text(

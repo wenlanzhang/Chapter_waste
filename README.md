@@ -15,8 +15,13 @@ Chapter_waste/
 ├── R/
 │   ├── chapter_colours.R           # Shared brown chapter palette (maps + validation charts)
 │   ├── map_theme.R                 # Shared ggplot2 theme, north arrow, scale bar, legend
-│   ├── mitigation_map_theme.R      # Source/cluster map styling (4_compare, 5_cluster)
+│   ├── mitigation_map_theme.R      # Source/cluster map styling (4_compare, 5_spatial_pattern)
 │   └── compare_sources_maps.R      # Shared SVI/waste source map builders (4_compare)
+│
+├── 0_extend_grid/                  # Optional: Mollweide 100 m fill of Angela grid gaps
+│   ├── 1_extend_grid.py            # Keep Angela cells; fill constituency gaps (ESRI:54009)
+│   ├── 2_provenance_extended.py    # Indicator provenance on extended grid (standalone)
+│   └── 3_plot_extended_grid.R      # Angela-vs-fill + extended provenance maps
 │
 ├── 1prepare_chapter_data/
 │   ├── 1_prepare_chapter_data.py   # Step 1: clean & export harmonised layers
@@ -35,14 +40,15 @@ Chapter_waste/
 │   ├── 1cityroad.py                # City → road metrics on H3 grid
 │   ├── 1plot_cityroad_maps.R       # H3 choropleths + Spearman correlation figures
 │   ├── 1plot_cityroad_analysis.R   # H3 metric distribution violin/histogram panels
-│   ├── 2roadsvi.py                 # Road → SVI coverage by road metre
-│   ├── 2plot_roadsvi_maps.R        # City-wide SVI gap map
+│   ├── 2roadsvi.py                 # Road → SVI coverage by road metre (+ H3 ratios)
+│   ├── 2plot_roadsvi_maps.R        # SVI gap map + H3 choropleth + hist/scatter (75/100 → buffer/)
 │   ├── 3sviwaste.py                # SVI → waste-positive panoids
 │   ├── 3plot_sviwaste_maps.R
+│   ├── 4roadwaste.py               # Road → waste-positive panoid coverage (metres + H3)
 │   └── plot_process_zoom_map.R     # Zoomed pipeline schematic (panels + layers)
 │
 ├── 3_100m/                         # Step 3: 100 m grid coverage & validation
-│   ├── output_paths.py                   # Shared data paths (grid / validation / mitigation)
+│   ├── output_paths.py                   # Shared data paths; prefers extended grid if present
 │   ├── ideamaps_grid_pipeline.py         # EB ratio + spatial fill + Jenks (IDEAMaps logic)
 │   ├── grid_classification.py            # Fixed-band ratio helpers (0.024 / 0.164 thresholds; reference only)
 │   ├── 1_grid_coverage.py                # Grid cell counts + nested coverage matrix
@@ -54,7 +60,10 @@ Chapter_waste/
 │   ├── 3_plot_mitigation_validation.R            # Binary metrics, all validated cells
 │   ├── 3_plot_mitigation_validation_severity.R     # 3-class metrics, all validated cells
 │   ├── 3_plot_mitigation_validation_overlap.R      # Combined binary + 3-class (self-overlap n=133)
-│   └── 3_plot_mitigation_validation_overlap_pattern.R  # Pattern variant (stripes = 3-class)
+│   ├── 3_plot_mitigation_validation_overlap_pattern.R  # Pattern variant (stripes = 3-class)
+│   ├── 4_indicator_provenance.py         # Direct / interpolated / unsupported provenance
+│   ├── 4_plot_indicator_provenance_map.R # Provenance choropleth
+│   └── 5_validation_by_provenance.py     # Crowd metrics: all cells vs direct-observation subset
 │
 ├── 4_compare/                      # Step 4: GSVI vs GSVI + self-collected source comparison
 │   ├── 1_compare_sources_table.py     # Image-level counts by source (thesis table)
@@ -62,27 +71,80 @@ Chapter_waste/
 │   ├── 2_plot_waste_sources_map.R     # Waste detections by source (Step 1 gpkgs)
 │   └── 3_plot_sources_comparison_panel.R  # Two-panel A/B source comparison map
 │
-├── 5_cluster/                      # Step 5: HDBSCAN hotspots + KDE robustness
+├── 5_spatial_pattern/              # Step 5: panoid pattern + hotspots
+│   ├── panoid_locations.py           # Shared panoid loaders (+ year, n_positive_views)
+│   ├── settlement/                   # Urban-poor boundary association + NNR + temporal
+│   │   ├── 1_nnr_observation_frame.py
+│   │   ├── 2_settlement_association.py     # χ² / rates / density / zone table
+│   │   ├── 3_plot_settlement_association.R
+│   │   ├── 5_temporal_robustness.py
+│   │   └── 6_plot_temporal_robustness.R
+│   ├── Distance_decay/               # ECDF / NegExp distance-decay modelling
+│   │   ├── 1_distance_decay_negexp.py
+│   │   ├── 2_plot_distance_decay.R
+│   │   └── 3_plot_negexp_notebook_style.R
+│   ├── Signed_distance/              # Signed-distance logistic GAM
+│   │   ├── 1_signed_distance_gam.py
+│   │   ├── 2_plot_signed_distance_gam.R
+│   │   └── period_stratified_robustness/
+│   │       ├── 1_period_signed_distance_gam.py
+│   │       └── 2_plot_period_signed_distance_gam.R
+│   ├── pop_adjusted/                 # Population-adjusted signed-distance GAMs (Reviewer 3)
+│   │   ├── 1_pop_adjusted_gam.py
+│   │   ├── 2_plot_pop_adjusted_gam.R
+│   │   ├── 3_plot_mdp_residual_map.R # Excess-occurrence residual map (MDP)
+│   │   └── worldpop_2020/            # Sensitivity: unconstrained WorldPop 2020
+│   │       ├── 1_pop_adjusted_gam.py
+│   │       └── 2_plot_pop_adjusted_gam.R
 │   ├── HDBSCAN/
-│   │   ├── 3_hdbscan_waste.py            # HDBSCAN clustering (both arms)
-│   │   ├── 4_mitigation_comparison.py    # Hotspot metrics: gsvi vs gsvi_selfcollected
-│   │   ├── 3_plot_hdbscan_map.R          # HDBSCAN cluster maps
-│   │   ├── 4_plot_new_obs_stacked_bar.R  # New-obs inside vs new-hotspot bar
-│   │   └── 5_plot_hotspot_difference_map.R  # Hotspot overlap vs additional area map
+│   │   ├── 3_hdbscan_waste.py            # Exp 4: HDBSCAN on panoid locations
+│   │   ├── 4_mitigation_comparison.py    # gsvi vs gsvi_selfcollected
+│   │   ├── 5_hdbscan_cluster_views.py    # n_positive_views descriptives
+│   │   ├── 6_hdbscan_100m_sensitivity.py # 100 m-cell HDBSCAN sensitivity
+│   │   ├── 3_plot_hdbscan_map.R
+│   │   ├── 4_plot_new_obs_stacked_bar.R
+│   │   ├── 5_plot_hotspot_difference_map.R
+│   │   ├── 6_plot_hdbscan_100m_sensitivity.R
+│   │   ├── 7_hdbscan_settlement_context.py   # Cluster × urban-poor distance bins
+│   │   ├── 7_plot_hdbscan_context_map.R      # Context map (slums, Dandora, majors)
+│   │   ├── 8_plot_cluster_distance_composition.R  # Stacked composition by distance
+│   │   ├── 9_cluster_size_distribution.py         # Cluster sizes × inside/outside + silhouette
+│   │   ├── 9_plot_cluster_size_distribution.R     # Violin + histogram (notebook panel)
+│   │   └── period_stratified_robustness/ # Period-stratified HDBSCAN (capture eras)
+│   │       ├── 1_period_hdbscan.py
+│   │       └── 2_plot_period_hdbscan.R
 │   └── KDE/
-│       ├── 1_kde_hotspots.py             # KDE surfaces → hotspot polygons + metrics
-│       └── 2_plot_kde_comparison.R       # Two-panel + difference KDE maps
+│       ├── 1_kde_hotspots.py             # Supplementary robustness
+│       └── 2_plot_kde_comparison.R
 │
-├── 6_sensitivity/                  # Step 6: YOLO training mix sensitivity (optional)
-│   └── 1_training_dataset_csv.ipynb    # YOLO training mix sensitivity (GSVI ↔ SC swap scenarios)
+├── 6_sensitivity_training/         # Step 6: SC share in YOLO *training* (0% = no SC … 100% = baseline)
+│   ├── README.md
+│   ├── 1_training_dataset_pipeline.ipynb  # Inventory + GSVI↔SC training swaps → sc_*pct/
+│   └── 7_plot_baseline_training_curves.R  # Baseline (sc_100pct) training curves
+│
+├── 7_heldout_validation/           # Step 7: independent 180-image GSVI held-out *evaluation*
+│   ├── README.md
+│   ├── paths.py
+│   ├── 0_run_all.py                # one-shot: tables + figures
+│   ├── 1_build_training_inventory.py / 2_prepare_heldout_gsvi.py  # optional prep
+│   ├── 3_Qwen_heldout_validation.ipynb       # legacy FP-only Qwen
+│   ├── 4_Qwen_yolo_positives_replicates.ipynb  # Qwen on 115 YOLO+ ×3
+│   ├── 5_build_outputs.py          # thesis tables (Wilson CIs)
+│   └── 6_plot_outputs.R            # all Step 7 figures
+│
+├── 6_sensitivity_archive/          # Frozen previous Step 6 dump (gitignored; do not extend)
 │
 ├── del/                            # Local archive (gitignored): legacy notebooks + 3_100m_backup scripts
 │
 ├── Figure/                         # All map outputs (PNG)
+│   ├── 0_extend_grid/
+│   │   ├── Grid_extension_angela_vs_fill.png
+│   │   └── Indicator_provenance_100m_extended.png
 │   ├── 1prepare_chapter_data/
 │   ├── 2coverage_analysis/
 │   ├── 3_100m/
 │   │   ├── Grid_coverage_summary.png
+│   │   ├── Indicator_provenance_100m.png
 │   │   ├── Validation_confusion_matrix.png          # combined 3-class + binary panel
 │   │   ├── Validation_confusion_matrix_severity.png
 │   │   ├── Validation_confusion_matrix_binary.png
@@ -91,24 +153,40 @@ Chapter_waste/
 │   │   ├── Validation_mitigation_self_overlap.png
 │   │   └── Validation_mitigation_self_overlap_pattern.png
 │   ├── 4_compare/
-│   ├── 5_cluster/
+│   ├── 5_spatial_pattern/
+│   │   ├── settlement/
+│   │   ├── Distance_decay/
+│   │   ├── Signed_distance/
+│   │   ├── pop_adjusted/
+│   │   │   └── worldpop_2020/
 │   │   ├── HDBSCAN/
 │   │   └── KDE/
-│   └── 3_100m_backup/              # Figures from previous waste-ratio workflow
+│   ├── 6_sensitivity_training/     # Baseline YOLO training curves
+│   ├── 7_heldout_validation/       # Held-out binary / mAP charts
+│   ├── 6_sensitivity_archive/      # Frozen dump figures (gitignored)
+│   └── 3_100m_backup/              # Previous waste-ratio figures (gitignored)
 ```
 
 **Processed data** (not in this repo) lives under:
 
 ```
 /Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste/
-├── 1prepare_chapter_data/          # Harmonised GeoPackages (+ grid + validation layers)
+├── 0_extend_grid/                  # Extended 100 m grid + standalone provenance CSVs
+├── 1prepare_chapter_data/          # Harmonised GeoPackages (+ Angela grid + validation layers)
 ├── 2coverage_analysis/             # Coverage CSVs & GeoPackages
-├── 3_100m/                         # Grid coverage, validation & mitigation tables (grid/, validation/, mitigation/)
+├── 3_100m/                         # Grid coverage, provenance, validation & mitigation (grid/, validation/, mitigation/, thesis_table/)
 ├── 4_compare/                      # Source comparison table (thesis_table/)
-├── 5_cluster/                      # HDBSCAN outputs, hotspot gpkgs, thesis_table/
+├── 5_spatial_pattern/              # Pattern analysis processed outputs
+│   ├── settlement/                 # Urban-poor boundary stats + thesis_table/
+│   ├── Distance_decay/             # ECDF / NegExp + thesis_table/
+│   ├── Signed_distance/            # GAM (+ period) + thesis_table/
+│   ├── pop_adjusted/               # WorldPop 2024 CN + pop-adjusted GAM outputs + thesis_table/
+│   │   └── worldpop_2020/          # Unconstrained WorldPop 2020 sensitivity + thesis_table/
 │   ├── HDBSCAN/
-│   └── KDE/                        # KDE robustness polygons, params, thesis_table/
-└── 6_sensitivity/                  # YOLO training CSVs, swap manifests, scenario folders (see Step 6)
+│   └── KDE/
+├── 6_sensitivity_training/         # Training inventory + SC swap tables / scenarios/
+├── 7_heldout_validation/           # 180 GSVI held-out CSVs + val summaries
+└── 6_sensitivity_archive/          # Frozen previous dump
 ```
 
 Previous waste-ratio scripts are archived in `del/3_100m_backup/` (local only, gitignored). Previous figures remain in `Figure/3_100m_backup/`. Previous processed outputs (tables, GeoPackages, CSVs) are archived in `Data/Chapter_waste/3_100m_backup/`.
@@ -130,31 +208,33 @@ Raw CSVs & shapefiles
 │  • Compare sources & select road layer for downstream analysis   │
 └──────────────────────────────────────────────────────────────────┘
         │
-        ▼
-┌──────────────────────────────────────────────────────────────────┐
-│ Step 2 — Coverage analysis (2coverage_analysis/)                 │
-│  city → roads → SVI → waste                                      │
-└──────────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│ 2a. cityroad      │  H3 grid road metrics (city scale)
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│ 2b. roadsvi       │  Road-metre SVI coverage
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│ 2c. sviwaste      │  Waste-positive SVI panoids
-└───────────────────┘
+        ├──────────────────────────────────────────────────────────┐
+        ▼                                                          ▼
+┌──────────────────────────────────────────┐   ┌──────────────────────────────────────────┐
+│ Step 0 — Extend grid (0_extend_grid/)    │   │ Step 2 — Coverage (2coverage_analysis/) │
+│  [optional; after Step 1]                │   │  city → roads → SVI → waste             │
+│  Mollweide 100 m fill of Angela gaps     │   └──────────────────────────────────────────┘
+│  → preferred grid for Step 3 when present│              │
+└──────────────────────────────────────────┘              ▼
+        │                                    ┌───────────────────┐
+        │                                    │ 2a. cityroad      │
+        │                                    └───────────────────┘
+        │                                              │
+        │                                              ▼
+        │                                    ┌───────────────────┐
+        │                                    │ 2b. roadsvi       │
+        │                                    └───────────────────┘
+        │                                              │
+        │                                              ▼
+        │                                    ┌───────────────────┐
+        │                                    │ 2c. sviwaste      │
+        │                                    └───────────────────┘
         │
         ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │ Step 3 — 100 m grid (3_100m/)                                    │
-│  coverage matrix → crowd validation → mitigation validation      │
+│  coverage → crowd validation → mitigation → provenance           │
+│  (uses Mollweide-extended grid if 0_extend_grid outputs exist)   │
 └──────────────────────────────────────────────────────────────────┘
         │
         ▼
@@ -164,19 +244,54 @@ Raw CSVs & shapefiles
         │
         ▼
 ┌───────────────────┐
-│ Step 5 — Cluster  │  HDBSCAN hotspots + KDE robustness (5_cluster/)
+│ Step 5 — Pattern │  Observation-frame NNR, settlement association, HDBSCAN/KDE (5_spatial_pattern/)
 └───────────────────┘
         │
         ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│ Step 6 — YOLO training sensitivity (6_sensitivity/)  [optional]  │
-│  training CSV → GSVI↔SC swap scenarios → retrain & compare       │
+│ Step 6 — YOLO training sensitivity (6_sensitivity_training/)     │
+│  SC-slot retention in *training*: 0% = no SC … 100% = baseline │
+└──────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ Step 7 — Held-out GSVI validation (7_heldout_validation/)        │
+│  Independent 180-image GSVI test (does not change training)      │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 **Coverage hierarchy:** city (boundary) → roads → SVI sampling → waste detections
 
 The local vs OSMnx road comparison lives inside **Step 1** — it supports choosing which cleaned road layer to feed into Step 2, not a separate analysis track.
+
+**Grid for Step 3:** `3_100m/output_paths.py` prefers `0_extend_grid/Nairobi_grid_100m_extended_32737.gpkg` when present; otherwise falls back to the Angela-only Step 1 clip. Existing Angela `cell_id` values are preserved in the extension.
+
+---
+
+## Step 0 — Extend 100 m grid (optional)
+
+Standalone fill of constituency gaps left by Angela’s clipped IDEAMaps grid. Does **not** overwrite Step 1 outputs; writes under `Data/Chapter_waste/0_extend_grid/`.
+
+**Method:** Angela’s `IDEAmaps_grid-boundary-nairobi.gpkg` is an exact 100 m lattice in Mollweide / GHSL (`ESRI:54009`). This step keeps existing clipped Angela cells and `cell_id` values, then fills remaining constituency area with new Mollweide 100 m cells whose centroids fall inside the Nairobi boundary and outside the Angela clip.
+
+| Output | Description |
+| --- | --- |
+| `Nairobi_grid_100m_extended_32737.gpkg` | Angela + extension cells (`grid_source`, `cell_id`) |
+| `Nairobi_grid_100m_extension_cells_32737.gpkg` | Extension cells only |
+| `Nairobi_grid_extension_summary.csv` | Cell counts + uncovered % before/after |
+
+Example (current run): Angela 57,013 → +12,930 extension → **69,943** total; uncovered area ~18.7% → ~0.3%.
+
+```bash
+# Requires Step 1 (Angela clip + boundary)
+python 0_extend_grid/1_extend_grid.py
+python 0_extend_grid/2_provenance_extended.py   # standalone provenance on extended grid
+Rscript 0_extend_grid/3_plot_extended_grid.R
+```
+
+**Figures:** `Figure/0_extend_grid/Grid_extension_angela_vs_fill.png`, `Indicator_provenance_100m_extended.png`
+
+`2_provenance_extended.py` reuses the Step 3 IDEAMaps pipeline helpers but writes only to `0_extend_grid/` (does not touch `3_100m/` tables). For thesis provenance on the same grid used by Step 3, prefer `3_100m/4_indicator_provenance.py` after the extension exists.
 
 ---
 
@@ -204,7 +319,7 @@ Reads raw sources, applies consistent cleaning, clips to Nairobi boundary, repro
 | `Nairobi_validation_point_32737.gpkg` | IDEAMaps crowd validation clicks (lat/lon + labels), with `cell_id` | varies |
 | `Nairobi_validation_grid_32737.gpkg` | One row per validated grid cell (max severity when 2+ clicks) | varies |
 
-**Grid prep:** Raw `Waste/Angela/IDEAmaps_grid-boundary-nairobi.gpkg` is intersected with the constituency boundary and filtered to cells whose centroids fall inside the study area, then reprojected to EPSG:32737. Used by Step 3 (`3_100m/`).
+**Grid prep:** Raw `Waste/Angela/IDEAmaps_grid-boundary-nairobi.gpkg` is intersected with the constituency boundary and filtered to cells whose centroids fall inside the study area, then reprojected to EPSG:32737. Used by Step 3 (`3_100m/`). Optional Step 0 (`0_extend_grid/`) fills remaining constituency gaps with Mollweide 100 m cells while preserving Angela `cell_id` values; when that extended gpkg exists, Step 3 prefers it.
 
 **Validation prep:** Raw clicks from `Waste/IDEAMaps/260701validation/validation-dataset.csv` are clipped to Nairobi, joined to the 100 m grid, and aggregated to one row per cell. When multiple validators click the same cell, both `validation_result` and `model_result` use **max severity** (0 = no waste, 1 = medium, 2 = high). Binary flags `is_waste` / `model_is_waste` are derived as `result > 0`. To re-export validation layers without rerunning all of Step 1, use `export_validation_only.py`.
 
@@ -337,19 +452,21 @@ Rscript 2coverage_analysis/1plot_cityroad_analysis.R --h3-res 8 --road-buffer-m 
 
 ---
 
-### 2b. `2roadsvi.py` — Road → SVI (metre level)
+### 2b. `2roadsvi.py` — Road → SVI (metre level + H3 ratios)
 
-**Unit:** Road metres within local cleaned OSM segments (one row per OSM way segment).
+**Unit:** Road metres within local cleaned OSM segments (one row per OSM way segment), plus H3 cell aggregates.
 
-Each SVI panoid is buffered (default **50 m**). For each road segment, nearby buffers are unioned and the line is split into **covered** and **uncovered** parts (`segment ∩ zone` and `segment − zone`). Partially covered segments contribute metre length to both classes — uncovered sub-parts appear as gaps on the map.
+Each SVI panoid is buffered (default **50 m**). For each road segment, nearby buffers are unioned and the line is split into **covered** and **uncovered** parts (`segment ∩ zone` and `segment − zone`). Partially covered segments contribute metre length to both classes — uncovered sub-parts appear as gaps on the map. Covered/uncovered parts are then intersected with an H3 grid (default res **8**) to give per-cell **road-length SVI coverage ratios** (`covered_m / total_road_m`).
 
 ```bash
 python 2coverage_analysis/2roadsvi.py
-python 2coverage_analysis/2roadsvi.py --svi-buffer-m 50
-Rscript 2coverage_analysis/2plot_roadsvi_maps.R --svi-buffer-m 50
+python 2coverage_analysis/2roadsvi.py --svi-buffer-m 50 --h3-res 8
+# If metre coverage already exists, aggregate to H3 only:
+python 2coverage_analysis/2roadsvi.py --h3-only --svi-buffer-m 50 --h3-res 8
+Rscript 2coverage_analysis/2plot_roadsvi_maps.R --svi-buffer-m 50 --h3-res 8
 ```
 
-**Sensitivity analysis** (repeat Python + R plotting for other buffer distances):
+**Sensitivity analysis** (75 / 100 m buffers → figures under `Figure/2coverage_analysis/buffer/`):
 
 ```bash
 python 2coverage_analysis/2roadsvi.py --svi-buffer-m 75
@@ -360,13 +477,17 @@ Rscript 2coverage_analysis/plot_process_zoom_map.R --layout=layers --svi-buffer-
 Rscript 2coverage_analysis/plot_process_zoom_map.R --layout=layers --svi-buffer-m 100
 ```
 
-**Outputs** (tagged by buffer, e.g. `buf50m`):
+**Outputs** (metre outputs tagged by buffer, e.g. `buf50m`; H3 by `h3_res8_buf50m`):
 
 - `Nairobi_roadsvi_coverage_buf50m.{gpkg,csv}` — covered/uncovered line parts (for maps)
 - `Nairobi_roadsvi_segments_buf50m.{gpkg,csv}` — per-segment length breakdown (`covered_length_m`, `uncovered_length_m`, `partially_covered`)
-- `Nairobi_roadsvi_summary_buf50m.csv`
+- `Nairobi_roadsvi_grid_h3_res8_buf50m.{gpkg,csv}` — per-cell road length + `svi_coverage_ratio`
+- `Nairobi_roadsvi_summary_buf50m.csv` — citywide metres + H3 summary stats
 
-**Figure (`2plot_roadsvi_maps.R`):** light grey = all road metres; red = metres outside SVI buffers. Report + hi-res PNGs (`Nairobi_roadsvi_uncovered_buf50m.png`).
+**Figures (`2plot_roadsvi_maps.R`):** main (50 m) in `Figure/2coverage_analysis/`; sensitivity (75 / 100 m) in `Figure/2coverage_analysis/buffer/`
+- Uncovered roads: light grey = all road metres; red = metres outside SVI buffers (`Nairobi_roadsvi_uncovered_buf50m.png`, + `_hires`)
+- H3 choropleth: `svi_coverage_ratio` for cells with road (`Nairobi_roadsvi_coverage_h3_res8_buf50m.png`)
+- H3 analysis: histogram + road-length scatter (`Nairobi_roadsvi_analysis_h3_res8_buf50m.png`)
 
 **Process schematic (`plot_process_zoom_map.R`):**
 
@@ -406,11 +527,31 @@ Rscript 2coverage_analysis/3plot_sviwaste_maps.R
 
 **Figure:** light blue = all SVI sampling points; red = waste-positive panoids. Subtitle shows total SVI count.
 
+### 2d. `4roadwaste.py` — Road → waste-positive panoid (metre level)
+
+**Unit:** Road metres; same split logic as `2roadsvi.py`, but buffers only the **2,696 waste-positive** GSVI panoids (not all 76,605 sampling panoids).
+
+```bash
+python 2coverage_analysis/4roadwaste.py
+python 2coverage_analysis/4roadwaste.py --buffer-m 50 --h3-res 8
+# Sensitivity:
+python 2coverage_analysis/4roadwaste.py --buffer-m 75
+python 2coverage_analysis/4roadwaste.py --buffer-m 100
+```
+
+**Outputs** (`Data/.../2coverage_analysis/`):
+
+- `Nairobi_roadwaste_coverage_buf50m.{gpkg,csv}` — covered/uncovered line parts
+- `Nairobi_roadwaste_segments_buf50m.{gpkg,csv}` — per-segment length breakdown
+- `Nairobi_roadwaste_grid_h3_res8_buf50m.{gpkg,csv}` — per-cell `waste_coverage_ratio`
+- `Nairobi_roadwaste_summary_buf50m.csv` — citywide metres + optional all-GSVI reference %
+- `thesis_table/table_4_roadwaste_buf50m.csv`
+
 ---
 
 ## Step 3 — 100 m grid coverage & validation
 
-Three related analyses on the clipped **IDEAMaps 100 m grid**: (3a) nested coverage context, (3b) crowd validation vs the IDEAMaps submission model, (3c) mitigation validation comparing GSVI vs G+Self recomputed on the Nairobi grid.
+Analyses on the **100 m IDEAMaps grid** used by Step 3 scripts via `output_paths.GRID_GPKG`: Mollweide-extended constituency grid when `0_extend_grid/` outputs exist, otherwise the Angela-only Step 1 clip. Blocks: (3a) nested coverage, (3b) crowd validation vs the IDEAMaps submission model, (3c) mitigation validation (GSVI vs G+Self), (3d) indicator provenance, (3e) validation metrics by provenance.
 
 ### 3a. Grid coverage
 
@@ -418,8 +559,8 @@ Assigns Step 1 layers to the grid and summarises how many cells fall in each cov
 
 | Context | Rule (per grid cell) |
 | --- | --- |
-| City | All cells in Nairobi-clipped grid |
-| Road | `road_length_m ≥ 25` (local noded roads from Step 1) |
+| City | All cells in the active Step 3 grid |
+| Road | `road_length_m ≥ 25` (local noded roads from Step 1; `Nairobi_road_line_32737.gpkg`) |
 | SVI | `svi_images ≥ 1` |
 | Waste | `waste_images ≥ 1` |
 
@@ -428,6 +569,9 @@ Assigns Step 1 layers to the grid and summarises how many cells fall in each cov
 ```bash
 # Step 1 must be run first (grid + point layers + validation)
 python 1prepare_chapter_data/1_prepare_chapter_data.py
+
+# Optional but recommended: Mollweide fill so Step 3 uses the extended grid
+python 0_extend_grid/1_extend_grid.py
 
 python 3_100m/1_grid_coverage.py
 Rscript 3_100m/1_plot_grid_coverage_matrix.R
@@ -439,6 +583,10 @@ python 3_100m/3_mitigation_validation.py
 Rscript 3_100m/3_plot_mitigation_validation.R
 Rscript 3_100m/3_plot_mitigation_validation_severity.R
 Rscript 3_100m/3_plot_mitigation_validation_overlap.R
+
+python 3_100m/4_indicator_provenance.py
+Rscript 3_100m/4_plot_indicator_provenance_map.R
+python 3_100m/5_validation_by_provenance.py
 ```
 
 ### Cell count table
@@ -449,14 +597,16 @@ One row per context; single column `Grid cells` (comma-formatted integers).
 
 **Output:** `3_100m/grid/Nairobi_grid_coverage_cell_counts.csv`
 
-Example (current run):
+Example (current run on **Mollweide-extended** grid):
 
 | Context | Grid cells |
 | --- | --- |
-| City | 57,013 |
-| Road (≥25 m) | 38,992 |
-| SVI (≥1 image) | 20,969 |
-| Waste (≥1 detection) | 2,052 |
+| City | 69,943 |
+| Road (≥25 m) | 43,863 |
+| SVI (≥1 image) | 22,672 |
+| Waste (≥1 detection) | 2,065 |
+
+*(Angela-only clip was 57,013 city cells; re-run after deleting or renaming the extended gpkg to reproduce that baseline.)*
 
 ### Nested coverage matrix
 
@@ -466,7 +616,7 @@ Same script writes a **row / column percentage matrix** based on cell counts:
 \text{matrix}[\text{row}, \text{col}] = \frac{n(\text{row} \cap \text{col})}{n(\text{col})} \times 100
 \]
 
-Diagonal entries are 100%. Off-diagonal entries show how much of each column context is captured by the row context (e.g. road / city ≈ 68% of city cells have ≥25 m road).
+Diagonal entries are 100%. Off-diagonal entries show how much of each column context is captured by the row context (e.g. road / city ≈ share of city cells with ≥25 m road).
 
 **Outputs:**
 
@@ -518,7 +668,7 @@ Rscript 3_100m/2_plot_validation_confusion_matrix.R
 
 **Scripts:** `3_100m/ideamaps_grid_pipeline.py` (shared), `3_100m/3_mitigation_validation.py`
 
-Re-runs the IDEAMaps 100 m indicator pipeline on the **Nairobi-clipped grid** for both arms, using **identical Jenks break points** from the GSVI submission (`GSVI_SUBMISSION_JENKS_BREAKS` in `ideamaps_grid_pipeline.py`). Only the input SVI/waste GeoPackages differ:
+Re-runs the IDEAMaps 100 m indicator pipeline on the **active Step 3 grid** (`output_paths.GRID_GPKG`: extended when available) for both arms, using **identical Jenks break points** from the GSVI submission (`GSVI_SUBMISSION_JENKS_BREAKS` in `ideamaps_grid_pipeline.py`). Only the input SVI/waste GeoPackages differ:
 
 | Arm | SVI input | Waste input |
 | --- | --- | --- |
@@ -550,6 +700,7 @@ Metrics per subset × arm: binary and 3-class accuracy, precision, recall, F1. T
 - `3_100m/mitigation/Nairobi_validation_mitigation_cells.csv`
 - `3_100m/mitigation/Nairobi_validation_mitigation_comparison.csv`
 - `3_100m/mitigation/Nairobi_validation_mitigation_summary.csv`
+- `3_100m/thesis_table/table_waste_observation_mitigation.csv` — binary metrics thesis table (all cells + self-overlap n ≈ 133)
 
 **Figures:**
 
@@ -571,6 +722,53 @@ Rscript 3_100m/3_plot_mitigation_validation_overlap_pattern.R   # optional
 ```
 
 **Sensitivity (optional):** `3_mitigation_validation_sensitivity.py` repeats the comparison using raw cell waste/SVI ratios (no Empirical Bayes, no spatial fill) with the same fixed Jenks breaks. Writes `3_100m/mitigation/Nairobi_validation_mitigation_sensitivity_comparison.csv`.
+
+### 3d. Indicator provenance
+
+**Scripts:** `3_100m/4_indicator_provenance.py`, `3_100m/4_plot_indicator_provenance_map.R`
+
+Classifies every city-grid cell (GSVI arm, same IDEAMaps pipeline as mitigation: EB + spatial fill + fixed Jenks) into one of three provenance classes:
+
+| Provenance | Definition |
+| --- | --- |
+| Direct observation | ≥1 GSVI image in the cell |
+| Interpolated support | No local imagery; value from spatial fill |
+| Unsupported, platform-coded low | Still missing after interpolation; encoded as zero because IDEAMaps required a complete categorical map |
+
+Example shares on the extended grid (current run): Direct ~32.4% | Interpolated ~65.3% | Unsupported ~2.3% (n = 69,943).
+
+**Outputs:**
+
+- `3_100m/grid/Nairobi_indicator_provenance_cells.csv` — per-cell ratios + `indicator_provenance`
+- `3_100m/grid/Nairobi_indicator_provenance_summary.csv`
+- `3_100m/thesis_table/table_indicator_provenance.csv`
+
+**Figure:** `Figure/3_100m/Indicator_provenance_100m.png` (choropleth; prefers extended-grid geometry when present)
+
+```bash
+python 3_100m/4_indicator_provenance.py
+Rscript 3_100m/4_plot_indicator_provenance_map.R
+```
+
+### 3e. Crowd validation by provenance
+
+**Script:** `3_100m/5_validation_by_provenance.py`
+
+Joins crowd-validated cells to provenance labels and reports binary waste metrics (`is_waste` vs IDEAMaps `model_is_waste`) for:
+
+- All crowd-validation cells
+- Cells with direct GSVI observations (main contrast)
+
+An intermediate “evidence-supported (direct + interpolated)” row is kept in the numeric summary CSV for archive/appendix. Metrics apply only to the validation sample (not all Nairobi cells).
+
+**Outputs:**
+
+- `3_100m/validation/Nairobi_validation_by_provenance.csv`
+- `3_100m/thesis_table/table_validation_by_provenance.csv`
+
+```bash
+python 3_100m/5_validation_by_provenance.py
+```
 
 ---
 
@@ -635,41 +833,259 @@ Side-by-side panel: (A) SVI imagery by source, (B) waste detections by source.
 
 ---
 
-## Step 5 — Cluster analysis
+## Step 5 — Spatial pattern analysis
 
-HDBSCAN hotspot clustering and mitigation metrics for the same two arms. KDE is a supplementary robustness check.
+Panorama-level pattern tests and hotspot detection. The **primary spatial unit** is the GSVI **panorama (panoid)** from Step 2c (`Nairobi_sviwaste_points.gpkg`: 2,696 waste-positive of 76,605), not the 3,236 directional waste images. A panorama is waste-positive if **at least one** directional view is positive (`n_positive_views` is retained for sensitivity only).
 
-Both arms use identical HDBSCAN settings on harmonised Step 1 inputs (EPSG:32737).
+| Experiment | Content | Primary? |
+| --- | --- | --- |
+| 1. Observation-conditioned clustering | NNR: 2,696 positives vs draws from 76,605 panoids | Yes |
+| 2. Settlement association | P(waste\|inside) vs P(waste\|outside); χ² / PCR | Yes |
+| 3. Signed-distance relationship | Logistic GAM: `logit(p)=α+s(signed_distance)+γ_year` | Yes |
+| 3b. Population-adjusted distance | Nested GAMs with `s(log1p(pop_density))` (MP vs MDP) | Supplementary (R3) |
+| 4. Local hotspot identification | HDBSCAN on positive panoids (+ 100 m-cell sensitivity) | Yes (HDBSCAN) |
+| 5. Temporal robustness | Settlement rates / NNR by capture year | Yes |
+| Supplement | Distance-decay NegExp/ECDF; KDE hotspots | No |
 
 ### Run order
 
 ```bash
-# Step 1 must be run first (creates gsvi / gsvi_selfcollected gpkgs)
-python 1prepare_chapter_data/1_prepare_chapter_data.py
+# Requires Step 1 + Step 2c (sviwaste panoid labels)
+python 2coverage_analysis/3sviwaste.py
 
-# Clustering + comparison tables
-python 5_cluster/HDBSCAN/3_hdbscan_waste.py
-python 5_cluster/HDBSCAN/4_mitigation_comparison.py
+# Exp 1–2: NNR + urban-poor boundary association
+python 5_spatial_pattern/settlement/1_nnr_observation_frame.py
+python 5_spatial_pattern/settlement/2_settlement_association.py
+Rscript 5_spatial_pattern/settlement/3_plot_settlement_association.R
 
-# Cluster maps + stacked bar
-Rscript 5_cluster/HDBSCAN/3_plot_hdbscan_map.R
-Rscript 5_cluster/HDBSCAN/5_plot_hotspot_difference_map.R
-Rscript 5_cluster/HDBSCAN/4_plot_new_obs_stacked_bar.R
+# Distance-decay / NegExp (supplement)
+python 5_spatial_pattern/Distance_decay/1_distance_decay_negexp.py
+Rscript 5_spatial_pattern/Distance_decay/2_plot_distance_decay.R
+Rscript 5_spatial_pattern/Distance_decay/3_plot_negexp_notebook_style.R
 
-# KDE robustness (Step 1 gpkgs only — supplementary to HDBSCAN)
-python 5_cluster/KDE/1_kde_hotspots.py
-Rscript 5_cluster/KDE/2_plot_kde_comparison.R
+# Exp 3: signed-distance GAM (+ year FE) and period-stratified robustness
+python 5_spatial_pattern/Signed_distance/1_signed_distance_gam.py
+Rscript 5_spatial_pattern/Signed_distance/2_plot_signed_distance_gam.R
+python 5_spatial_pattern/Signed_distance/period_stratified_robustness/1_period_signed_distance_gam.py
+Rscript 5_spatial_pattern/Signed_distance/period_stratified_robustness/2_plot_period_signed_distance_gam.R
+python 5_spatial_pattern/HDBSCAN/period_stratified_robustness/1_period_hdbscan.py
+Rscript 5_spatial_pattern/HDBSCAN/period_stratified_robustness/2_plot_period_hdbscan.R
+
+# Exp 3b: population-adjusted signed-distance GAMs (Reviewer 3)
+python 5_spatial_pattern/pop_adjusted/1_pop_adjusted_gam.py
+Rscript 5_spatial_pattern/pop_adjusted/2_plot_pop_adjusted_gam.R
+Rscript 5_spatial_pattern/pop_adjusted/3_plot_mdp_residual_map.R
+# Sensitivity: unconstrained WorldPop 2020
+python 5_spatial_pattern/pop_adjusted/worldpop_2020/1_pop_adjusted_gam.py
+Rscript 5_spatial_pattern/pop_adjusted/worldpop_2020/2_plot_pop_adjusted_gam.R
+Rscript 5_spatial_pattern/pop_adjusted/3_plot_mdp_residual_map.R --data-subdir=worldpop_2020 --fig-subdir=worldpop_2020
+
+# Exp 5: temporal robustness
+python 5_spatial_pattern/settlement/5_temporal_robustness.py
+Rscript 5_spatial_pattern/settlement/6_plot_temporal_robustness.R
+
+# Exp 4: HDBSCAN + mitigation + sensitivities
+python 5_spatial_pattern/HDBSCAN/3_hdbscan_waste.py
+python 5_spatial_pattern/HDBSCAN/4_mitigation_comparison.py
+python 5_spatial_pattern/HDBSCAN/5_hdbscan_cluster_views.py
+python 5_spatial_pattern/HDBSCAN/6_hdbscan_100m_sensitivity.py
+Rscript 5_spatial_pattern/HDBSCAN/3_plot_hdbscan_map.R
+Rscript 5_spatial_pattern/HDBSCAN/5_plot_hotspot_difference_map.R
+Rscript 5_spatial_pattern/HDBSCAN/4_plot_new_obs_stacked_bar.R
+Rscript 5_spatial_pattern/HDBSCAN/6_plot_hdbscan_100m_sensitivity.R
+python 5_spatial_pattern/HDBSCAN/7_hdbscan_settlement_context.py
+Rscript 5_spatial_pattern/HDBSCAN/7_plot_hdbscan_context_map.R
+Rscript 5_spatial_pattern/HDBSCAN/8_plot_cluster_distance_composition.R
+python 5_spatial_pattern/HDBSCAN/9_cluster_size_distribution.py
+Rscript 5_spatial_pattern/HDBSCAN/9_plot_cluster_size_distribution.R
+
+# Supplementary: KDE
+python 5_spatial_pattern/KDE/1_kde_hotspots.py
+Rscript 5_spatial_pattern/KDE/2_plot_kde_comparison.R
 ```
 
-### 5a. HDBSCAN clustering
+### 5a. Observation-frame NNR
 
-**Script:** `5_cluster/HDBSCAN/3_hdbscan_waste.py`
+**Script:** `5_spatial_pattern/settlement/1_nnr_observation_frame.py`
+
+Primary null preserves the GSVI road/platform frame: compare mean 1-NN distance among the 2,696 waste-positive panoids with 999 random draws of 2,696 locations from the 76,605 available GSVI panoids.
+
+- Observation-frame NNR = `d_obs / mean(d_null)`
+- One-sided p-value = `P(d_null ≤ d_obs)`
+- Clark–Evans CSR over the city polygon is reported only as an appendix row
+
+**Outputs:** `Data/.../settlement/Nairobi_nnr_observation_frame_summary.csv`, null distances CSV, `thesis_table/nnr_observation_frame.csv`  
+**Figure:** `Figure/5_spatial_pattern/settlement/NNR_observation_frame_null.png`
+
+### 5b. Settlement association (χ², density) — urban-poor boundary stats
+
+**Script:** `5_spatial_pattern/settlement/2_settlement_association.py`
+
+Labels each of 76,605 GSVI panoids as inside/outside urban-poor settlements (`Nairobi_slum_polygon_32737.gpkg`).
+
+- **Chi-square:** 2×2 among panoids (waste-positive × inside settlement); Pearson χ², Cramér’s V, odds ratio
+- **Area-normalised density:** waste-positive panoids per km² inside vs outside; PCR = (waste share inside) / (settlement area share)
+- **Zone table:** urban poor / non-urban poor / ratio / total
+
+**Outputs:** contingency, χ², density under `Data/.../settlement/`; `thesis_table/{settlement_association,settlement_zone_summary}.csv`  
+**Figures:** `Figure/5_spatial_pattern/settlement/Settlement_*.png`
+
+### 5b1. Distance-decay / NegExp (supplement)
+
+**Scripts:** `5_spatial_pattern/Distance_decay/`
+
+- ECDF of unsigned distance to settlement (waste+ vs non+)
+- NegExp \(P(x)=a(1-e^{-bx})\) for waste-positive vs all GSVI (half-distance \(\ln 2/b\))
+- Distance threshold table; panoid distance export (unsigned + signed)
+
+```bash
+python 5_spatial_pattern/Distance_decay/1_distance_decay_negexp.py
+Rscript 5_spatial_pattern/Distance_decay/2_plot_distance_decay.R
+Rscript 5_spatial_pattern/Distance_decay/3_plot_negexp_notebook_style.R
+```
+
+**Outputs:** `Data/.../Distance_decay/` + `thesis_table/{distance_thresholds,distance_decay_negexp}.csv`  
+**Figures:**  
+- `Figure/5_spatial_pattern/Distance_decay/Distance_ecdf.png`  
+- `Distance_decay_negexp.png`  
+- `NegExp_Panoids_vs_WastePositive.png`  
+- `NegExp_derivative.png`
+
+### 5b2. Signed-distance logistic GAM (Exp 3) — primary year-adjusted model
+
+**Scripts:**  
+- `5_spatial_pattern/Signed_distance/1_signed_distance_gam.py`  
+- `5_spatial_pattern/Signed_distance/2_plot_signed_distance_gam.R`
+
+**Primary temporal-robustness model** at panorama unit (full GSVI sample):
+
+\[
+\operatorname{logit}(p_i)=\alpha+s(\text{signed distance}_i)+\gamma_{\text{year}}
+\]
+
+This is the explicit “control for image year” specification: the settlement–distance gradient is estimated conditional on capture year.
+
+- Sparse years (`n < 200` panoids; 2015, 2019) are pooled then reassigned to the nearest year FE with ≥1 waste-positive so that **all panoramas with valid year are retained** (no complete-separation drops).
+- Nested comparison: year-only `logit(p)=α+γ_year` vs year + `s(signed_distance)` (LRT + ΔAIC).
+- Figure: **year-standardised (marginal)** predicted probabilities at each signed distance, averaging over the observed capture-year FE distribution, with bootstrap 95% CI.
+- Claim supported when distance remains after year adjustment: *“The signed-distance relationship remained after adjustment for panorama capture year.”*
+
+Period-stratified curves and HDBSCAN maps are **supporting** robustness only (see below).
+
+**Outputs:** GAM frame/curve/year-effects/LRT/summary CSVs under  
+`Data/Chapter_waste/5_spatial_pattern/Signed_distance/`; thesis table  
+`…/Signed_distance/thesis_table/signed_distance_gam.csv`  
+**Figures:**  
+- `Figure/5_spatial_pattern/Signed_distance/Signed_distance_gam_curve.png`  
+- `Figure/5_spatial_pattern/Signed_distance/Signed_distance_gam_curve_inset.png` (near-edge zoom ≤ 1 km)
+
+### 5b2c. Population-adjusted signed-distance GAMs (Reviewer 3)
+
+**Scripts:**  
+- `5_spatial_pattern/pop_adjusted/1_pop_adjusted_gam.py`  
+- `5_spatial_pattern/pop_adjusted/2_plot_pop_adjusted_gam.R`  
+- `5_spatial_pattern/pop_adjusted/3_plot_mdp_residual_map.R`
+
+Uses the same panorama unit and year FE treatment as the primary S4 model, with **static** WorldPop Constrained Kenya 2024 (`ken_pop_2024_CN_100m_R2025A_v1.tif` under `Data/.../pop_adjusted/`) as `s(log1p(pop_density))` (not temporally matched to capture year).
+
+Nested models:
+
+| Model | Specification |
+| --- | --- |
+| M0 | `logit(p)=α+year` |
+| MP | `logit(p)=α+s(log1p(pop_density))+year` |
+| MD | `logit(p)=α+s(signed_distance)+year` (same as S4) |
+| MDP | `logit(p)=α+s(signed_distance)+s(log1p(pop_density))+year` |
+| MDPS | MDP + thin-plate spatial field on `(x,y)` if residual Moran’s I is significant |
+
+**Central test:** MP vs MDP (does signed distance still matter after population + year?). Also report MD vs MDP (how much population adds). Outputs include ΔAIC, LRT, pseudo-R², concurvity, residual Moran’s I, 5-fold spatial-block CV (Brier / log-loss), and waste+ deduplication at 50 m / 100 m.
+
+**Residual / excess-occurrence map:** panorama-level MDP residuals (`y − μ` and Pearson) aggregated to hex cells. Complements the two-panel adjusted-effects figure: effects ask *what the adjusted smooths look like*; the residual map asks *where the model still under- or over-predicts* after population, settlement proximity, and year (landmarks for orientation only).
+
+```bash
+python 5_spatial_pattern/pop_adjusted/1_pop_adjusted_gam.py
+Rscript 5_spatial_pattern/pop_adjusted/2_plot_pop_adjusted_gam.R
+# Residual map only (reuses saved frame; skips bootstrap / CV):
+python 5_spatial_pattern/pop_adjusted/1_pop_adjusted_gam.py --residuals-only
+Rscript 5_spatial_pattern/pop_adjusted/3_plot_mdp_residual_map.R
+```
+
+**Outputs:** `Data/Chapter_waste/5_spatial_pattern/pop_adjusted/` (+ `thesis_table/pop_adjusted_gam.csv`; residual CSV `Nairobi_pop_adjusted_mdp_residuals.csv`)  
+**Figures:**  
+- `Figure/5_spatial_pattern/pop_adjusted/Pop_adjusted_gam_effects.png` (two-panel adjusted effects)  
+- `Figure/5_spatial_pattern/pop_adjusted/Pop_adjusted_mdp_residual_map.png` (hex mean Pearson residual)  
+- `Figure/5_spatial_pattern/pop_adjusted/Pop_adjusted_mdp_excess_prob_map.png` (hex mean response residual)
+
+**Sensitivity — WorldPop unconstrained 2020** (`ken_ppp_2020.tif`): same nested models / year FE / robustness suite, written under `…/pop_adjusted/worldpop_2020/` (scripts in `5_spatial_pattern/pop_adjusted/worldpop_2020/`).
+
+```bash
+python 5_spatial_pattern/pop_adjusted/worldpop_2020/1_pop_adjusted_gam.py
+Rscript 5_spatial_pattern/pop_adjusted/worldpop_2020/2_plot_pop_adjusted_gam.R
+```
+
+**Outputs:** `Data/.../pop_adjusted/worldpop_2020/` (+ `thesis_table/pop_adjusted_gam_worldpop_2020.csv`)  
+**Figures:**  
+- `Figure/5_spatial_pattern/pop_adjusted/worldpop_2020/Pop_adjusted_gam_effects.png`  
+- `Figure/5_spatial_pattern/pop_adjusted/worldpop_2020/Pop_adjusted_mdp_residual_map.png`  
+- `Figure/5_spatial_pattern/pop_adjusted/worldpop_2020/Pop_adjusted_mdp_excess_prob_map.png`
+
+### 5b2b. Period-stratified robustness (signed distance + HDBSCAN)
+
+Because individual years are extremely uneven (e.g. 2015 = 5; 2019 = 73), capture years are grouped into two nearly balanced periods for stratified spatial analysis. The GSVI observation frame is **2015–2022 excluding 2020** (n = 76,605). There are **no 2023 panoramas**.
+
+| Period | Years | GSVI panoramas |
+| --- | --- | ---: |
+| Early | 2015–2019 | 36,446 |
+| Later | 2021–2022 | 40,159 |
+
+**A. Period signed-distance GAM** — scripts: `5_spatial_pattern/Signed_distance/period_stratified_robustness/`
+
+Within each period (no year FE; stratification is the temporal control):
+
+\[
+\operatorname{logit}\{P(\text{Waste}=1)\}=\alpha+s(\text{signed distance})
+\]
+
+Bootstrap 95% CIs on a shared distance grid. Addresses whether the settlement-distance gradient appears in both capture eras.
+
+**B. Period HDBSCAN** — scripts: `5_spatial_pattern/HDBSCAN/period_stratified_robustness/`
+
+Waste-positive panoramas only, same parameters as the main analysis (`min_cluster_size=25`, `min_samples=6`). Two-panel map; report clusters and `% waste points clustered`. Caption (not on-figure): period-specific concentrations, **not** temporal persistence.
+
+```bash
+python 5_spatial_pattern/Signed_distance/period_stratified_robustness/1_period_signed_distance_gam.py
+Rscript 5_spatial_pattern/Signed_distance/period_stratified_robustness/2_plot_period_signed_distance_gam.R
+python 5_spatial_pattern/HDBSCAN/period_stratified_robustness/1_period_hdbscan.py
+Rscript 5_spatial_pattern/HDBSCAN/period_stratified_robustness/2_plot_period_hdbscan.R
+```
+
+**Outputs — signed distance:** `…/Signed_distance/period_stratified_robustness/` (frame/curves/summaries, thesis table)  
+**Outputs — HDBSCAN:** `…/HDBSCAN/period_stratified_robustness/` (gpkgs, summaries, thesis table)  
+
+**Figures:**  
+- `Figure/5_spatial_pattern/Signed_distance/period_stratified_robustness/Period_signed_distance_gam_curve.png`  
+- `…/Period_signed_distance_gam_curve_near_edge.png`  
+- `Figure/5_spatial_pattern/HDBSCAN/period_stratified_robustness/Period_HDBSCAN_comparison.png`
+
+### 5b3. Temporal robustness (Exp 5)
+
+**Script:** `5_spatial_pattern/settlement/5_temporal_robustness.py`
+
+Within each capture year (rare years pooled): settlement positive rates, prevalence/odds ratios, and observation-frame NNR when ≥50 waste-positive panoramas.
+
+**Outputs:** `Nairobi_temporal_robustness_by_year.csv`, `thesis_table/temporal_robustness.csv`  
+**Figures:** `Temporal_waste_positive_rate_by_year.png`, `Temporal_prevalence_ratio_by_year.png`
+
+### 5c. HDBSCAN clustering (panoid locations)
+
+**Script:** `5_spatial_pattern/HDBSCAN/3_hdbscan_waste.py`
 
 | Parameter | Value |
 | --- | --- |
 | `min_cluster_size` | 25 |
 | `min_samples` | 6 |
-| Coordinate space | EPSG:32737 (projected easting/northing) |
+| Unit | GSVI waste-positive panoids (~2,696); + Faith/ZWL locations for self-collected arm (~2,845) |
+| Coordinate space | EPSG:32737 |
 
 **Outputs (processed data):**
 
@@ -677,7 +1093,7 @@ Rscript 5_cluster/KDE/2_plot_kde_comparison.R
 - `Nairobi_waste_hdbscan_gsvi_selfcollected_32737.gpkg`, `Nairobi_waste_hdbscan_summary_gsvi_selfcollected.csv`
 - `Nairobi_waste_hdbscan_summary_comparison.csv`
 
-**Script:** `5_cluster/HDBSCAN/3_plot_hdbscan_map.R`
+**Script:** `5_spatial_pattern/HDBSCAN/3_plot_hdbscan_map.R`
 
 **Figures:**
 
@@ -687,11 +1103,36 @@ Rscript 5_cluster/KDE/2_plot_kde_comparison.R
 
 Map styling: chocolate-brown HDBSCAN clusters, grey noise points, black city boundary, repelled cluster ID labels, north arrow, scale bar, inside bottom-right legend.
 
-### 5b. Mitigation comparison
+**Context map + cluster–settlement composition** (from notebook logic in `del/SVI_distance_use.ipynb`):
 
-**Script:** `5_cluster/HDBSCAN/4_mitigation_comparison.py`
+```bash
+python 5_spatial_pattern/HDBSCAN/7_hdbscan_settlement_context.py
+Rscript 5_spatial_pattern/HDBSCAN/7_plot_hdbscan_context_map.R
+Rscript 5_spatial_pattern/HDBSCAN/8_plot_cluster_distance_composition.R
+python 5_spatial_pattern/HDBSCAN/9_cluster_size_distribution.py
+Rscript 5_spatial_pattern/HDBSCAN/9_plot_cluster_size_distribution.R
+```
 
-Compares **gsvi** vs **gsvi_selfcollected**. Hotspot area = sum of per-cluster convex-hull polygon areas (km², EPSG:32737).
+- Distance bins (panoid/location unit): Within Urban Poor | 0–250 m | 250–500 m | >500 m
+- Figures:
+  - `Waste_HDBSCAN_context_gsvi.png` / `Waste_HDBSCAN_context_gsvi_selfcollected.png` — clusters + urban-poor polygons + major areas (Kibera, Mukuru, Mathare, Kawangware) + Dandora
+  - `Cluster_Composition_By_Distance_gsvi.png` / `…_gsvi_selfcollected.png` — 100% stacked bars per cluster
+  - `Cluster_Size_Distribution_gsvi.png` / `…_gsvi_selfcollected.png` — violin (associated with urban-poor settlements vs other clusters; any-overlap rule) + cluster-size histogram
+
+### 5c2. HDBSCAN sensitivities (`n_positive_views`, 100 m cells)
+
+**Scripts:**
+
+- `5_hdbscan_cluster_views.py` — join `n_positive_views` after clustering; per-cluster descriptives only (does **not** re-weight HDBSCAN)
+- `6_hdbscan_100m_sensitivity.py` — cell positive if ≥1 positive panorama; HDBSCAN on cell centroids; Jaccard vs panoid hotspots
+
+**Figures:** `Figure/5_spatial_pattern/HDBSCAN/HDBSCAN_100m_cell_sensitivity.png`
+
+### 5d. Mitigation comparison
+
+**Script:** `5_spatial_pattern/HDBSCAN/4_mitigation_comparison.py`
+
+Compares **gsvi** vs **gsvi_selfcollected** at panoid/location level. Hotspot area = sum of per-cluster convex-hull polygon areas (km², EPSG:32737). New locations keyed by `panoid` (Google) or `img_name`/coords (self-collected).
 
 **Outputs:**
 
@@ -700,9 +1141,9 @@ Compares **gsvi** vs **gsvi_selfcollected**. Hotspot area = sum of per-cluster c
 - `Nairobi_waste_hotspot_polygons_gsvi_32737.gpkg`
 - `Nairobi_waste_hotspot_polygons_gsvi_selfcollected_32737.gpkg`
 
-### 5c. Hotspot area difference map
+### 5e. Hotspot area difference map
 
-**Script:** `5_cluster/HDBSCAN/5_plot_hotspot_difference_map.R`
+**Script:** `5_spatial_pattern/HDBSCAN/5_plot_hotspot_difference_map.R`
 
 Requires hotspot polygon GeoPackages from `4_mitigation_comparison.py`. Unions all cluster convex hulls per arm, then maps:
 
@@ -710,53 +1151,49 @@ Requires hotspot polygon GeoPackages from `4_mitigation_comparison.py`. Unions a
 - **Light fill** — overlapping hotspot footprint (shared between gsvi and gsvi_selfcollected)
 - **Dark fill** — additional footprint from adding self-collected imagery
 - **Medium fill** (if present) — GSVI-only footprint lost when clusters are re-fit
-- **Light brown points** — GSVI waste detections (`#C9A27F`, matches waste source map)
-- **Dark brown points** — self-collected waste detections (`#6B4226`)
-
-Legend shows km² per zone (union-based; matches the spatial +5.4 km² net change in the comparison table).
+- **Light brown points** — GSVI waste-positive panoids (`#C9A27F`)
+- **Dark brown points** — self-collected waste locations (`#6B4226`)
 
 ```bash
-Rscript 5_cluster/HDBSCAN/5_plot_hotspot_difference_map.R
+Rscript 5_spatial_pattern/HDBSCAN/5_plot_hotspot_difference_map.R
 ```
 
-**Figure:** `Figure/5_cluster/HDBSCAN/Hotspot_area_difference_gsvi_selfcollected.png`
+**Figure:** `Figure/5_spatial_pattern/HDBSCAN/Hotspot_area_difference_gsvi_selfcollected.png`
 
-### 5d. Stacked bar
+### 5f. Stacked bar
 
-**Script:** `5_cluster/HDBSCAN/4_plot_new_obs_stacked_bar.R`
+**Script:** `5_spatial_pattern/HDBSCAN/4_plot_new_obs_stacked_bar.R`
 
 Reads `thesis_table/Nairobi_mitigation_new_observations_table.csv` — one horizontal stacked bar: inside existing hotspots vs forming new hotspots.
 
-**Figure:** `Figure/5_cluster/HDBSCAN/Mitigation_new_obs_stacked_bar.png`
+**Figure:** `Figure/5_spatial_pattern/HDBSCAN/Mitigation_new_obs_stacked_bar.png`
 
-### 5e. KDE robustness (supplementary)
+### 5g. KDE robustness (supplementary)
 
-**Purpose:** Robustness check only — does the neighbourhood-scale hotspot pattern stay broadly similar when switching from discrete HDBSCAN clusters to a smooth KDE surface and adding supplementary self-collected observations? HDBSCAN remains the primary method; KDE does not replace it.
+**Purpose:** Robustness check only — does the neighbourhood-scale hotspot pattern stay broadly similar when switching from discrete HDBSCAN clusters to a smooth KDE surface and adding supplementary self-collected observations? HDBSCAN remains the primary hotspot method; KDE does not replace it.
 
 **Scripts:**
 
-- `5_cluster/KDE/1_kde_hotspots.py` — KDE surfaces, shared threshold, union hotspot polygons, overlap metrics
-- `5_cluster/KDE/2_plot_kde_comparison.R` — two-panel comparison + difference map
+- `5_spatial_pattern/KDE/1_kde_hotspots.py` — KDE on panoid locations, shared threshold, union polygons, overlap metrics
+- `5_spatial_pattern/KDE/2_plot_kde_comparison.R` — two-panel comparison + difference map
 
 **Config constants** (top of `1_kde_hotspots.py`):
 
 | Constant | Default | Meaning |
 | --- | --- | --- |
-| Bandwidth | `KDE_BANDWIDTH_M = 400` | Fixed isotropic Gaussian sd (m); Scott on city-wide points over-smooths (~1.7 km) — same bandwidth for both arms |
+| Bandwidth | `KDE_BANDWIDTH_M = 400` | Fixed isotropic Gaussian sd (m); same bandwidth for both arms |
 | `GRID_CELL_M` | 150 | Regular grid cell size (m, EPSG:32737) |
-| `KDE_HOTSPOT_PERCENTILE` | 2 | Top N% of gsvi density values → one shared absolute threshold for both arms (tune after inspecting test maps) |
-
-**Run order** (after Step 1 only):
+| `KDE_HOTSPOT_PERCENTILE` | 2 | Top N% of gsvi density values → shared absolute threshold |
 
 ```bash
-python 5_cluster/KDE/1_kde_hotspots.py
-Rscript 5_cluster/KDE/2_plot_kde_comparison.R
+python 5_spatial_pattern/KDE/1_kde_hotspots.py
+Rscript 5_spatial_pattern/KDE/2_plot_kde_comparison.R
 ```
 
 **Outputs (processed data):**
 
 ```
-5_cluster/KDE/
+5_spatial_pattern/KDE/
 ├── thesis_table/Nairobi_kde_robustness_comparison.csv
 ├── Nairobi_kde_hotspot_polygons_gsvi_32737.gpkg
 ├── Nairobi_kde_hotspot_polygons_gsvi_selfcollected_32737.gpkg
@@ -765,79 +1202,54 @@ Rscript 5_cluster/KDE/2_plot_kde_comparison.R
 
 **Figures:**
 
-- `Figure/5_cluster/KDE/KDE_hotspot_gsvi.png`
-- `Figure/5_cluster/KDE/KDE_hotspot_gsvi_selfcollected.png`
-- `Figure/5_cluster/KDE/KDE_hotspot_comparison.png` — side-by-side (A/B)
-- `Figure/5_cluster/KDE/KDE_hotspot_difference.png` — overlap vs additional area
-
-**What to report in thesis** (three bullets only):
-
-- Main hotspot locations remain similar or shift when self-collected imagery is added
-- Hotspot footprint expands or contracts (union polygon area change)
-- Supplementary observations reinforce existing density peaks vs create new ones (difference map + waste point overlay)
+- `Figure/5_spatial_pattern/KDE/KDE_hotspot_gsvi.png`
+- `Figure/5_spatial_pattern/KDE/KDE_hotspot_gsvi_selfcollected.png`
+- `Figure/5_spatial_pattern/KDE/KDE_hotspot_comparison.png` — side-by-side (A/B)
+- `Figure/5_spatial_pattern/KDE/KDE_hotspot_difference.png` — overlap vs additional area
 
 **What not to do:** no parameter-sweep narrative, no algorithm horse-race; KDE is supplementary to HDBSCAN.
 
 ---
 
-## Step 6 — YOLO training mix sensitivity (optional)
+## Step 6 — YOLO training-mix sensitivity (`6_sensitivity_training/`)
 
-Supplementary robustness check for the **waste detector**, not the spatial pipeline. Tests whether downstream waste detections change when the YOLO training set varies the share of self-collected (SC) vs Google Street View (GSVI) images, while keeping **695 images** and the same waste/background class balance.
+Changes **training data** only (not the spatial pipeline).
 
-**Companion notebook:** `del/SVI_Val.ipynb` evaluates the validation split (TP/FP/FN/TN, optional CPM). Step 6 builds the training-side inventory and swap scenarios.
+Varies **SC-slot retention** in the 695-image YOLO set (original 85 SC slots):
 
-**Script:** `6_sensitivity/1_training_dataset_csv.ipynb`
-
-### Inputs
-
-| Source | Path |
+| Scenario | Meaning |
 | --- | --- |
-| YOLO training split | `Waste/img/Train0315_695/dataSet/trainval.txt` (696 labelled images; 695 exported after QA) |
-| Images + labels | `Waste/img/Train0315_695/images/`, `labels/` |
-| Metadata lookup | `Waste/img/Google_basic.csv`, `Faith_basic.csv`, `ZWL_basic.csv` |
-| SVI waste inventory | `Waste/img/Correct_SVI.csv`, `Combined_SVI.csv` |
+| `sc_100pct` | **Baseline — model used in the main chapter** (610 GSVI + 85 SC) |
+| `sc_75/50/25pct` | Fewer SC slots, replaced by GSVI |
+| `sc_0pct` | **No SC** in training |
 
-### Workflow (notebook sections)
+See `6_sensitivity_training/README.md`. Pipeline notebook: `1_training_dataset_pipeline.ipynb`.  
+Scenario image folders: `Waste/img/6_sensitivity_training/sc_*pct/` (symlinks into the archive).
 
-1. **Sections 1–6** — Build `Train0315_695_training.csv`: one row per training image with metadata (`lat`, `lon`, `panoid`, `collection`, `class`, YOLO bboxes). `collection` = GSVI if heading suffix `_0/_90/_180/_270`, else SC.
-2. **Section 7** — Plan GSVI ↔ SC swap scenarios. Fixed **610 GSVI core** + **85 switchable SC slots**; scenarios at 0%, 25%, 50%, 75%, 100% SC share (100% = current baseline).
-3. **Section 8** — Export label manifest for GSVI replacement images needed at each scenario (`Train0315_695_gsvi_label_manifest.csv`, `Train0315_695_gsvi_swap_needs.csv`).
-4. **Section 9** — After labelling replacements, build YOLO-ready scenario folders under `sensitivity/sc_*pct/` (`images/`, `labels/`, `train.txt`, `Waste.yaml`, `training.csv`).
+Frozen messy dump of the old combined Step 6: `6_sensitivity_archive/`.
 
-### Run
+---
 
-Open and run cells in order in Jupyter (conda env with pandas, Pillow):
+## Step 7 — Held-out GSVI validation (`7_heldout_validation/`)
 
-```bash
-conda activate geo_env_LLM
-jupyter notebook 6_sensitivity/1_training_dataset_csv.ipynb
-```
+**Evaluation only** — does not change training.
 
-### Outputs
+Independent GSVI test: ~100 panoids → **180 images** (90 waste + 90 background), panoid-safe vs `Train0315_695`.
 
-Generated files are written under `Data/Chapter_waste/6_sensitivity/` (not tracked in git):
+Canonical labeled set (180 images):
 
-```
-Data/Chapter_waste/6_sensitivity/
-├── Train0315_695_training.csv              # baseline 695-row training inventory
-├── Train0315_695_gsvi_swap_needs.csv       # per-scenario replacement counts
-├── Train0315_695_gsvi_label_manifest.csv   # images to label for swaps
-└── scenarios/                              # optional: per-scenario training.csv exports
+`Waste/img/7_heldout_validation/20260807_heldout_GSVI_p100_label/`
 
-Data/Waste/img/sensitivity/                 # label-first image staging (post section 8)
-├── waste/
-└── background/
+**Thesis tables:** `Data/Chapter_waste/7_heldout_validation/thesis_table/`  
+(display + Wilson CI + detail + citywide funnel). Regenerate with `python 7_heldout_validation/0_run_all.py`. See `7_heldout_validation/README.md`.
 
-Data/Waste/img/sensitivity/sc_*pct/         # YOLO-ready folders (post section 9)
-```
-
-This step is independent of Steps 1–5. Re-run spatial analysis only if you retrain YOLO and regenerate waste detections from new model weights.
+Steps 6–7 are independent of Steps 1–5. Re-run spatial analysis only if you retrain YOLO and regenerate citywide waste detections.
 
 ---
 
 ## Archived — previous 100 m waste-ratio workflow
 
-The earlier waste/SVI ratio pipeline (Empirical Bayes smoothing, IDEAMaps fixed bands, gsvi vs g+self context maps) is preserved locally in `del/3_100m_backup/` and `Figure/3_100m_backup/`. See `del/SVI_IDEAMaps.ipynb` for the original notebook logic. The `del/` folder is gitignored and kept on disk only.
+The earlier waste/SVI ratio pipeline (Empirical Bayes smoothing, IDEAMaps fixed bands, gsvi vs g+self context maps) is preserved locally in `del/3_100m_backup/` and `Figure/3_100m_backup/` (both gitignored). See `del/SVI_IDEAMaps.ipynb` for the original notebook logic.
 
 ---
 
@@ -856,29 +1268,65 @@ Chapter_waste/3_100m/
 │   ├── Nairobi_grid_coverage_cell_counts.csv
 │   ├── Nairobi_grid_coverage_matrix_pct.csv
 │   ├── Nairobi_grid_coverage_matrix_long.csv
-│   └── Nairobi_grid_coverage_32737.gpkg
+│   ├── Nairobi_grid_coverage_32737.gpkg
+│   ├── Nairobi_indicator_provenance_cells.csv
+│   └── Nairobi_indicator_provenance_summary.csv
 ├── validation/
 │   ├── Nairobi_validation_grid.csv
 │   ├── Nairobi_validation_confusion_severity.csv
 │   ├── Nairobi_validation_confusion_binary.csv
 │   ├── Nairobi_validation_metrics.csv
-│   └── Nairobi_validation_summary.csv
-└── mitigation/
-    ├── Nairobi_validation_selfcollected_overlap.csv
-    ├── Nairobi_validation_mitigation_method.csv
-    ├── Nairobi_validation_mitigation_cells.csv
-    ├── Nairobi_validation_mitigation_comparison.csv
-    ├── Nairobi_validation_mitigation_summary.csv
-    └── Nairobi_validation_mitigation_sensitivity_*.csv
+│   ├── Nairobi_validation_summary.csv
+│   └── Nairobi_validation_by_provenance.csv
+├── mitigation/
+│   ├── Nairobi_validation_selfcollected_overlap.csv
+│   ├── Nairobi_validation_mitigation_method.csv
+│   ├── Nairobi_validation_mitigation_cells.csv
+│   ├── Nairobi_validation_mitigation_comparison.csv
+│   ├── Nairobi_validation_mitigation_summary.csv
+│   └── Nairobi_validation_mitigation_sensitivity_*.csv
+└── thesis_table/
+    ├── table_waste_observation_mitigation.csv
+    ├── table_indicator_provenance.csv
+    └── table_validation_by_provenance.csv
+
+Chapter_waste/0_extend_grid/
+├── Nairobi_grid_100m_extended_32737.gpkg
+├── Nairobi_grid_100m_extension_cells_32737.gpkg
+├── Nairobi_grid_extension_summary.csv
+├── Nairobi_indicator_provenance_cells_extended.csv
+└── Nairobi_indicator_provenance_summary_extended.csv
 
 Chapter_waste/4_compare/thesis_table/
 └── Nairobi_compare_sources_table.csv
 
-Chapter_waste/5_cluster/HDBSCAN/thesis_table/
+Chapter_waste/5_spatial_pattern/settlement/thesis_table/
+├── nnr_observation_frame.csv
+├── settlement_association.csv
+├── settlement_zone_summary.csv
+└── temporal_robustness.csv
+
+Chapter_waste/5_spatial_pattern/Distance_decay/thesis_table/
+├── distance_thresholds.csv
+└── distance_decay_negexp.csv
+
+Chapter_waste/5_spatial_pattern/Signed_distance/thesis_table/
+└── signed_distance_gam.csv
+
+Chapter_waste/5_spatial_pattern/pop_adjusted/thesis_table/
+└── pop_adjusted_gam.csv
+
+Chapter_waste/5_spatial_pattern/pop_adjusted/worldpop_2020/thesis_table/
+└── pop_adjusted_gam_worldpop_2020.csv
+
+Chapter_waste/5_spatial_pattern/Signed_distance/period_stratified_robustness/thesis_table/
+└── period_signed_distance_gam.csv
+
+Chapter_waste/5_spatial_pattern/HDBSCAN/thesis_table/
 ├── Nairobi_mitigation_comparison_table.csv
 └── Nairobi_mitigation_new_observations_table.csv
 
-Chapter_waste/5_cluster/KDE/thesis_table/
+Chapter_waste/5_spatial_pattern/KDE/thesis_table/
 └── Nairobi_kde_robustness_comparison.csv
 ```
 
@@ -888,7 +1336,7 @@ Tables are generated alongside the analysis outputs (not a separate script), so 
 
 ## Figures (R)
 
-All maps use `R/map_theme.R` and `R/chapter_colours.R` (coverage and validation charts) or `R/mitigation_map_theme.R` (source and cluster maps in `4_compare/` and `5_cluster/`):
+All maps use `R/map_theme.R` and `R/chapter_colours.R` (coverage and validation charts) or `R/mitigation_map_theme.R` (source and cluster maps in `4_compare/` and `5_spatial_pattern/`):
 
 - North arrow (top-right)
 - Scale bar (bottom-left)
@@ -898,6 +1346,7 @@ All maps use `R/map_theme.R` and `R/chapter_colours.R` (coverage and validation 
 
 | Script                                                     | Figures                                                                 |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `0_extend_grid/3_plot_extended_grid.R`                     | Angela vs Mollweide fill + extended-grid provenance map                 |
 | `1prepare_chapter_data/plot_maps.R`                        | Waste, SVI, boundary, slum preview maps                                 |
 | `1prepare_chapter_data/plot_road_figures.R`                | Five numbered road maps (01–05) + hi-res comparison                     |
 | `1prepare_chapter_data/plot_road_type_composition.R`       | Local road type pie chart                                               |
@@ -906,7 +1355,7 @@ All maps use `R/map_theme.R` and `R/chapter_colours.R` (coverage and validation 
 | `2coverage_analysis/1plot_cityroad_maps.R`                 | 4 H3 choropleths + Spearman heatmap + scatter matrix                    |
 | `2coverage_analysis/1plot_cityroad_analysis.R`             | H3 metric distribution panels (violin + histogram)                        |
 | `2coverage_analysis/plot_process_zoom_map.R`               | Zoomed pipeline schematic: 4-panel + single-hex layers map              |
-| `2coverage_analysis/2plot_roadsvi_maps.R`                  | Road SVI gap map (+ `_hires` version; repeat per buffer tag)              |
+| `2coverage_analysis/2plot_roadsvi_maps.R`                  | Road SVI gap map + H3 choropleth + hist/scatter (75/100 → `buffer/`)      |
 | `2coverage_analysis/3plot_sviwaste_maps.R`                 | SVI waste-positive map (+ `_hires` version)                             |
 | `3_100m/1_plot_grid_coverage_matrix.R`                       | 100 m grid cell counts + nested coverage heatmap                        |
 | `3_100m/2_plot_validation_confusion_matrix.R`              | Crowd validation confusion matrices (combined + 3-class + binary)         |
@@ -914,13 +1363,27 @@ All maps use `R/map_theme.R` and `R/chapter_colours.R` (coverage and validation 
 | `3_100m/3_plot_mitigation_validation_severity.R`             | Mitigation validation — 3-class metrics (all cells)                       |
 | `3_100m/3_plot_mitigation_validation_overlap.R`              | Mitigation validation — self-overlap subset (primary combined figure)   |
 | `3_100m/3_plot_mitigation_validation_overlap_pattern.R`      | Pattern variant of self-overlap figure (optional)                         |
+| `3_100m/4_plot_indicator_provenance_map.R`                   | Indicator provenance choropleth (direct / interpolated / unsupported)   |
 | `4_compare/1_plot_svi_sources_map.R`                         | SVI panoids by source (GSVI vs self-collected)                          |
 | `4_compare/2_plot_waste_sources_map.R`                       | Waste detections by source (GSVI vs self-collected)                     |
 | `4_compare/3_plot_sources_comparison_panel.R`                | Two-panel source comparison (SVI + waste)                               |
-| `5_cluster/HDBSCAN/3_plot_hdbscan_map.R`                     | HDBSCAN cluster maps + side-by-side comparison                          |
-| `5_cluster/HDBSCAN/4_plot_new_obs_stacked_bar.R`             | New observations inside vs new hotspot bar                              |
-| `5_cluster/HDBSCAN/5_plot_hotspot_difference_map.R`          | Hotspot overlap vs additional area map                                  |
-| `5_cluster/KDE/2_plot_kde_comparison.R`                      | KDE hotspot comparison + difference map                                 |
+| `5_spatial_pattern/settlement/3_plot_settlement_association.R` | NNR null, density, rates, composition |
+| `5_spatial_pattern/Distance_decay/2_plot_distance_decay.R` | ECDF + NegExp distance-decay |
+| `5_spatial_pattern/Distance_decay/3_plot_negexp_notebook_style.R` | NegExp cumulative + derivative pair |
+| `5_spatial_pattern/HDBSCAN/3_plot_hdbscan_map.R`                     | HDBSCAN cluster maps + side-by-side comparison                          |
+| `5_spatial_pattern/HDBSCAN/4_plot_new_obs_stacked_bar.R`             | New locations inside vs new hotspot bar                              |
+| `5_spatial_pattern/HDBSCAN/5_plot_hotspot_difference_map.R`          | Hotspot overlap vs additional area map                                  |
+| `5_spatial_pattern/HDBSCAN/7_plot_hdbscan_context_map.R`             | Context map (urban poor, majors, Dandora)                               |
+| `5_spatial_pattern/HDBSCAN/8_plot_cluster_distance_composition.R`    | Cluster composition by distance to urban-poor boundary                |
+| `5_spatial_pattern/HDBSCAN/9_cluster_size_distribution.py`           | Cluster sizes × inside/outside + silhouette                           |
+| `5_spatial_pattern/HDBSCAN/9_plot_cluster_size_distribution.R`       | Violin + histogram of cluster sizes                                   |
+| `5_spatial_pattern/KDE/2_plot_kde_comparison.R`                      | KDE hotspot comparison + difference map                                 |
+| `6_sensitivity_training/7_plot_baseline_training_curves.R`           | Baseline YOLO training loss/mAP curves (sc_100pct)                      |
+| `7_heldout_validation/0_run_all.py`                                  | One-shot Step 7 tables + figures                                        |
+| `7_heldout_validation/2_prepare_heldout_gsvi.py`                     | 180-image GSVI held-out export (panoid-first; optional)                 |
+| `7_heldout_validation/4_Qwen_yolo_positives_replicates.ipynb`        | Qwen ×3 on all YOLO held-out positives → with_qwen CSV                  |
+| `7_heldout_validation/5_build_outputs.py`                            | Thesis tables (display + Wilson CIs + funnel; best Qwen2_* by F1)       |
+| `7_heldout_validation/6_plot_outputs.R`                              | Held-out sensitivity charts + YOLO vs YOLO→Qwen confusion               |
 
 
 Hi-res exports (`*_hires.png`) are 12,000 × 12,000 px for zooming; standard PNGs (~3,000 px) are for reports.
@@ -947,6 +1410,7 @@ Local archive under `del/` (gitignored — not synced to remote):
 | --- | --- |
 | `del/SVI_IDEAMaps.ipynb` | Original 100 m grid submission workflow |
 | `del/SVI_Val.ipynb` | YOLO validation split evaluation (companion to Step 6) |
+| `del/1_training_dataset_csv.ipynb` | Earlier draft of the Step 6 training inventory notebook |
 | `del/SVI_PPP_Stats_USE.ipynb` | Earlier PPP / stats analysis |
 | `del/SVI_distance_use.ipynb` | Earlier distance analysis |
 | `del/3_100m_backup/` | Previous grid waste-ratio scripts (`1_grid_waste_ratio.py`, context maps, etc.) |
@@ -969,6 +1433,11 @@ Rscript 1prepare_chapter_data/plot_maps.R
 python 1prepare_chapter_data/2_prepare_osmnx_roads.py
 Rscript 1prepare_chapter_data/plot_road_figures.R
 
+# Step 0 — optional Mollweide fill (preferred grid for Step 3)
+python 0_extend_grid/1_extend_grid.py
+python 0_extend_grid/2_provenance_extended.py
+Rscript 0_extend_grid/3_plot_extended_grid.R
+
 # Step 2 — coverage (uses local cleaned roads from step 1a)
 python 2coverage_analysis/1cityroad.py
 python 2coverage_analysis/2roadsvi.py
@@ -986,7 +1455,7 @@ Rscript 2coverage_analysis/plot_process_zoom_map.R --layout=layers --svi-buffer-
 Rscript 2coverage_analysis/plot_process_zoom_map.R --layout=layers --svi-buffer-m=100
 Rscript 2coverage_analysis/3plot_sviwaste_maps.R
 
-# Step 3 — 100 m grid coverage + validation (after Step 1)
+# Step 3 — 100 m grid coverage + validation (+ provenance)
 python 3_100m/1_grid_coverage.py
 Rscript 3_100m/1_plot_grid_coverage_matrix.R
 python 3_100m/2_validation_analysis.py
@@ -995,6 +1464,9 @@ python 3_100m/3_mitigation_validation.py
 Rscript 3_100m/3_plot_mitigation_validation.R
 Rscript 3_100m/3_plot_mitigation_validation_severity.R
 Rscript 3_100m/3_plot_mitigation_validation_overlap.R
+python 3_100m/4_indicator_provenance.py
+Rscript 3_100m/4_plot_indicator_provenance_map.R
+python 3_100m/5_validation_by_provenance.py
 
 # Step 4 — compare GSVI vs GSVI + self-collected (after Step 1)
 python 4_compare/1_compare_sources_table.py
@@ -1002,16 +1474,49 @@ Rscript 4_compare/1_plot_svi_sources_map.R
 Rscript 4_compare/2_plot_waste_sources_map.R
 Rscript 4_compare/3_plot_sources_comparison_panel.R
 
-# Step 5 — cluster analysis (after Step 1)
-python 5_cluster/HDBSCAN/3_hdbscan_waste.py
-python 5_cluster/HDBSCAN/4_mitigation_comparison.py
-Rscript 5_cluster/HDBSCAN/3_plot_hdbscan_map.R
-Rscript 5_cluster/HDBSCAN/5_plot_hotspot_difference_map.R
-Rscript 5_cluster/HDBSCAN/4_plot_new_obs_stacked_bar.R
-python 5_cluster/KDE/1_kde_hotspots.py
-Rscript 5_cluster/KDE/2_plot_kde_comparison.R
+# Step 5 — spatial pattern (after Step 2c; panorama unit)
+python 5_spatial_pattern/settlement/1_nnr_observation_frame.py
+python 5_spatial_pattern/settlement/2_settlement_association.py
+python 5_spatial_pattern/Distance_decay/1_distance_decay_negexp.py
+python 5_spatial_pattern/Signed_distance/1_signed_distance_gam.py
+python 5_spatial_pattern/pop_adjusted/1_pop_adjusted_gam.py
+python 5_spatial_pattern/pop_adjusted/worldpop_2020/1_pop_adjusted_gam.py
+python 5_spatial_pattern/settlement/5_temporal_robustness.py
+python 5_spatial_pattern/Signed_distance/period_stratified_robustness/1_period_signed_distance_gam.py
+python 5_spatial_pattern/HDBSCAN/period_stratified_robustness/1_period_hdbscan.py
+Rscript 5_spatial_pattern/settlement/3_plot_settlement_association.R
+Rscript 5_spatial_pattern/Distance_decay/2_plot_distance_decay.R
+Rscript 5_spatial_pattern/Distance_decay/3_plot_negexp_notebook_style.R
+Rscript 5_spatial_pattern/Signed_distance/2_plot_signed_distance_gam.R
+Rscript 5_spatial_pattern/pop_adjusted/2_plot_pop_adjusted_gam.R
+Rscript 5_spatial_pattern/pop_adjusted/3_plot_mdp_residual_map.R
+Rscript 5_spatial_pattern/pop_adjusted/worldpop_2020/2_plot_pop_adjusted_gam.R
+Rscript 5_spatial_pattern/pop_adjusted/3_plot_mdp_residual_map.R --data-subdir=worldpop_2020 --fig-subdir=worldpop_2020
+Rscript 5_spatial_pattern/Signed_distance/period_stratified_robustness/2_plot_period_signed_distance_gam.R
+Rscript 5_spatial_pattern/HDBSCAN/period_stratified_robustness/2_plot_period_hdbscan.R
+Rscript 5_spatial_pattern/settlement/6_plot_temporal_robustness.R
+python 5_spatial_pattern/HDBSCAN/3_hdbscan_waste.py
+python 5_spatial_pattern/HDBSCAN/4_mitigation_comparison.py
+python 5_spatial_pattern/HDBSCAN/5_hdbscan_cluster_views.py
+python 5_spatial_pattern/HDBSCAN/6_hdbscan_100m_sensitivity.py
+Rscript 5_spatial_pattern/HDBSCAN/3_plot_hdbscan_map.R
+Rscript 5_spatial_pattern/HDBSCAN/5_plot_hotspot_difference_map.R
+Rscript 5_spatial_pattern/HDBSCAN/4_plot_new_obs_stacked_bar.R
+Rscript 5_spatial_pattern/HDBSCAN/6_plot_hdbscan_100m_sensitivity.R
+python 5_spatial_pattern/HDBSCAN/7_hdbscan_settlement_context.py
+Rscript 5_spatial_pattern/HDBSCAN/7_plot_hdbscan_context_map.R
+Rscript 5_spatial_pattern/HDBSCAN/8_plot_cluster_distance_composition.R
+python 5_spatial_pattern/HDBSCAN/9_cluster_size_distribution.py
+Rscript 5_spatial_pattern/HDBSCAN/9_plot_cluster_size_distribution.R
+python 5_spatial_pattern/KDE/1_kde_hotspots.py
+Rscript 5_spatial_pattern/KDE/2_plot_kde_comparison.R
 
-# Step 6 — YOLO training mix sensitivity (optional; independent of Steps 1–5)
-jupyter notebook 6_sensitivity/1_training_dataset_csv.ipynb
+# Step 6 — YOLO training mix (SC in training; 100% = baseline, 0% = no SC)
+jupyter notebook 6_sensitivity_training/1_training_dataset_pipeline.ipynb
+Rscript 6_sensitivity_training/7_plot_baseline_training_curves.R
+
+# Step 7 — independent 180 GSVI held-out validation
+# Canonical set: Waste/img/7_heldout_validation/20260807_heldout_GSVI_p100_label/
+# Colab YOLO val → 4_Qwen_yolo_positives_replicates.ipynb → python 7_heldout_validation/0_run_all.py
 ```
 

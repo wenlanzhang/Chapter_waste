@@ -24,12 +24,12 @@ SUMMARY_CSV <- file.path(VALIDATION_TABLE_DIR, "Nairobi_validation_summary.csv")
 
 SEVERITY_LEVELS <- c("0", "1", "2")
 SEVERITY_LABELS <- c(
-  "0" = "No waste (0)",
+  "0" = "Low (0)",
   "1" = "Medium (1)",
   "2" = "High (2)"
 )
 BINARY_LEVELS <- c("0", "1")
-BINARY_LABELS <- c("0" = "No waste", "1" = "Waste present")
+BINARY_LABELS <- c("0" = "Low", "1" = "Waste present")
 
 FILL_LABEL <- "Count"
 
@@ -75,8 +75,8 @@ build_confusion_panel <- function(cm, title, show_legend = FALSE, caption = NULL
     labs(
       title = title,
       caption = caption,
-      x = "Model prediction",
-      y = "Validation (ground truth)"
+      x = "Indicator category",
+      y = "Crowd-assessed category"
     ) +
     map_theme() +
     theme(

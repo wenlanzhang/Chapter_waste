@@ -3,6 +3,11 @@
 library(ggplot2)
 library(ggspatial)
 
+# Rscript starts in the C locale, which mangles degree/superscript/dash glyphs
+if (!identical(Sys.getlocale("LC_CTYPE"), "en_US.UTF-8")) {
+  suppressWarnings(Sys.setlocale("LC_CTYPE", "en_US.UTF-8"))
+}
+
 get_repo_root <- function(script_dir) {
   normalizePath(file.path(script_dir, ".."))
 }
@@ -145,6 +150,8 @@ trim_map_png <- function(path) {
   }
   img <- magick::image_read(path)
   img <- magick::image_trim(img)
+  # Keep a small breathing space so titles/captions never touch the edge
+  img <- magick::image_border(img, color = "none", geometry = "24x24")
   magick::image_write(img, path, format = "png")
   invisible(path)
 }
@@ -168,7 +175,16 @@ save_map <- function(
   width <- if (is.null(width)) base_size else width
   height <- if (is.null(height)) base_size else height
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
-  ggsave(filename = path, plot = plot, width = width, height = height, dpi = dpi, bg = bg)
+  is_png <- grepl("\\.[Pp][Nn][Gg]$", path, perl = TRUE)
+  # quartz drops non-ASCII glyphs (arrows, superscripts); agg_png renders them
+  if (is_png && requireNamespace("ragg", quietly = TRUE)) {
+    ggsave(
+      filename = path, plot = plot, width = width, height = height,
+      dpi = dpi, bg = bg, device = ragg::agg_png
+    )
+  } else {
+    ggsave(filename = path, plot = plot, width = width, height = height, dpi = dpi, bg = bg)
+  }
   if (trim && grepl("\\.[Pp][Nn][Gg]$", path, perl = TRUE)) {
     trim_map_png(path)
   }
