@@ -18,10 +18,11 @@ script_dir <- if (length(file_arg)) {
 } else {
   "."
 }
+source(file.path(script_dir, "../..", "R", "chapter_paths.R"))
 source(file.path(script_dir, "..", "..", "R", "map_theme.R"))
 source(file.path(script_dir, "..", "..", "R", "mitigation_map_theme.R"))
 
-DATA_ROOT <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste"
+DATA_ROOT <- chapter_data_root
 INPUT_DIR <- file.path(DATA_ROOT, "1prepare_chapter_data")
 CLUSTER_DIR <- file.path(DATA_ROOT, "5_spatial_pattern", "HDBSCAN")
 FIG_DIR <- file.path(script_dir, "..", "..", "Figure", "5_spatial_pattern", "HDBSCAN")

@@ -22,9 +22,11 @@ import pandas as pd
 from scipy.stats import chi2_contingency
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR.parent))
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-from panoid_locations import (  # noqa: E402
+from lib.panoids import (  # noqa: E402
     PATTERN_DIR,
     enrich_sviwaste_frame,
     label_inside_settlement,

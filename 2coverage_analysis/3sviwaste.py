@@ -7,15 +7,20 @@ Labels each SVI panoid as waste-positive if it appears in the waste dataset.
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import geopandas as gpd
 import pandas as pd
 
-from thesis_tables import build_sviwaste_table, save_thesis_table
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-DATA_ROOT = Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data")
-INPUT_DIR = DATA_ROOT / "Chapter_waste" / "1prepare_chapter_data"
-OUTPUT_DIR = DATA_ROOT / "Chapter_waste" / "2coverage_analysis"
+from chapter_paths import coverage_dir, prep_dir  # noqa: E402
+from lib.thesis_tables import build_sviwaste_table, save_thesis_table  # noqa: E402
+
+INPUT_DIR = prep_dir()
+OUTPUT_DIR = coverage_dir()
 
 
 def label_waste_on_svi(svi: gpd.GeoDataFrame, waste: gpd.GeoDataFrame) -> gpd.GeoDataFrame:

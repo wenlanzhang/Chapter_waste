@@ -24,6 +24,7 @@ script_dir <- if (length(file_arg)) {
 } else {
   "."
 }
+source(file.path(script_dir, "../..", "R", "chapter_paths.R"))
 source(file.path(script_dir, "..", "..", "R", "chapter_colours.R"))
 source(file.path(script_dir, "..", "..", "R", "mitigation_map_theme.R"))
 
@@ -44,7 +45,7 @@ run_hint <- get_opt(
   "python 5_spatial_pattern/pop_adjusted/1_pop_adjusted_gam.py --residuals-only"
 )
 
-DATA_ROOT <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste"
+DATA_ROOT <- chapter_data_root
 INPUT_DIR <- file.path(DATA_ROOT, "1prepare_chapter_data")
 POP_DIR <- if (nzchar(data_subdir)) {
   file.path(DATA_ROOT, "5_spatial_pattern", "pop_adjusted", data_subdir)

@@ -17,7 +17,8 @@ script_dir <- if (length(file_arg)) {
   "."
 }
 
-DATA_ROOT <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste"
+source(file.path(script_dir, "../../..", "R", "chapter_paths.R"))
+DATA_ROOT <- chapter_data_root
 EXTERNAL_DIR <- file.path(
   DATA_ROOT, "5_spatial_pattern", "Signed_distance", "period_stratified_robustness"
 )

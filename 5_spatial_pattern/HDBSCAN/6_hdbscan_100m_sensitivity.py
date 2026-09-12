@@ -16,77 +16,44 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
-import hdbscan
 import numpy as np
 import pandas as pd
-from shapely.geometry import MultiPoint
 from shapely.ops import unary_union
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR.parent))
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-from panoid_locations import (  # noqa: E402
-    INPUT_DIR,
+from chapter_paths import active_grid_gpkg  # noqa: E402
+from lib.hdbscan_fit import (  # noqa: E402
+    MIN_CLUSTER_SIZE,
+    MIN_SAMPLES,
+    cluster_convex_hull,
+    cluster_labels,
+)
+from lib.panoids import (  # noqa: E402
     PATTERN_DIR,
     load_gsvi_waste_panoids,
 )
 
 OUTPUT_DIR = PATTERN_DIR / "HDBSCAN"
 TABLE_DIR = OUTPUT_DIR / "thesis_table"
-EXTEND_DIR = PATTERN_DIR.parent / "0_extend_grid"
-
-_EXTENDED_GRID = EXTEND_DIR / "Nairobi_grid_100m_extended_32737.gpkg"
-_ANGELA_GRID = INPUT_DIR / "Nairobi_grid_100m_32737.gpkg"
-GRID_GPKG = _EXTENDED_GRID if _EXTENDED_GRID.exists() else _ANGELA_GRID
+GRID_GPKG = active_grid_gpkg()
 
 PANOID_HOTSPOT_GPKG = OUTPUT_DIR / "Nairobi_waste_hotspot_polygons_gsvi_32737.gpkg"
 PANOID_CLUSTERED_GPKG = OUTPUT_DIR / "Nairobi_waste_hdbscan_gsvi_32737.gpkg"
 
-MIN_CLUSTER_SIZE = 25
-MIN_SAMPLES = 6
-# If n_positive_cells is much smaller, allow a modest reduction
 MIN_CLUSTER_SIZE_FLOOR = 10
 
 
-def cluster_convex_hull(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    clustered = gdf[gdf["HDB_cluster"] != -1].copy()
-    if clustered.empty:
-        return gpd.GeoDataFrame(
-            columns=["HDB_cluster", "n_points", "area_m2", "area_km2", "geometry"],
-            geometry="geometry",
-            crs=gdf.crs,
-        )
-
-    def hull(geoms: gpd.GeoSeries) -> object:
-        points = list(geoms)
-        if len(points) == 1:
-            return points[0].buffer(1.0)
-        hull_geom = MultiPoint(points).convex_hull
-        if hull_geom.area == 0:
-            return hull_geom.buffer(1.0)
-        return hull_geom
-
-    polys = (
-        clustered.groupby("HDB_cluster")["geometry"]
-        .apply(hull)
-        .reset_index(name="geometry")
-    )
-    polys = gpd.GeoDataFrame(polys, geometry="geometry", crs=gdf.crs)
-    polys["n_points"] = clustered.groupby("HDB_cluster").size().values
-    polys["area_m2"] = polys.geometry.area
-    polys["area_km2"] = polys["area_m2"] / 1e6
-    return polys
-
-
 def run_hdbscan(gdf: gpd.GeoDataFrame, min_cluster_size: int) -> gpd.GeoDataFrame:
-    coords = np.column_stack([gdf.geometry.x, gdf.geometry.y])
-    clusterer = hdbscan.HDBSCAN(
+    out = gdf.copy()
+    out["HDB_cluster"] = cluster_labels(
+        gdf,
         min_cluster_size=min_cluster_size,
         min_samples=min(MIN_SAMPLES, min_cluster_size),
-        gen_min_span_tree=True,
     )
-    out = gdf.copy()
-    out["HDB_cluster"] = clusterer.fit_predict(coords)
     return out
 
 

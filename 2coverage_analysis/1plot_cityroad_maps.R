@@ -12,10 +12,11 @@ suppressPackageStartupMessages({
 args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
+source(file.path(script_dir, "..", "R", "chapter_paths.R"))
 source(file.path(script_dir, "..", "R", "map_theme.R"))
 
-DATA_DIR <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste/2coverage_analysis"
-INPUT_DIR <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste/1prepare_chapter_data"
+DATA_DIR <- file.path(chapter_data_root, "2coverage_analysis")
+INPUT_DIR <- file.path(chapter_data_root, "1prepare_chapter_data")
 FIG_DIR <- file.path(script_dir, "..", "Figure", "2coverage_analysis")
 CRS_EA <- 32737
 
@@ -82,6 +83,10 @@ plot_spearman_heatmap <- function(corr_mat, tag, n_cells) {
   n <- length(CORR_COLUMNS)
   labels <- CORR_LABELS[CORR_COLUMNS]
 
+  rho_range <- range(corr_mat[lower.tri(corr_mat)], na.rm = TRUE)
+  fill_low <- floor(rho_range[1] * 20) / 20 - 0.02
+  fill_high <- 1
+
   corr_long <- data.frame(
     row_idx = rep(seq_len(n), each = n),
     col_idx = rep(seq_len(n), times = n),
@@ -107,10 +112,6 @@ plot_spearman_heatmap <- function(corr_mat, tag, n_cells) {
         limits = c(fill_low, fill_high)
       )
     )
-
-  rho_range <- range(corr_long$rho[corr_long$cell_type == "lower"], na.rm = TRUE)
-  fill_low <- floor(rho_range[1] * 20) / 20 - 0.02
-  fill_high <- 1
 
   lower_cells <- corr_long |> filter(.data$cell_type == "lower")
   diag_cells <- corr_long |> filter(.data$cell_type == "diag")

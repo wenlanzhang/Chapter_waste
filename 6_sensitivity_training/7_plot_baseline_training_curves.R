@@ -13,12 +13,13 @@ suppressPackageStartupMessages({
 args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
+source(file.path(script_dir, "..", "R", "chapter_paths.R"))
 source(file.path(script_dir, "..", "R", "map_theme.R"))
 
-DATA_ROOT <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data"
+DATA_ROOT <- phd_data_root
 RESULTS_CSV <- file.path(DATA_ROOT, "Waste/img/train_SVI_Yolo/results.csv")
 FIG_DIR <- file.path(script_dir, "..", "Figure", "6_sensitivity")
-OUT_META <- file.path(DATA_ROOT, "Chapter_waste/6_sensitivity/baseline_yolo_training_checkpoint.csv")
+OUT_META <- file.path(chapter_data_root, "6_sensitivity/baseline_yolo_training_checkpoint.csv")
 
 raw <- read_csv(RESULTS_CSV, show_col_types = FALSE)
 # Ultralytics CSVs often have leading spaces in column names

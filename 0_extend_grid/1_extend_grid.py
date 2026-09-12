@@ -16,6 +16,7 @@ Standalone experiment — does not modify Step 1 / 3_100m outputs.
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import geopandas as gpd
 import numpy as np
@@ -23,13 +24,16 @@ import pandas as pd
 from shapely.geometry import box
 from shapely.ops import unary_union
 
-DATA_ROOT = Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste")
-INPUT_DIR = DATA_ROOT / "1prepare_chapter_data"
-RAW_ANGELA = Path(
-    "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Waste/Angela/"
-    "IDEAmaps_grid-boundary-nairobi.gpkg"
-)
-OUTPUT_DIR = DATA_ROOT / "0_extend_grid"
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from chapter_paths import extend_dir, phd_data_root, prep_dir, waste_raw_dir  # noqa: E402
+
+DATA_ROOT = phd_data_root() / "Chapter_waste"
+INPUT_DIR = prep_dir()
+RAW_ANGELA = waste_raw_dir() / "Angela" / "IDEAmaps_grid-boundary-nairobi.gpkg"
+OUTPUT_DIR = extend_dir()
 
 CLIPPED_GRID = INPUT_DIR / "Nairobi_grid_100m_32737.gpkg"
 BOUNDARY_GPKG = INPUT_DIR / "Nairobi_boundary_polygon_32737.gpkg"

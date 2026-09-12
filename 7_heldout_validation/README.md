@@ -17,8 +17,8 @@ Canonical images:
 ├── 3_Qwen_heldout_validation.ipynb           # main pipeline: Qwen on YOLO FPs only
 ├── 4_Qwen_yolo_positives_replicates.ipynb    # stability: Qwen ×3 on all 115 YOLO+
 ├── 5_build_outputs.py                        # thesis tables (+ Wilson CIs)
-├── 6_plot_outputs.R                          # figures
-├── paths.py
+├── 6_plot_outputs.R                          # figures (`R/chapter_paths.R`)
+├── paths.py                                  # wraps chapter_paths.py
 └── README.md
 ```
 

@@ -8,26 +8,31 @@ Thin wrapper around the parent 1_pop_adjusted_gam.py with:
 
 from __future__ import annotations
 
-import runpy
-import sys
 from pathlib import Path
+import sys
+
+import runpy
+
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from chapter_paths import pattern_dir, phd_data_root  # noqa: E402
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PARENT_DIR = SCRIPT_DIR.parent
 PARENT_SCRIPT = PARENT_DIR / "1_pop_adjusted_gam.py"
 
-# Data root mirrors the chapter layout used by panoid_locations.PATTERN_DIR
-DATA_OUT = (
-    Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste")
-    / "5_spatial_pattern"
-    / "pop_adjusted"
-    / "worldpop_2020"
-)
+_PHD_DATA = phd_data_root()
+DATA_OUT = pattern_dir() / "pop_adjusted" / "worldpop_2020"
 POP_RASTER = DATA_OUT / "ken_ppp_2020.tif"
 # Fallback if symlink not created yet
-POP_RASTER_FALLBACK = Path(
-    "/Users/wenlanzhang/Downloads/PhD_UCL/Data/RS/Pop_density/"
-    "UnconstraintIndividualCountries/ken_ppp_2020.tif"
+POP_RASTER_FALLBACK = (
+    _PHD_DATA
+    / "RS"
+    / "Pop_density"
+    / "UnconstraintIndividualCountries"
+    / "ken_ppp_2020.tif"
 )
 
 

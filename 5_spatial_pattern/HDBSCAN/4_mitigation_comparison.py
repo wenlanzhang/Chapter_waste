@@ -11,15 +11,15 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
-import hdbscan
-import numpy as np
 import pandas as pd
-from shapely.geometry import MultiPoint
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR.parent))
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-from panoid_locations import (  # noqa: E402
+from lib.hdbscan_fit import cluster_convex_hull, cluster_labels  # noqa: E402
+from lib.panoids import (  # noqa: E402
     PATTERN_DIR,
     load_gsvi_selfcollected_locations,
     load_gsvi_waste_panoids,
@@ -27,9 +27,6 @@ from panoid_locations import (  # noqa: E402
 )
 
 OUTPUT_DIR = PATTERN_DIR / "HDBSCAN"
-
-MIN_CLUSTER_SIZE = 25
-MIN_SAMPLES = 6
 
 ARMS = {
     "gsvi": {
@@ -58,45 +55,9 @@ HOTSPOT_OVERLAP_FRAC = 0.30
 
 
 def run_hdbscan(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    coords = np.column_stack([gdf.geometry.x, gdf.geometry.y])
-    clusterer = hdbscan.HDBSCAN(
-        min_cluster_size=MIN_CLUSTER_SIZE,
-        min_samples=MIN_SAMPLES,
-        gen_min_span_tree=True,
-    )
     out = gdf.copy()
-    out["HDB_cluster"] = clusterer.fit_predict(coords)
+    out["HDB_cluster"] = cluster_labels(gdf)
     return out
-
-
-def cluster_convex_hull(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    clustered = gdf[gdf["HDB_cluster"] != -1].copy()
-    if clustered.empty:
-        return gpd.GeoDataFrame(
-            columns=["HDB_cluster", "n_points", "area_m2", "area_km2", "geometry"],
-            geometry="geometry",
-            crs=gdf.crs,
-        )
-
-    def hull(geoms: gpd.GeoSeries) -> object:
-        points = list(geoms)
-        if len(points) == 1:
-            return points[0].buffer(1.0)
-        hull_geom = MultiPoint(points).convex_hull
-        if hull_geom.area == 0:
-            return hull_geom.buffer(1.0)
-        return hull_geom
-
-    polys = (
-        clustered.groupby("HDB_cluster")["geometry"]
-        .apply(hull)
-        .reset_index(name="geometry")
-    )
-    polys = gpd.GeoDataFrame(polys, geometry="geometry", crs=gdf.crs)
-    polys["n_points"] = clustered.groupby("HDB_cluster").size().values
-    polys["area_m2"] = polys.geometry.area
-    polys["area_km2"] = polys["area_m2"] / 1e6
-    return polys
 
 
 def compute_metrics(clustered_gdf: gpd.GeoDataFrame) -> dict:

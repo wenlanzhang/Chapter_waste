@@ -25,37 +25,30 @@ import statsmodels.api as sm
 from statsmodels.gam.api import BSplines, GLMGam
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-from panoid_locations import (  # noqa: E402
+from lib.gam import (  # noqa: E402
+    BOOT_B,
+    BOOT_SEED,
+    CI_ALPHA,
+    PRED_GRID_N,
+    SPLINE_DEGREE,
+    SPLINE_DF,
+)
+from lib.panoids import (  # noqa: E402
     PATTERN_DIR,
     enrich_sviwaste_frame,
     label_inside_settlement,
     load_slums,
     signed_distance_to_slums,
 )
+from lib.periods import PERIODS, assign_period  # noqa: E402
 
 # Always write under the external data root (not the code tree).
 OUTPUT_DIR = PATTERN_DIR / "Signed_distance" / "period_stratified_robustness"
 TABLE_DIR = OUTPUT_DIR / "thesis_table"
-
-PERIODS = {
-    "2015_2019": {
-        "label": "2015–2019",
-        "years": {2015, 2016, 2017, 2018, 2019},
-    },
-    "2021_2022": {
-        "label": "2021–2022",
-        "years": {2021, 2022},
-    },
-}
-
-SPLINE_DF = 8
-SPLINE_DEGREE = 3
-PRED_GRID_N = 200
-CI_ALPHA = 0.05
-BOOT_B = 80
-BOOT_SEED = 42
 
 
 def prepare_period_frame() -> pd.DataFrame:
@@ -82,14 +75,7 @@ def prepare_period_frame() -> pd.DataFrame:
     df = df.dropna(subset=["year", "signed_distance_m", "waste_positive"]).copy()
     df["year"] = df["year"].astype(int)
     df["waste_positive"] = df["waste_positive"].astype(int)
-
-    def _period(y: int) -> str | None:
-        for key, meta in PERIODS.items():
-            if y in meta["years"]:
-                return key
-        return None
-
-    df["period"] = df["year"].map(_period)
+    df["period"] = assign_period(df["year"])
     return df.loc[df["period"].notna()].reset_index(drop=True)
 
 

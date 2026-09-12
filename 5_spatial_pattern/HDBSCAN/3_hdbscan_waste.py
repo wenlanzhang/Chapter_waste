@@ -11,23 +11,21 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import hdbscan
-import numpy as np
 import pandas as pd
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR.parent))
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-from panoid_locations import (  # noqa: E402
+from lib.hdbscan_fit import cluster_points  # noqa: E402
+from lib.panoids import (  # noqa: E402
     PATTERN_DIR,
     load_gsvi_selfcollected_locations,
     load_gsvi_waste_panoids,
 )
 
 OUTPUT_DIR = PATTERN_DIR / "HDBSCAN"
-
-MIN_CLUSTER_SIZE = 25
-MIN_SAMPLES = 6
 
 DATASETS = {
     "gsvi": {
@@ -47,36 +45,10 @@ DATASETS = {
 }
 
 
-def run_hdbscan(gdf):
-    coords = np.column_stack([gdf.geometry.x, gdf.geometry.y])
-    clusterer = hdbscan.HDBSCAN(
-        min_cluster_size=MIN_CLUSTER_SIZE,
-        min_samples=MIN_SAMPLES,
-        gen_min_span_tree=True,
-    )
-    labels = clusterer.fit_predict(coords)
-
-    out = gdf.copy()
-    out["HDB_cluster"] = labels
-
-    n_noise = int((labels == -1).sum())
-    n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-    summary = {
-        "min_cluster_size": MIN_CLUSTER_SIZE,
-        "min_samples": MIN_SAMPLES,
-        "n_points": len(labels),
-        "n_clusters": n_clusters,
-        "n_noise": n_noise,
-        "noise_ratio": n_noise / len(labels),
-        "unit": "panorama_location",
-    }
-    return out, summary
-
-
 def process_dataset(key: str) -> dict:
     meta = DATASETS[key]
     gdf = meta["loader"]()
-    clustered, summary = run_hdbscan(gdf)
+    clustered, summary = cluster_points(gdf)
     summary["dataset"] = key
     summary["label"] = meta["label"]
 

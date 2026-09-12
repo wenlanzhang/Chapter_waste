@@ -7,6 +7,7 @@ GeoPackages to Chapter_waste/1prepare_chapter_data.
 SVI points are deduplicated by panoid (one row per panorama, not per image).
 """
 
+import sys
 from pathlib import Path
 
 import geopandas as gpd
@@ -16,23 +17,26 @@ import pandas as pd
 from shapely.geometry import Point
 from shapely.ops import unary_union
 
-from road_utils import ROAD_FILES, clean_road_segments, node_road_segments, prepare_raw_local
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from chapter_paths import phd_data_root, prep_dir, waste_raw_dir  # noqa: E402
+from lib.roads import ROAD_FILES, clean_road_segments, node_road_segments, prepare_raw_local  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-DATA_ROOT = Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data")
-OUTPUT_DIR = DATA_ROOT / "Chapter_waste" / "1prepare_chapter_data"
+DATA_ROOT = phd_data_root()
+OUTPUT_DIR = prep_dir()
 
-WASTE_CSV = DATA_ROOT / "Waste/img/Correct_SVI.csv"
-SVI_CSV = DATA_ROOT / "Waste/img/Combined_SVI.csv"
+WASTE_CSV = waste_raw_dir() / "img" / "Correct_SVI.csv"
+SVI_CSV = waste_raw_dir() / "img" / "Combined_SVI.csv"
 BOUNDARY_SHP = DATA_ROOT / "Shp/NariobiShp/Shp_from_Constituency/Nairobi_shp_C.shp"
-SLUM_SHP = DATA_ROOT / "Waste/Angela/slumaps_nairobi_sett/slumaps_nairobi_sett.shp"
-ROAD_GPKG = DATA_ROOT / "Waste/Angela/OSM_NAI_AOI.gpkg"
-GRID_GPKG = DATA_ROOT / "Waste/Angela/IDEAmaps_grid-boundary-nairobi.gpkg"
-VALIDATION_CSV = (
-    DATA_ROOT / "Waste/IDEAMaps/260701validation/validation-dataset.csv"
-)
+SLUM_SHP = waste_raw_dir() / "Angela/slumaps_nairobi_sett/slumaps_nairobi_sett.shp"
+ROAD_GPKG = waste_raw_dir() / "Angela/OSM_NAI_AOI.gpkg"
+GRID_GPKG = waste_raw_dir() / "Angela/IDEAmaps_grid-boundary-nairobi.gpkg"
+VALIDATION_CSV = waste_raw_dir() / "IDEAMaps/260701validation/validation-dataset.csv"
 
 WGS84 = "EPSG:4326"
 PROJECTED_CRS = "EPSG:32737"

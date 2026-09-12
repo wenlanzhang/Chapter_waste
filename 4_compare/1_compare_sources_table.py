@@ -8,13 +8,19 @@ row per data source: GSVI, Self-collected, and GSVI + Self-collected.
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import geopandas as gpd
 import pandas as pd
 
-DATA_ROOT = Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data")
-INPUT_DIR = DATA_ROOT / "Chapter_waste" / "1prepare_chapter_data"
-OUTPUT_DIR = DATA_ROOT / "Chapter_waste" / "4_compare"
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from chapter_paths import compare_dir, prep_dir  # noqa: E402
+
+INPUT_DIR = prep_dir()
+OUTPUT_DIR = compare_dir()
 TABLE_DIR = OUTPUT_DIR / "thesis_table"
 TABLE_PATH = TABLE_DIR / "Nairobi_compare_sources_table.csv"
 

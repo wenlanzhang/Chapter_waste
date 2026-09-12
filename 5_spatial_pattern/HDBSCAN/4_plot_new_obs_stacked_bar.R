@@ -11,7 +11,8 @@ args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
 
-DATA_ROOT <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste"
+source(file.path(script_dir, "../..", "R", "chapter_paths.R"))
+DATA_ROOT <- chapter_data_root
 MITIGATION_DIR <- file.path(DATA_ROOT, "5_spatial_pattern", "HDBSCAN")
 FIG_DIR <- file.path(script_dir, "..", "..", "Figure", "5_spatial_pattern", "HDBSCAN")
 
