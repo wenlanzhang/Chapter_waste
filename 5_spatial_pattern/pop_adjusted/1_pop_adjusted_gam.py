@@ -40,9 +40,19 @@ from sklearn.metrics import brier_score_loss, log_loss
 from statsmodels.gam.api import BSplines, GLMGam
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR.parent))
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-from panoid_locations import (  # noqa: E402
+from lib.gam import (  # noqa: E402
+    BOOT_SEED,
+    CI_ALPHA,
+    PRED_GRID_N,
+    SPLINE_DEGREE,
+    SPLINE_DF,
+    assign_year_fe,
+)
+from lib.panoids import (  # noqa: E402
     PATTERN_DIR,
     enrich_sviwaste_frame,
     label_inside_settlement,
@@ -58,14 +68,8 @@ POP_LABEL = "static WorldPop Constrained Kenya 2024 (100 m CN)"
 POP_SHORT = "WorldPop Constrained KE 2024, 100 m (static)"
 THESIS_NAME = "pop_adjusted_gam.csv"
 
-MIN_YEAR_N = 200
-SPLINE_DF = 8
-SPLINE_DEGREE = 3
 SPLINE_DF_SPATIAL = 6
-PRED_GRID_N = 200
-CI_ALPHA = 0.05
 BOOT_B = 40
-BOOT_SEED = 42
 N_SPATIAL_KNOTS = 25
 N_CV_FOLDS = 5
 DEDUP_THRESHOLDS_M = (50.0, 100.0)
@@ -118,29 +122,7 @@ def prepare_analysis_frame() -> pd.DataFrame:
     df["waste_positive"] = df["waste_positive"].astype(int)
 
     n_before_year = len(df)
-    year_counts = df["year"].value_counts()
-    rare = set(year_counts[year_counts < MIN_YEAR_N].index.tolist())
-    df["year_fe"] = df["year"].astype(str)
-    if rare:
-        df.loc[df["year"].isin(rare), "year_fe"] = "other"
-        print(f"  Pooling rare years (n<{MIN_YEAR_N}) as 'other': {sorted(rare)}")
-
-    pos_by_fe = df.groupby("year_fe")["waste_positive"].sum()
-    zero_pos = [lv for lv, n in pos_by_fe.items() if int(n) == 0]
-    if zero_pos:
-        rep_year = df.groupby("year_fe")["year"].median().astype(float).to_dict()
-        positive_levels = [lv for lv, n in pos_by_fe.items() if int(n) > 0]
-        pos_reps = {lv: rep_year[lv] for lv in positive_levels}
-        for lv in zero_pos:
-            y0 = rep_year[lv]
-            nearest = min(pos_reps.items(), key=lambda kv: abs(kv[1] - y0))[0]
-            n_move = int((df["year_fe"] == lv).sum())
-            print(
-                f"  Reassigning year_fe='{lv}' ({n_move:,} panoids, 0 waste+) "
-                f"→ '{nearest}' (nearest year FE with positives)"
-            )
-            df.loc[df["year_fe"] == lv, "year_fe"] = nearest
-
+    df = assign_year_fe(df)
     print(
         f"  Frame: n={len(df):,} (dropped NA pop/year/distance from "
         f"enrichment; year FE applied; n_before_fe_ops≈{n_before_year:,})"

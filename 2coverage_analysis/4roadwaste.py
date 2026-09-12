@@ -10,42 +10,45 @@ Default: 50 m buffer; EPSG:32737 roads + panoids.
 from __future__ import annotations
 
 import argparse
-import importlib.util
-import sys
 from pathlib import Path
+import sys
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-_PREP_DIR = SCRIPT_DIR.parent / "1prepare_chapter_data"
-if str(_PREP_DIR) not in sys.path:
-    sys.path.insert(0, str(_PREP_DIR))
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-from road_utils import ROAD_FILES  # noqa: E402
-from thesis_tables import build_roadwaste_table, save_thesis_table  # noqa: E402
-
-# Load sibling module (filename starts with a digit)
-_spec = importlib.util.spec_from_file_location("roadsvi_mod", SCRIPT_DIR / "2roadsvi.py")
-roadsvi = importlib.util.module_from_spec(_spec)
-assert _spec.loader is not None
-_spec.loader.exec_module(roadsvi)
+from chapter_paths import coverage_dir, prep_dir  # noqa: E402
+from lib.road_coverage import (  # noqa: E402
+    DEFAULT_WORKERS,
+    buffer_file_tag as file_tag,
+    compute_h3_metrics,
+    export_coverage_csv,
+    export_h3_csv,
+    export_segment_csv,
+    h3_file_tag,
+    prepare_road_segments,
+    split_road_coverage,
+)
+from lib.roads import ROAD_FILES  # noqa: E402
+from lib.thesis_tables import build_roadwaste_table, save_thesis_table  # noqa: E402
 
 ROAD_GPKG = ROAD_FILES["coverage"]
-
-DATA_ROOT = Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data")
-INPUT_DIR = DATA_ROOT / "Chapter_waste" / "1prepare_chapter_data"
-OUTPUT_DIR = DATA_ROOT / "Chapter_waste" / "2coverage_analysis"
+INPUT_DIR = prep_dir()
+OUTPUT_DIR = coverage_dir()
 SVIWASTE_GPKG = OUTPUT_DIR / "Nairobi_sviwaste_points.gpkg"
 SVI_GPKG = INPUT_DIR / "Nairobi_SVI_point_gsvi_32737.gpkg"
 WASTE_GPKG = INPUT_DIR / "Nairobi_Waste_point_gsvi_32737.gpkg"
 
 DEFAULT_BUFFER_M = 50.0
 DEFAULT_H3_RES = 8
-DEFAULT_WORKERS = 8
+H3_RATIO_KWARGS = {
+    "ratio_col": "waste_coverage_ratio",
+    "covered_flag": "has_waste_coverage",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -81,14 +84,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def file_tag(buffer_m: float) -> str:
-    return f"buf{int(buffer_m)}m"
-
-
-def h3_file_tag(h3_res: int, buffer_m: float) -> str:
-    return f"h3_res{h3_res}_buf{int(buffer_m)}m"
-
-
 def load_waste_positive_panoids() -> gpd.GeoDataFrame:
     """One point per waste-positive GSVI panoid (prefer Step 2c labels)."""
     if SVIWASTE_GPKG.exists():
@@ -116,33 +111,6 @@ def load_waste_positive_panoids() -> gpd.GeoDataFrame:
         drop=True
     )
     return waste
-
-
-def _rename_h3_columns(metrics: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    out = metrics.copy()
-    rename = {
-        "svi_coverage_ratio": "waste_coverage_ratio",
-        "has_svi_coverage": "has_waste_coverage",
-    }
-    out = out.rename(columns=rename)
-    return out
-
-
-def _export_h3_csv(metrics: gpd.GeoDataFrame, path: Path) -> None:
-    columns = [
-        "h3_index",
-        "h3_res",
-        "cell_area_m2",
-        "city_area_m2",
-        "in_city",
-        "road_length_m",
-        "covered_road_length_m",
-        "uncovered_road_length_m",
-        "waste_coverage_ratio",
-        "has_road",
-        "has_waste_coverage",
-    ]
-    metrics[columns].to_csv(path, index=False)
 
 
 def _attach_h3_summary(
@@ -260,8 +228,8 @@ def run_h3_only(args: argparse.Namespace) -> None:
     coverage_parts = gpd.read_file(coverage_gpkg)
 
     print(f"Aggregating coverage to H3 res {args.h3_res}...")
-    h3_metrics = _rename_h3_columns(
-        roadsvi.compute_h3_metrics(coverage_parts, boundary, args.h3_res)
+    h3_metrics = compute_h3_metrics(
+        coverage_parts, boundary, args.h3_res, **H3_RATIO_KWARGS
     )
 
     if summary_csv.exists():
@@ -297,7 +265,7 @@ def run_h3_only(args: argparse.Namespace) -> None:
     print(f"Writing {h3_gpkg.name}...")
     h3_metrics.to_file(h3_gpkg, driver="GPKG")
     print(f"Writing {h3_csv.name}...")
-    _export_h3_csv(h3_metrics, h3_csv)
+    export_h3_csv(h3_metrics, h3_csv, **H3_RATIO_KWARGS)
     print(f"Writing {summary_csv.name}...")
     summary.to_csv(summary_csv, index=False)
 
@@ -335,13 +303,13 @@ def main() -> None:
     waste = load_waste_positive_panoids()
 
     print("Preparing road segments...")
-    segments = roadsvi.prepare_road_segments(roads)
+    segments = prepare_road_segments(roads)
 
     print(
         f"Splitting road coverage by metre "
         f"({len(segments):,} segments, {len(waste):,} waste+ panoids)..."
     )
-    coverage_parts, segment_summary = roadsvi.split_road_coverage(
+    coverage_parts, segment_summary = split_road_coverage(
         segments,
         waste,
         args.buffer_m,
@@ -349,8 +317,8 @@ def main() -> None:
     )
 
     print(f"Aggregating coverage to H3 res {args.h3_res}...")
-    h3_metrics = _rename_h3_columns(
-        roadsvi.compute_h3_metrics(coverage_parts, boundary, args.h3_res)
+    h3_metrics = compute_h3_metrics(
+        coverage_parts, boundary, args.h3_res, **H3_RATIO_KWARGS
     )
     summary = compute_summary(
         segment_summary,
@@ -365,19 +333,19 @@ def main() -> None:
     segment_summary.to_file(segments_gpkg, driver="GPKG")
 
     print(f"Writing {segments_csv.name}...")
-    roadsvi.export_segment_csv(segment_summary, segments_csv)
+    export_segment_csv(segment_summary, segments_csv)
 
     print(f"Writing {coverage_gpkg.name}...")
     coverage_parts.to_file(coverage_gpkg, driver="GPKG")
 
     print(f"Writing {coverage_csv.name}...")
-    roadsvi.export_coverage_csv(coverage_parts, coverage_csv)
+    export_coverage_csv(coverage_parts, coverage_csv)
 
     print(f"Writing {h3_gpkg.name}...")
     h3_metrics.to_file(h3_gpkg, driver="GPKG")
 
     print(f"Writing {h3_csv.name}...")
-    _export_h3_csv(h3_metrics, h3_csv)
+    export_h3_csv(h3_metrics, h3_csv, **H3_RATIO_KWARGS)
 
     print(f"Writing {summary_csv.name}...")
     summary.to_csv(summary_csv, index=False)

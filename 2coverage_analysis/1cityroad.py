@@ -12,27 +12,25 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 from shapely.geometry import Point
 
-from h3_utils import PROJECTED_CRS, build_h3_grid, clip_grid_to_city
-from thesis_tables import build_cityroad_table, save_thesis_table
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-import sys
-
-_PREP_DIR = Path(__file__).resolve().parent.parent / "1prepare_chapter_data"
-if str(_PREP_DIR) not in sys.path:
-    sys.path.insert(0, str(_PREP_DIR))
-from road_utils import ROAD_FILES
+from chapter_paths import coverage_dir, prep_dir  # noqa: E402
+from lib.h3_grid import PROJECTED_CRS, build_h3_grid, clip_grid_to_city  # noqa: E402
+from lib.roads import ROAD_FILES  # noqa: E402
+from lib.thesis_tables import build_cityroad_table, save_thesis_table  # noqa: E402
 
 ROAD_GPKG = ROAD_FILES["coverage"]
-
-DATA_ROOT = Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data")
-INPUT_DIR = DATA_ROOT / "Chapter_waste" / "1prepare_chapter_data"
-OUTPUT_DIR = DATA_ROOT / "Chapter_waste" / "2coverage_analysis"
+INPUT_DIR = prep_dir()
+OUTPUT_DIR = coverage_dir()
 
 DEFAULT_H3_RES = 8
 DEFAULT_ROAD_BUFFER_M = 50

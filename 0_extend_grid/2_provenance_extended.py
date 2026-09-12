@@ -7,59 +7,32 @@ Reuses 3_100m pipeline helpers without modifying that folder's outputs.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
+import sys
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "3_100m"))
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-from ideamaps_grid_pipeline import (  # noqa: E402
+from chapter_paths import extend_dir, prep_dir  # noqa: E402
+from lib.ideamaps import (  # noqa: E402
     load_gsvi_submission_jenks_breaks,
     run_ideamaps_grid_pipeline,
 )
-from output_paths import INPUT_DIR  # noqa: E402
+from lib.provenance import DEFINITIONS, PROVENANCE_ORDER, assign_provenance  # noqa: E402
 
-DATA_ROOT = Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste")
-EXT_DIR = DATA_ROOT / "0_extend_grid"
+INPUT_DIR = prep_dir()
+EXT_DIR = extend_dir()
 
 GRID_GPKG = EXT_DIR / "Nairobi_grid_100m_extended_32737.gpkg"
 SVI_GPKG = INPUT_DIR / "Nairobi_SVI_image_gsvi_32737.gpkg"
 WASTE_GPKG = INPUT_DIR / "Nairobi_Waste_point_gsvi_32737.gpkg"
 CELLS_CSV = EXT_DIR / "Nairobi_indicator_provenance_cells_extended.csv"
 SUMMARY_CSV = EXT_DIR / "Nairobi_indicator_provenance_summary_extended.csv"
-
-PROVENANCE_ORDER = [
-    "Direct observation",
-    "Interpolated support",
-    "Unsupported, platform-coded low",
-]
-
-DEFINITIONS = {
-    "Direct observation": "At least one GSVI image in the cell",
-    "Interpolated support": (
-        "No local imagery; value estimated through interpolation"
-    ),
-    "Unsupported, platform-coded low": (
-        "Missing after interpolation; encoded as zero for IDEAMaps"
-    ),
-}
-
-
-def assign_provenance(grid: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    out = grid.copy()
-    has_svi = out["total_svi_images"].fillna(0).astype(int) > 0
-    filled = out["final_waste_ratio"].notna()
-
-    provenance = np.full(len(out), PROVENANCE_ORDER[2], dtype=object)
-    provenance[has_svi.to_numpy()] = PROVENANCE_ORDER[0]
-    provenance[(~has_svi & filled).to_numpy()] = PROVENANCE_ORDER[1]
-    out["indicator_provenance"] = provenance
-    out["final_waste_ratio_platform"] = out["final_waste_ratio"].fillna(0)
-    return out
 
 
 def build_summary(cells: gpd.GeoDataFrame) -> pd.DataFrame:

@@ -35,6 +35,7 @@ script_dir <- if (length(file_arg)) {
   "."
 }
 
+source(file.path(script_dir, "../..", "R", "chapter_paths.R"))
 # Optional trailing args: --data-subdir=worldpop_2020 --fig-subdir=worldpop_2020
 #                        --pop-caption="..." --run-hint="python ..."
 trailing <- commandArgs(trailingOnly = TRUE)
@@ -54,7 +55,7 @@ run_hint <- get_opt(
   "python 5_spatial_pattern/pop_adjusted/1_pop_adjusted_gam.py"
 )
 
-DATA_ROOT <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste"
+DATA_ROOT <- chapter_data_root
 POP_DIR <- if (nzchar(data_subdir)) {
   file.path(DATA_ROOT, "5_spatial_pattern", "pop_adjusted", data_subdir)
 } else {

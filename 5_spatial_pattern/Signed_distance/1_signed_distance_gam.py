@@ -26,9 +26,21 @@ from scipy import stats
 from statsmodels.gam.api import BSplines, GLMGam
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR.parent))
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-from panoid_locations import (  # noqa: E402
+from lib.gam import (  # noqa: E402
+    BOOT_B,
+    BOOT_SEED,
+    CI_ALPHA,
+    MIN_YEAR_N,
+    PRED_GRID_N,
+    SPLINE_DEGREE,
+    SPLINE_DF,
+    assign_year_fe,
+)
+from lib.panoids import (  # noqa: E402
     PATTERN_DIR,
     enrich_sviwaste_frame,
     label_inside_settlement,
@@ -39,14 +51,6 @@ from panoid_locations import (  # noqa: E402
 # Always write under the external data root (not the code tree).
 OUTPUT_DIR = PATTERN_DIR / "Signed_distance"
 TABLE_DIR = OUTPUT_DIR / "thesis_table"
-
-MIN_YEAR_N = 200
-SPLINE_DF = 8
-SPLINE_DEGREE = 3
-PRED_GRID_N = 200
-CI_ALPHA = 0.05
-BOOT_B = 80
-BOOT_SEED = 42
 
 
 def prepare_analysis_frame() -> pd.DataFrame:
@@ -69,36 +73,7 @@ def prepare_analysis_frame() -> pd.DataFrame:
     df = df.dropna(subset=["year", "signed_distance_m", "waste_positive"]).copy()
     df["year"] = df["year"].astype(int)
     df["waste_positive"] = df["waste_positive"].astype(int)
-
-    year_counts = df["year"].value_counts()
-    rare = set(year_counts[year_counts < MIN_YEAR_N].index.tolist())
-    df["year_fe"] = df["year"].astype(str)
-    if rare:
-        df.loc[df["year"].isin(rare), "year_fe"] = "other"
-        print(f"  Pooling rare years (n<{MIN_YEAR_N}) as 'other': {sorted(rare)}")
-
-    # Avoid complete separation: reassign zero-positive FE levels to nearest
-    # calendar year that has at least one waste-positive (keeps all panoids).
-    pos_by_fe = df.groupby("year_fe")["waste_positive"].sum()
-    zero_pos = [lv for lv, n in pos_by_fe.items() if int(n) == 0]
-    if zero_pos:
-        # Representative year for each FE level (median of member years)
-        rep_year = (
-            df.groupby("year_fe")["year"].median().astype(float).to_dict()
-        )
-        positive_levels = [lv for lv, n in pos_by_fe.items() if int(n) > 0]
-        pos_reps = {lv: rep_year[lv] for lv in positive_levels}
-        for lv in zero_pos:
-            y0 = rep_year[lv]
-            nearest = min(pos_reps.items(), key=lambda kv: abs(kv[1] - y0))[0]
-            n_move = int((df["year_fe"] == lv).sum())
-            print(
-                f"  Reassigning year_fe='{lv}' ({n_move:,} panoids, 0 waste+) "
-                f"→ '{nearest}' (nearest year FE with positives)"
-            )
-            df.loc[df["year_fe"] == lv, "year_fe"] = nearest
-
-    return df.reset_index(drop=True)
+    return assign_year_fe(df).reset_index(drop=True)
 
 
 def _year_exog(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:

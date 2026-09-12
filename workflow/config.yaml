@@ -1,0 +1,15 @@
+# Spatial pipeline (Steps 0–5). Override on the CLI:
+#   snakemake --config phd_data_root=/path/to/PhD_UCL/Data
+# or: export PHD_DATA_ROOT=...
+
+phd_data_root: /Users/wenlanzhang/Downloads/PhD_UCL/Data
+
+use_extended_grid: true
+include_osmnx: true
+
+h3_res: 8
+road_buffer_m: 50
+svi_buffers_m:
+  - 50
+  - 75
+  - 100

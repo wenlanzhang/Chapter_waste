@@ -11,9 +11,10 @@ suppressPackageStartupMessages({
 args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
+source(file.path(script_dir, "..", "R", "chapter_paths.R"))
 source(file.path(script_dir, "..", "R", "map_theme.R"))
 
-DATA_ROOT <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste"
+DATA_ROOT <- chapter_data_root
 INPUT_DIR <- file.path(DATA_ROOT, "1prepare_chapter_data")
 EXT_DIR <- file.path(DATA_ROOT, "0_extend_grid")
 FIG_DIR <- file.path(script_dir, "..", "Figure", "0_extend_grid")

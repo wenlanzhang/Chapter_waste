@@ -13,10 +13,11 @@ suppressPackageStartupMessages({
 args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
+source(file.path(script_dir, "..", "R", "chapter_paths.R"))
 source(file.path(script_dir, "..", "R", "map_theme.R"))
 
-DATA_DIR <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste/2coverage_analysis"
-INPUT_DIR <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste/1prepare_chapter_data"
+DATA_DIR <- file.path(chapter_data_root, "2coverage_analysis")
+INPUT_DIR <- file.path(chapter_data_root, "1prepare_chapter_data")
 ROAD_GPKG <- "Nairobi_road_03_local_cleaned_32737.gpkg"
 FIG_DIR_ROOT <- file.path(script_dir, "..", "Figure", "2coverage_analysis")
 MAIN_SVI_BUFFER_M <- 50L

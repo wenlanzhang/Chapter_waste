@@ -15,15 +15,21 @@ Uses the same GSVI layers and IDEAMaps pipeline as mitigation validation
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from ideamaps_grid_pipeline import (
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from lib.ideamaps import (  # noqa: E402
     load_gsvi_submission_jenks_breaks,
     run_ideamaps_grid_pipeline,
 )
+from lib.provenance import DEFINITIONS, PROVENANCE_ORDER, assign_provenance  # noqa: E402
 from output_paths import GRID_GPKG, INPUT_DIR, OUTPUT_DIR
 
 VALIDATION_GRID_GPKG = INPUT_DIR / "Nairobi_validation_grid_32737.gpkg"
@@ -34,42 +40,6 @@ THESIS_DIR = OUTPUT_DIR / "thesis_table"
 CELLS_CSV = OUTPUT_DIR / "grid" / "Nairobi_indicator_provenance_cells.csv"
 SUMMARY_CSV = OUTPUT_DIR / "grid" / "Nairobi_indicator_provenance_summary.csv"
 TABLE_PATH = THESIS_DIR / "table_indicator_provenance.csv"
-
-PROVENANCE_ORDER = [
-    "Direct observation",
-    "Interpolated support",
-    "Unsupported, platform-coded low",
-]
-
-DEFINITIONS = {
-    "Direct observation": "At least one GSVI image in the cell",
-    "Interpolated support": (
-        "No local imagery; value estimated through interpolation"
-    ),
-    "Unsupported, platform-coded low": (
-        "Missing after interpolation; encoded as zero for IDEAMaps"
-    ),
-}
-
-
-def assign_provenance(grid: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """
-    Classify provenance from pipeline columns.
-
-    Requires total_svi_images and final_waste_ratio *before* fillna(0).
-    """
-    out = grid.copy()
-    has_svi = out["total_svi_images"].fillna(0).astype(int) > 0
-    filled = out["final_waste_ratio"].notna()
-
-    provenance = np.full(len(out), PROVENANCE_ORDER[2], dtype=object)
-    provenance[has_svi.to_numpy()] = PROVENANCE_ORDER[0]
-    provenance[(~has_svi & filled).to_numpy()] = PROVENANCE_ORDER[1]
-    out["indicator_provenance"] = provenance
-
-    # Platform encoding used for Jenks / IDEAMaps complete map
-    out["final_waste_ratio_platform"] = out["final_waste_ratio"].fillna(0)
-    return out
 
 
 def build_summary(

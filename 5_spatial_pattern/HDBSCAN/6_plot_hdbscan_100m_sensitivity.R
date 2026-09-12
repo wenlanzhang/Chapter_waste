@@ -15,7 +15,8 @@ script_dir <- if (length(file_arg)) {
   "."
 }
 
-DATA_ROOT <- "/Users/wenlanzhang/Downloads/PhD_UCL/Data/Chapter_waste"
+source(file.path(script_dir, "../..", "R", "chapter_paths.R"))
+DATA_ROOT <- chapter_data_root
 HDB_DIR <- file.path(DATA_ROOT, "5_spatial_pattern", "HDBSCAN")
 INPUT_DIR <- file.path(DATA_ROOT, "1prepare_chapter_data")
 FIG_DIR <- file.path(script_dir, "..", "..", "Figure", "5_spatial_pattern", "HDBSCAN")

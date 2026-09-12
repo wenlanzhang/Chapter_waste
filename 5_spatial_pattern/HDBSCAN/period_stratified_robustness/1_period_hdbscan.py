@@ -15,34 +15,20 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
-import hdbscan
 import numpy as np
 import pandas as pd
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-from panoid_locations import (  # noqa: E402
-    PATTERN_DIR,
-    enrich_sviwaste_frame,
-)
+from lib.hdbscan_fit import MIN_CLUSTER_SIZE, MIN_SAMPLES, cluster_points  # noqa: E402
+from lib.panoids import PATTERN_DIR, enrich_sviwaste_frame  # noqa: E402
+from lib.periods import PERIODS, assign_period  # noqa: E402
 
 OUTPUT_DIR = PATTERN_DIR / "HDBSCAN" / "period_stratified_robustness"
 TABLE_DIR = OUTPUT_DIR / "thesis_table"
-
-MIN_CLUSTER_SIZE = 25
-MIN_SAMPLES = 6
-
-PERIODS = {
-    "2015_2019": {
-        "label": "2015–2019",
-        "years": {2015, 2016, 2017, 2018, 2019},
-    },
-    "2021_2022": {
-        "label": "2021–2022",
-        "years": {2021, 2022},
-    },
-}
 
 
 def prepare_waste_by_period() -> gpd.GeoDataFrame:
@@ -52,47 +38,10 @@ def prepare_waste_by_period() -> gpd.GeoDataFrame:
     waste["year"] = pd.to_numeric(waste["year"], errors="coerce")
     waste = waste.dropna(subset=["year"]).copy()
     waste["year"] = waste["year"].astype(int)
-
-    def _period(y: int) -> str | None:
-        for key, meta in PERIODS.items():
-            if y in meta["years"]:
-                return key
-        return None
-
-    waste["period"] = waste["year"].map(_period)
+    waste["period"] = assign_period(waste["year"])
     waste = waste.loc[waste["period"].notna()].copy()
     waste["location_kind"] = "gsvi_panoid"
     return waste.reset_index(drop=True)
-
-
-def run_hdbscan(gdf: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict]:
-    coords = np.column_stack([gdf.geometry.x, gdf.geometry.y])
-    clusterer = hdbscan.HDBSCAN(
-        min_cluster_size=MIN_CLUSTER_SIZE,
-        min_samples=MIN_SAMPLES,
-        gen_min_span_tree=True,
-    )
-    labels = clusterer.fit_predict(coords)
-
-    out = gdf.copy()
-    out["HDB_cluster"] = labels
-
-    n_noise = int((labels == -1).sum())
-    n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-    n_pts = int(len(labels))
-    n_clustered = n_pts - n_noise
-    summary = {
-        "min_cluster_size": MIN_CLUSTER_SIZE,
-        "min_samples": MIN_SAMPLES,
-        "n_waste_positive": n_pts,
-        "n_clusters": n_clusters,
-        "n_noise": n_noise,
-        "n_clustered": n_clustered,
-        "pct_waste_points_clustered": 100.0 * n_clustered / n_pts if n_pts else np.nan,
-        "noise_ratio": n_noise / n_pts if n_pts else np.nan,
-        "unit": "waste_positive_panoid",
-    }
-    return out, summary
 
 
 def main() -> None:
@@ -136,7 +85,8 @@ def main() -> None:
             )
             continue
 
-        clustered, summary = run_hdbscan(sub)
+        clustered, summary = cluster_points(sub, unit="waste_positive_panoid")
+        summary["n_waste_positive"] = summary["n_points"]
         summary["period"] = key
         summary["period_label"] = meta["label"]
         summary["years"] = "|".join(str(y) for y in sorted(meta["years"]))

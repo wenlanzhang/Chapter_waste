@@ -19,7 +19,7 @@ This step changes the **training set** only. Evaluation on held-out images is St
 ## Scripts
 
 - `1_training_dataset_pipeline.ipynb` — inventory, swap pools, scenario folders `sc_*pct/`
-- `7_plot_baseline_training_curves.R` — baseline (`sc_100pct`) YOLO loss/mAP curves
+- `7_plot_baseline_training_curves.R` — baseline (`sc_100pct`) YOLO loss/mAP curves (`R/chapter_paths.R` for `PHD_DATA_ROOT`)
 
 ## Paths
 

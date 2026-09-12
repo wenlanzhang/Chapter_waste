@@ -10,11 +10,17 @@ Produces numbered road layers:
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import geopandas as gpd
 import osmnx as ox
 
-from road_utils import (
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from chapter_paths import prep_dir  # noqa: E402
+from lib.roads import (  # noqa: E402
     ROAD_FILES,
     WGS84,
     analyze_svi_on_road_network,
@@ -25,8 +31,7 @@ from road_utils import (
     prepare_raw_osmnx_edges,
 )
 
-DATA_ROOT = Path("/Users/wenlanzhang/Downloads/PhD_UCL/Data")
-INPUT_DIR = DATA_ROOT / "Chapter_waste" / "1prepare_chapter_data"
+INPUT_DIR = prep_dir()
 OUTPUT_DIR = INPUT_DIR
 
 BOUNDARY_GPKG = INPUT_DIR / "Nairobi_boundary_polygon_32737.gpkg"

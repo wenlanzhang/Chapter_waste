@@ -24,9 +24,11 @@ import pandas as pd
 from sklearn.metrics import silhouette_score
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR.parent))
+_REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_paths.py").is_file())
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-from panoid_locations import PATTERN_DIR  # noqa: E402
+from lib.panoids import PATTERN_DIR  # noqa: E402
 
 OUTPUT_DIR = PATTERN_DIR / "HDBSCAN"
 TABLE_DIR = OUTPUT_DIR / "thesis_table"

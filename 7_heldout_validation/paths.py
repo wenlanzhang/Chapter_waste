@@ -2,28 +2,39 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
+import sys
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DATA_ROOT = Path(os.environ.get("PHD_DATA_ROOT", "/Users/wenlanzhang/Downloads/PhD_UCL/Data"))
+_REPO = Path(__file__).resolve().parents[1]
+if str(_REPO) not in sys.path:
+    sys.path.insert(0, str(_REPO))
 
-IMG_ROOT = DATA_ROOT / "Waste" / "img"
+from chapter_paths import (  # noqa: E402
+    REPO_ROOT,
+    heldout_dir,
+    phd_data_root,
+    training_dir,
+    waste_raw_dir,
+)
+
+DATA_ROOT = phd_data_root()
+
+IMG_ROOT = waste_raw_dir() / "img"
 TRAIN_ROOT = IMG_ROOT / "Train0315_695"
-OUTPUT_DIR = DATA_ROOT / "Chapter_waste" / "7_heldout_validation"
+OUTPUT_DIR = heldout_dir()
 HELDOUT_IMG_ROOT = IMG_ROOT / "7_heldout_validation"
 FIG_DIR = REPO_ROOT / "Figure" / "7_heldout_validation"
 VALIDATION_DIR = OUTPUT_DIR / "Validation"
 THESIS_TABLE_DIR = OUTPUT_DIR / "thesis_table"
 
 # Step 6 training sensitivity (inputs for design / scenario labels)
-STEP6_DIR = DATA_ROOT / "Chapter_waste" / "6_sensitivity_training"
+STEP6_DIR = training_dir()
 TRAINING_CSV_STEP6 = STEP6_DIR / "Train0315_695_training.csv"
 TRAINING_CSV = OUTPUT_DIR / "Train0315_695_training.csv"
 SCENARIO_SUMMARY_CSV = STEP6_DIR / "scenarios" / "scenario_summary.csv"
 
 # Frozen previous dump (fallback for Validation CSVs already computed)
-ARCHIVE_OUTPUT_DIR = DATA_ROOT / "Chapter_waste" / "6_sensitivity_archive"
+ARCHIVE_OUTPUT_DIR = phd_data_root() / "Chapter_waste" / "6_sensitivity_archive"
 ARCHIVE_VALIDATION_DIR = ARCHIVE_OUTPUT_DIR / "Validation"
 ARCHIVE_SENS_IMG_ROOT = IMG_ROOT / "sensitivity_archive"
 

@@ -20,3 +20,6 @@ Figure/6_sensitivity_archive/
 5_spatial_pattern/**/*.csv
 5_spatial_pattern/**/*.gpkg
 7_heldout_validation/thesis_table/
+
+# Snakemake
+.snakemake/

@@ -12,10 +12,30 @@ Pipeline for cleaning, harmonising, and analysing street-view imagery (SVI), was
 ```
 Chapter_waste/
 ├── README.md
+├── Snakefile                         # Thin wrap of Steps 0–5 (see Workflow (Snakemake))
+├── chapter_paths.py                  # PHD_DATA_ROOT / Step dirs / active 100 m grid
+├── lib/                              # Shared Python plumbing (CLI scripts bootstrap repo root)
+│   ├── panoids.py                    # Panoid loaders (+ year, n_positive_views)
+│   ├── periods.py                    # 2015–2019 / 2021–2022 capture eras
+│   ├── hdbscan_fit.py                # Cluster params + fit helpers
+│   ├── gam.py                        # Spline/bootstrap constants + year FE
+│   ├── provenance.py                 # Direct / interpolated / unsupported labels
+│   ├── road_coverage.py              # Buffer points → split road metres → H3
+│   ├── roads.py                      # Road cleaning, noding, comparison
+│   ├── h3_grid.py                    # H3 grid helpers
+│   ├── thesis_tables.py              # Publication-style thesis tables
+│   └── ideamaps.py                   # EB ratio + spatial fill + Jenks
+├── workflow/
+│   ├── config.yaml                   # phd_data_root, extended grid, buffers
+│   ├── Snakefile
+│   ├── export_dag.sh                 # rulegraph PDF
+│   └── rules/                        # 00_extend_grid … 05_spatial
 ├── R/
+│   ├── chapter_paths.R               # PHD_DATA_ROOT helper for R plots
 │   ├── chapter_colours.R           # Shared brown chapter palette (maps + validation charts)
 │   ├── map_theme.R                 # Shared ggplot2 theme, north arrow, scale bar, legend
 │   ├── mitigation_map_theme.R      # Source/cluster map styling (4_compare, 5_spatial_pattern)
+│   ├── mitigation_validation_charts.R  # Shared Step 3c mitigation chart builders
 │   └── compare_sources_maps.R      # Shared SVI/waste source map builders (4_compare)
 │
 ├── 0_extend_grid/                  # Optional: Mollweide 100 m fill of Angela grid gaps
@@ -27,7 +47,7 @@ Chapter_waste/
 │   ├── 1_prepare_chapter_data.py   # Step 1: clean & export harmonised layers
 │   ├── export_validation_only.py     # Re-export validation gpkgs without full Step 1 rerun
 │   ├── 2_prepare_osmnx_roads.py    # Step 1 (cont.): OSMnx roads + local vs OSMnx comparison
-│   ├── road_utils.py               # Shared road cleaning, noding, comparison
+│   ├── road_utils.py               # Shim → lib.roads
 │   ├── plot_maps.R                 # Step 1 layer preview maps (waste, SVI, slums…)
 │   ├── plot_road_figures.R         # Five numbered road network figures (01–05)
 │   ├── plot_road_type_composition.R
@@ -35,8 +55,8 @@ Chapter_waste/
 │   └── plot_road_network_comparison.R
 │
 ├── 2coverage_analysis/
-│   ├── h3_utils.py                 # Shared H3 grid helpers
-│   ├── thesis_tables.py            # Publication-style thesis tables (cityroad, roadsvi, sviwaste)
+│   ├── h3_utils.py                 # Shim → lib.h3_grid
+│   ├── thesis_tables.py            # Shim → lib.thesis_tables
 │   ├── 1cityroad.py                # City → road metrics on H3 grid
 │   ├── 1plot_cityroad_maps.R       # H3 choropleths + Spearman correlation figures
 │   ├── 1plot_cityroad_analysis.R   # H3 metric distribution violin/histogram panels
@@ -48,8 +68,8 @@ Chapter_waste/
 │   └── plot_process_zoom_map.R     # Zoomed pipeline schematic (panels + layers)
 │
 ├── 3_100m/                         # Step 3: 100 m grid coverage & validation
-│   ├── output_paths.py                   # Shared data paths; prefers extended grid if present
-│   ├── ideamaps_grid_pipeline.py         # EB ratio + spatial fill + Jenks (IDEAMaps logic)
+│   ├── output_paths.py                   # Wraps chapter_paths (active 100 m grid)
+│   ├── ideamaps_grid_pipeline.py         # Shim → lib.ideamaps
 │   ├── grid_classification.py            # Fixed-band ratio helpers (0.024 / 0.164 thresholds; reference only)
 │   ├── 1_grid_coverage.py                # Grid cell counts + nested coverage matrix
 │   ├── 1_plot_grid_coverage_matrix.R     # Bar chart + heatmap figure
@@ -72,7 +92,7 @@ Chapter_waste/
 │   └── 3_plot_sources_comparison_panel.R  # Two-panel A/B source comparison map
 │
 ├── 5_spatial_pattern/              # Step 5: panoid pattern + hotspots
-│   ├── panoid_locations.py           # Shared panoid loaders (+ year, n_positive_views)
+│   ├── panoid_locations.py           # Shim → lib.panoids
 │   ├── settlement/                   # Urban-poor boundary association + NNR + temporal
 │   │   ├── 1_nnr_observation_frame.py
 │   │   ├── 2_settlement_association.py     # χ² / rates / density / zone table
@@ -193,6 +213,14 @@ Previous waste-ratio scripts are archived in `del/3_100m_backup/` (local only, g
 
 Raw inputs are read-only from `PhD_UCL/Data/Waste/`, `Shp/`, etc.
 
+**Shared paths:** `chapter_paths.py` (Python) and `R/chapter_paths.R` own `PHD_DATA_ROOT` (default `/Users/wenlanzhang/Downloads/PhD_UCL/Data`) and Step 0–7 output dirs. Override with `export PHD_DATA_ROOT=…`. The active 100 m grid is `chapter_paths.active_grid_gpkg()` (`USE_EXTENDED_GRID` unset keeps the exists() fallback). Snakemake sets `PYTHONPATH` to the repo root; CLI scripts add it themselves so `python path/to/script.py` still works.
+
+**Shared Python:** import from `lib/` (`lib.roads`, `lib.panoids`, `lib.road_coverage`, …). Thin shims (`1prepare_chapter_data/road_utils.py`, `5_spatial_pattern/panoid_locations.py`, `2coverage_analysis/h3_utils.py`, `2coverage_analysis/thesis_tables.py`, `3_100m/ideamaps_grid_pipeline.py`) re-export the same names so older imports keep working.
+
+**Shared R:** plots source `R/chapter_paths.R`. Step 3c mitigation wrappers (`3_100m/3_plot_mitigation_validation*.R`) call `R/mitigation_validation_charts.R`.
+
+Processed GeoPackages/CSVs belong under `$PHD_DATA_ROOT/Chapter_waste/`, not next to the scripts.
+
 ---
 
 ## Workflow overview
@@ -264,7 +292,7 @@ Raw CSVs & shapefiles
 
 The local vs OSMnx road comparison lives inside **Step 1** — it supports choosing which cleaned road layer to feed into Step 2, not a separate analysis track.
 
-**Grid for Step 3:** `3_100m/output_paths.py` prefers `0_extend_grid/Nairobi_grid_100m_extended_32737.gpkg` when present; otherwise falls back to the Angela-only Step 1 clip. Existing Angela `cell_id` values are preserved in the extension.
+**Grid for Step 3:** `chapter_paths.active_grid_gpkg()` (via `3_100m/output_paths.py`) prefers `0_extend_grid/Nairobi_grid_100m_extended_32737.gpkg` when present; otherwise falls back to the Angela-only Step 1 clip. Existing Angela `cell_id` values are preserved in the extension.
 
 ---
 
@@ -364,7 +392,7 @@ Three road layers are produced from the local file:
 
 Legacy alias: `Nairobi_road_line_32737.gpkg` → same as `local_noded`.
 
-Shared logic lives in `road_utils.py` (`clean_road_segments`, `node_road_segments`, `build_cleaned_comparison`).
+Shared logic lives in `lib.roads` (`clean_road_segments`, `node_road_segments`, `build_cleaned_comparison`; shim: `1prepare_chapter_data/road_utils.py`).
 
 ### 1c. OSMnx roads & comparison
 
@@ -378,7 +406,7 @@ Downloads Nairobi roads via OSMnx (`network_type='all'`), producing:
 | `Nairobi_road_02_osmnx_raw_32737.gpkg`     | Download, project, truncate (no simplify) | ~587,562 | ~14,917 km |
 | `Nairobi_road_04_osmnx_cleaned_32737.gpkg` | `simplify_graph` + `clean_road_segments`  | ~181,287 | ~14,917 km |
 
-**Used by all step-2 coverage scripts:** `Nairobi_road_03_local_cleaned_32737.gpkg` (`ROAD_FILES["coverage"]` in `road_utils.py`).
+**Used by all step-2 coverage scripts:** `Nairobi_road_03_local_cleaned_32737.gpkg` (`ROAD_FILES["coverage"]` in `lib.roads`).
 
 
 Also writes comparison tables and a spatial overlap layer:
@@ -529,7 +557,7 @@ Rscript 2coverage_analysis/3plot_sviwaste_maps.R
 
 ### 2d. `4roadwaste.py` — Road → waste-positive panoid (metre level)
 
-**Unit:** Road metres; same split logic as `2roadsvi.py`, but buffers only the **2,696 waste-positive** GSVI panoids (not all 76,605 sampling panoids).
+**Unit:** Road metres; same split logic as `2roadsvi.py` (`lib.road_coverage`), but buffers only the **2,696 waste-positive** GSVI panoids (not all 76,605 sampling panoids).
 
 ```bash
 python 2coverage_analysis/4roadwaste.py
@@ -551,7 +579,7 @@ python 2coverage_analysis/4roadwaste.py --buffer-m 100
 
 ## Step 3 — 100 m grid coverage & validation
 
-Analyses on the **100 m IDEAMaps grid** used by Step 3 scripts via `output_paths.GRID_GPKG`: Mollweide-extended constituency grid when `0_extend_grid/` outputs exist, otherwise the Angela-only Step 1 clip. Blocks: (3a) nested coverage, (3b) crowd validation vs the IDEAMaps submission model, (3c) mitigation validation (GSVI vs G+Self), (3d) indicator provenance, (3e) validation metrics by provenance.
+Analyses on the **100 m IDEAMaps grid** used by Step 3 scripts via `chapter_paths.active_grid_gpkg()` (`output_paths.GRID_GPKG`): Mollweide-extended constituency grid when `0_extend_grid/` outputs exist, otherwise the Angela-only Step 1 clip. Blocks: (3a) nested coverage, (3b) crowd validation vs the IDEAMaps submission model, (3c) mitigation validation (GSVI vs G+Self), (3d) indicator provenance, (3e) validation metrics by provenance.
 
 ### 3a. Grid coverage
 
@@ -666,9 +694,9 @@ Rscript 3_100m/2_plot_validation_confusion_matrix.R
 
 ### 3c. Mitigation validation — GSVI vs G+Self on Nairobi grid
 
-**Scripts:** `3_100m/ideamaps_grid_pipeline.py` (shared), `3_100m/3_mitigation_validation.py`
+**Scripts:** `lib.ideamaps` (shared; shim `3_100m/ideamaps_grid_pipeline.py`), `3_100m/3_mitigation_validation.py`
 
-Re-runs the IDEAMaps 100 m indicator pipeline on the **active Step 3 grid** (`output_paths.GRID_GPKG`: extended when available) for both arms, using **identical Jenks break points** from the GSVI submission (`GSVI_SUBMISSION_JENKS_BREAKS` in `ideamaps_grid_pipeline.py`). Only the input SVI/waste GeoPackages differ:
+Re-runs the IDEAMaps 100 m indicator pipeline on the **active Step 3 grid** (`chapter_paths.active_grid_gpkg()`: extended when available) for both arms, using **identical Jenks break points** from the GSVI submission (`GSVI_SUBMISSION_JENKS_BREAKS` in `lib.ideamaps`). Only the input SVI/waste GeoPackages differ:
 
 | Arm | SVI input | Waste input |
 | --- | --- | --- |
@@ -710,6 +738,8 @@ Metrics per subset × arm: binary and 3-class accuracy, precision, recall, F1. T
 | `3_plot_mitigation_validation_severity.R` | `Validation_mitigation_severity.png` | 3-class metrics, all validated cells |
 | `3_plot_mitigation_validation_overlap.R` | `Validation_mitigation_self_overlap.png` | **Primary figure** — self-overlap subset; binary + 3-class in one chart |
 | `3_plot_mitigation_validation_overlap_pattern.R` | `Validation_mitigation_self_overlap_pattern.png` | Same as above; solid = binary, brown stripes = 3-class (optional variant) |
+
+Shared chart code is `R/mitigation_validation_charts.R`; the four `3_plot_mitigation_validation*.R` scripts are thin wrappers (same CLI paths).
 
 The overlap figure encodes **lightness = task** (light = binary, dark = 3-class) and **hue = arm** (brown = GSVI, green = G+Self). The pattern variant uses brown/white only (solid = binary, stripes = 3-class).
 
@@ -835,7 +865,7 @@ Side-by-side panel: (A) SVI imagery by source, (B) waste detections by source.
 
 ## Step 5 — Spatial pattern analysis
 
-Panorama-level pattern tests and hotspot detection. The **primary spatial unit** is the GSVI **panorama (panoid)** from Step 2c (`Nairobi_sviwaste_points.gpkg`: 2,696 waste-positive of 76,605), not the 3,236 directional waste images. A panorama is waste-positive if **at least one** directional view is positive (`n_positive_views` is retained for sensitivity only).
+Panorama-level pattern tests and hotspot detection. The **primary spatial unit** is the GSVI **panorama (panoid)** from Step 2c (`Nairobi_sviwaste_points.gpkg`: 2,696 waste-positive of 76,605), not the 3,236 directional waste images. A panorama is waste-positive if **at least one** directional view is positive (`n_positive_views` is retained for sensitivity only). Shared loaders live in `lib.panoids` (shim: `5_spatial_pattern/panoid_locations.py`); period labels, HDBSCAN params, and GAM year FE are in `lib.periods`, `lib.hdbscan_fit`, and `lib.gam`.
 
 | Experiment | Content | Primary? |
 | --- | --- | --- |
@@ -1336,7 +1366,7 @@ Tables are generated alongside the analysis outputs (not a separate script), so 
 
 ## Figures (R)
 
-All maps use `R/map_theme.R` and `R/chapter_colours.R` (coverage and validation charts) or `R/mitigation_map_theme.R` (source and cluster maps in `4_compare/` and `5_spatial_pattern/`):
+All maps use `R/chapter_paths.R` for data roots, plus `R/map_theme.R` and `R/chapter_colours.R` (coverage and validation charts) or `R/mitigation_map_theme.R` (source and cluster maps in `4_compare/` and `5_spatial_pattern/`). Step 3c mitigation charts share `R/mitigation_validation_charts.R`.
 
 - North arrow (top-right)
 - Scale bar (bottom-left)
@@ -1397,7 +1427,9 @@ Hi-res exports (`*_hires.png`) are 12,000 × 12,000 px for zooming; standard PNG
 | ------------------------------------------------ | ---------------------------- |
 | Python (geopandas, h3, osmnx, networkx, shapely, hdbscan) | `conda activate geo_env_LLM` |
 | Python (pandas, Pillow) — Step 6 notebook only   | `conda activate geo_env_LLM` |
+| Snakemake 7 + Graphviz (`dot`) — Steps 0–5 wrap  | `conda activate geo_env_LLM` (`pip install 'snakemake==7.32.4'`) |
 | R (sf, ggplot2, ggspatial, ggpattern, dplyr, scales, patchwork, cowplot) | system R (`Rscript`)         |
+| Data roots                                       | `PHD_DATA_ROOT` via `chapter_paths.py` / `R/chapter_paths.R` |
 
 
 ---
@@ -1416,6 +1448,37 @@ Local archive under `del/` (gitignored — not synced to remote):
 | `del/3_100m_backup/` | Previous grid waste-ratio scripts (`1_grid_waste_ratio.py`, context maps, etc.) |
 
 The original root-level `data.py` exploratory script was superseded by `1_prepare_chapter_data.py` and has been removed.
+
+---
+
+## Workflow (Snakemake)
+
+Steps 0–5 (spatial chapter + R figures) can be orchestrated with Snakemake on this branch. Steps 6–7, notebooks, Colab, and Qwen stay manual (`7_heldout_validation/0_run_all.py`).
+
+Requires `conda activate geo_env_LLM`, plus `snakemake` and Graphviz (`dot`) for the rulegraph. The Snakefile sets `PYTHONPATH` to the repo root so `lib/` and `chapter_paths.py` import without extra setup.
+
+```bash
+# Paths: default is this machine; override with --config or PHD_DATA_ROOT
+export PHD_DATA_ROOT=/Users/wenlanzhang/Downloads/PhD_UCL/Data
+
+snakemake -n                          # dry-run
+snakemake all_data --cores 1          # processed GeoPackages / CSVs only
+snakemake all --cores 1               # data + figures (Steps 0–5)
+snakemake dag --cores 1               # Figure/workflow/spatial_rulegraph.pdf
+# or: bash workflow/export_dag.sh
+
+# Rebuild one branch
+snakemake Figure/5_spatial_pattern/HDBSCAN/Waste_HDBSCAN_gsvi.png --cores 1
+```
+
+Config lives in `workflow/config.yaml` (`phd_data_root`, `use_extended_grid`, `include_osmnx`, H3/buffer settings). Optional extras not in `all`:
+
+```bash
+snakemake mitigation_validation_sensitivity --cores 1
+snakemake plot_mitigation_overlap_pattern --cores 1
+```
+
+Hand-running `python` / `Rscript` as below still works. The bash quick start is unchanged.
 
 ---
 
