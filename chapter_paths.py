@@ -1,4 +1,4 @@
-"""Shared data roots for Steps 0–7. Override with PHD_DATA_ROOT / USE_EXTENDED_GRID.
+"""Shared data roots for Steps 0–7 (+ optional SE). Override with PHD_DATA_ROOT / USE_EXTENDED_GRID.
 
 CLI scripts should put the repo root on ``sys.path`` before importing this module:
 
@@ -61,6 +61,10 @@ def training_dir() -> Path:
 
 def heldout_dir() -> Path:
     return chapter_data_root() / "7_heldout_validation"
+
+
+def optional_se_dir() -> Path:
+    return chapter_data_root() / "99_optional_SE_analysis"
 
 
 def extended_grid_gpkg() -> Path:
