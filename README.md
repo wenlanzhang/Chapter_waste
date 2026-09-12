@@ -154,6 +154,12 @@ Chapter_waste/
 │
 ├── 6_sensitivity_archive/          # Frozen previous Step 6 dump (gitignored; do not extend)
 │
+├── 99_optional_SE_analysis/        # Optional: admin-unit socio-economic vs waste-positive rate (not in Snakemake all)
+│   ├── README.md
+│   ├── 1_admin_se_waste_join.py    # Join GSVI panoids → SE admin polygons; correlations / Moran’s I
+│   ├── 2_plot_se_maps.R            # Choropleths + covariate panel
+│   └── 3_plot_se_correlations.R    # Correlation bars + scatter panel
+│
 ├── del/                            # Local archive (gitignored): legacy notebooks + 3_100m_backup scripts
 │
 ├── Figure/                         # All map outputs (PNG)
@@ -183,6 +189,7 @@ Chapter_waste/
 │   │   └── KDE/
 │   ├── 6_sensitivity_training/     # Baseline YOLO training curves
 │   ├── 7_heldout_validation/       # Held-out binary / mAP charts
+│   ├── 99_optional_SE_analysis/    # Optional admin SE choropleths / correlations
 │   ├── 6_sensitivity_archive/      # Frozen dump figures (gitignored)
 │   └── 3_100m_backup/              # Previous waste-ratio figures (gitignored)
 ```
@@ -1448,6 +1455,20 @@ Local archive under `del/` (gitignored — not synced to remote):
 | `del/3_100m_backup/` | Previous grid waste-ratio scripts (`1_grid_waste_ratio.py`, context maps, etc.) |
 
 The original root-level `data.py` exploratory script was superseded by `1_prepare_chapter_data.py` and has been removed.
+
+---
+
+## Optional: socio-economic admin analysis (`99_optional_SE_analysis/`)
+
+Not in Snakemake `all`. Ports the core of `SVI_Waste/.../SVI_Social_economic.ipynb` onto chapter GSVI panoids:
+
+```bash
+python 99_optional_SE_analysis/1_admin_se_waste_join.py
+Rscript 99_optional_SE_analysis/2_plot_se_maps.R
+Rscript 99_optional_SE_analysis/3_plot_se_correlations.R
+```
+
+Outputs: `Data/Chapter_waste/99_optional_SE_analysis/` and `Figure/99_optional_SE_analysis/`.
 
 ---
 
