@@ -12,7 +12,7 @@ PROVENANCE_ORDER = [
 ]
 
 DEFINITIONS = {
-    "Direct observation": "At least one GSVI image in the cell",
+    "Direct observation": "At least one street-level image in the cell (arm-specific)",
     "Interpolated support": "No local imagery; value estimated through interpolation",
     "Unsupported, platform-coded low": (
         "Missing after interpolation; encoded as zero for IDEAMaps"

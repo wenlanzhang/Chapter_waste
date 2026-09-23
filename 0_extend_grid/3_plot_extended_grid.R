@@ -22,7 +22,11 @@ CRS_EA <- 32737
 
 BOUNDARY_GPKG <- file.path(INPUT_DIR, "Nairobi_boundary_polygon_32737.gpkg")
 GRID_GPKG <- file.path(EXT_DIR, "Nairobi_grid_100m_extended_32737.gpkg")
-CELLS_CSV <- file.path(EXT_DIR, "Nairobi_indicator_provenance_cells_extended.csv")
+# Per-arm provenance (keys match lib/arms.py)
+ARMS <- c(gsvi = "GSVI only", gsvi_selfcollected = "GSVI + self-collected")
+cells_csv <- function(arm) {
+  file.path(EXT_DIR, sprintf("Nairobi_indicator_provenance_cells_extended_%s.csv", arm))
+}
 SUMMARY_CSV <- file.path(EXT_DIR, "Nairobi_grid_extension_summary.csv")
 
 SOURCE_LEVELS <- c("angela_original", "extension_mollweide_100m")
@@ -113,69 +117,74 @@ p_source <- make_base_map(
 source_path <- file.path(FIG_DIR, "Grid_extension_angela_vs_fill.png")
 save_map(p_source, source_path, limits = boundary, base_size = 10, bg = "transparent")
 
-if (!file.exists(CELLS_CSV)) {
-  message("Provenance CSV not found; skip provenance map.")
-  message("Run: python 0_extend_grid/2_provenance_extended.py")
-  quit(save = "no", status = 0)
-}
+plot_provenance <- function(arm) {
+  path <- cells_csv(arm)
+  if (!file.exists(path)) {
+    message("Provenance CSV not found for arm ", arm, "; skip provenance map.")
+    message("Run: python 0_extend_grid/2_provenance_extended.py")
+    return(invisible(NULL))
+  }
 
-cells <- read.csv(CELLS_CSV, stringsAsFactors = FALSE)
-joined <- grid |>
-  mutate(cell_id = as.integer(cell_id)) |>
-  left_join(
-    cells |>
-      transmute(
-        cell_id = as.integer(cell_id),
-        indicator_provenance
-      ),
-    by = "cell_id"
+  cells <- read.csv(path, stringsAsFactors = FALSE)
+  joined <- grid |>
+    mutate(cell_id = as.integer(cell_id)) |>
+    left_join(
+      cells |>
+        transmute(
+          cell_id = as.integer(cell_id),
+          indicator_provenance
+        ),
+      by = "cell_id"
+    )
+
+  if (anyNA(joined$indicator_provenance)) {
+    stop("Some extended-grid cells lack provenance labels (arm ", arm, ").")
+  }
+
+  joined <- joined |>
+    mutate(
+      indicator_provenance = factor(indicator_provenance, levels = PROVENANCE_LEVELS)
+    )
+
+  counts <- joined |>
+    st_drop_geometry() |>
+    count(indicator_provenance, name = "n") |>
+    mutate(share = 100 * n / sum(n))
+
+  prov_subtitle <- sprintf(
+    "Extended grid n = %s | Direct %.1f%% | Interpolated %.1f%% | Unsupported %.1f%%",
+    comma(nrow(joined)),
+    counts$share[counts$indicator_provenance == "Direct observation"],
+    counts$share[counts$indicator_provenance == "Interpolated support"],
+    counts$share[counts$indicator_provenance == "Unsupported, platform-coded low"]
   )
 
-if (anyNA(joined$indicator_provenance)) {
-  stop("Some extended-grid cells lack provenance labels.")
-}
-
-joined <- joined |>
-  mutate(
-    indicator_provenance = factor(indicator_provenance, levels = PROVENANCE_LEVELS)
-  )
-
-counts <- joined |>
-  st_drop_geometry() |>
-  count(indicator_provenance, name = "n") |>
-  mutate(share = 100 * n / sum(n))
-
-prov_subtitle <- sprintf(
-  "Extended grid n = %s | Direct %.1f%% | Interpolated %.1f%% | Unsupported %.1f%%",
-  comma(nrow(joined)),
-  counts$share[counts$indicator_provenance == "Direct observation"],
-  counts$share[counts$indicator_provenance == "Interpolated support"],
-  counts$share[counts$indicator_provenance == "Unsupported, platform-coded low"]
-)
-
-p_prov <- make_base_map(
-  boundary,
-  title = "Indicator provenance (Mollweide-extended 100 m grid)",
-  subtitle = prov_subtitle,
-  caption = paste0(
-    "GSVI arm on Angela + Mollweide 100 m fill | Direct: \u22651 local image | ",
-    "Interpolated: spatial fill | Unsupported: missing after fill, coded low"
-  ),
-  transparent_bg = TRUE
-) +
-  geom_sf(data = joined, aes(fill = indicator_provenance), color = NA, linewidth = 0) +
-  scale_fill_manual(
-    name = "Provenance",
-    values = PROVENANCE_COLOURS,
-    labels = PROVENANCE_LABELS,
-    drop = FALSE
+  p_prov <- make_base_map(
+    boundary,
+    title = sprintf("Indicator provenance (Mollweide-extended 100 m grid, %s)", ARMS[[arm]]),
+    subtitle = prov_subtitle,
+    caption = paste0(
+      ARMS[[arm]], " arm on Angela + Mollweide 100 m fill | Direct: \u22651 local image | ",
+      "Interpolated: spatial fill | Unsupported: missing after fill, coded low"
+    ),
+    transparent_bg = TRUE
   ) +
-  theme(
-    legend.key.size = unit(0.55, "cm"),
-    legend.text = element_text(size = 7.5)
-  )
+    geom_sf(data = joined, aes(fill = indicator_provenance), color = NA, linewidth = 0) +
+    scale_fill_manual(
+      name = "Provenance",
+      values = PROVENANCE_COLOURS,
+      labels = PROVENANCE_LABELS,
+      drop = FALSE
+    ) +
+    theme(
+      legend.key.size = unit(0.55, "cm"),
+      legend.text = element_text(size = 7.5)
+    )
 
-prov_path <- file.path(FIG_DIR, "Indicator_provenance_100m_extended.png")
-save_map(p_prov, prov_path, limits = boundary, base_size = 10, bg = "transparent")
+  prov_path <- file.path(FIG_DIR, sprintf("Indicator_provenance_100m_extended_%s.png", arm))
+  save_map(p_prov, prov_path, limits = boundary, base_size = 10, bg = "transparent")
+}
+
+for (arm in names(ARMS)) plot_provenance(arm)
 
 message("Done. Figures in ", FIG_DIR)

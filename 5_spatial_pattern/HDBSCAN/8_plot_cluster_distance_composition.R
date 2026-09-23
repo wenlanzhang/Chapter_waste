@@ -46,12 +46,6 @@ SPECS <- list(
     prop_csv = "Nairobi_hdbscan_cluster_distance_composition_gsvi.csv",
     title = "Cluster Composition by Distance to Urban Poor Boundary",
     subtitle = "GSVI waste-positive panoids (share of panoids per HDBSCAN cluster)"
-  ),
-  list(
-    tag = "gsvi_selfcollected",
-    prop_csv = "Nairobi_hdbscan_cluster_distance_composition_gsvi_selfcollected.csv",
-    title = "Cluster Composition by Distance to Urban Poor Boundary",
-    subtitle = "GSVI panoids + self-collected locations (share of locations per cluster)"
   )
 )
 

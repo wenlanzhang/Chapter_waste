@@ -1,4 +1,4 @@
-"""Road-metre coverage: buffer points, split segments, aggregate to H3."""
+"""Road-metre coverage: buffer sampling points and split road segments into covered/uncovered parts."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 from shapely.ops import unary_union
 
-from .h3_grid import build_h3_grid, clip_grid_to_city
 
 MIN_PART_LENGTH_M = 0.1
 DEFAULT_WORKERS = 8
@@ -18,10 +17,6 @@ DEFAULT_WORKERS = 8
 
 def buffer_file_tag(buffer_m: float) -> str:
     return f"buf{int(buffer_m)}m"
-
-
-def h3_file_tag(h3_res: int, buffer_m: float) -> str:
-    return f"h3_res{h3_res}_buf{int(buffer_m)}m"
 
 
 def prepare_road_segments(roads: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -184,112 +179,3 @@ def split_road_coverage(
     ).astype(int)
 
     return coverage_parts, segment_summary
-
-
-def export_segment_csv(segments: gpd.GeoDataFrame, path: Path) -> None:
-    columns = [
-        "segment_id",
-        "osm_id",
-        "type",
-        "length_m",
-        "covered_length_m",
-        "uncovered_length_m",
-        "pct_length_covered",
-        "fully_covered",
-        "fully_uncovered",
-        "partially_covered",
-    ]
-    segments[columns].to_csv(path, index=False)
-
-
-def export_coverage_csv(coverage: gpd.GeoDataFrame, path: Path) -> None:
-    columns = [
-        "segment_id",
-        "osm_id",
-        "type",
-        "coverage_status",
-        "length_m",
-    ]
-    coverage[columns].to_csv(path, index=False)
-
-
-def compute_h3_metrics(
-    coverage_parts: gpd.GeoDataFrame,
-    boundary: gpd.GeoDataFrame,
-    h3_res: int,
-    *,
-    ratio_col: str = "svi_coverage_ratio",
-    covered_flag: str = "has_svi_coverage",
-) -> gpd.GeoDataFrame:
-    """Aggregate covered/uncovered road metres onto an H3 grid."""
-    grid = build_h3_grid(boundary, h3_res)
-    metrics = clip_grid_to_city(grid, boundary)
-
-    cell_parts = gpd.overlay(
-        coverage_parts[["coverage_status", "geometry"]],
-        metrics[["h3_index", "geometry"]],
-        how="intersection",
-        keep_geom_type=False,
-    )
-    cell_parts = cell_parts.explode(index_parts=False).reset_index(drop=True)
-    cell_parts = cell_parts[cell_parts.geometry.length > 0].copy()
-    cell_parts["length_m"] = cell_parts.geometry.length
-
-    by_status = (
-        cell_parts.groupby(["h3_index", "coverage_status"], as_index=False)["length_m"]
-        .sum()
-        .pivot(index="h3_index", columns="coverage_status", values="length_m")
-        .fillna(0.0)
-    )
-    for col in ("covered", "uncovered"):
-        if col not in by_status.columns:
-            by_status[col] = 0.0
-
-    length_stats = pd.DataFrame(
-        {
-            "h3_index": by_status.index,
-            "covered_road_length_m": by_status["covered"].to_numpy(),
-            "uncovered_road_length_m": by_status["uncovered"].to_numpy(),
-        }
-    )
-    length_stats["road_length_m"] = (
-        length_stats["covered_road_length_m"] + length_stats["uncovered_road_length_m"]
-    )
-    length_stats[ratio_col] = np.where(
-        length_stats["road_length_m"] > 0,
-        length_stats["covered_road_length_m"] / length_stats["road_length_m"],
-        np.nan,
-    )
-    length_stats["has_road"] = (length_stats["road_length_m"] > 0).astype(int)
-    length_stats[covered_flag] = (length_stats["covered_road_length_m"] > 0).astype(int)
-
-    metrics = metrics.merge(length_stats, on="h3_index", how="left")
-    metrics["road_length_m"] = metrics["road_length_m"].fillna(0.0)
-    metrics["covered_road_length_m"] = metrics["covered_road_length_m"].fillna(0.0)
-    metrics["uncovered_road_length_m"] = metrics["uncovered_road_length_m"].fillna(0.0)
-    metrics["has_road"] = metrics["has_road"].fillna(0).astype(int)
-    metrics[covered_flag] = metrics[covered_flag].fillna(0).astype(int)
-    return metrics
-
-
-def export_h3_csv(
-    metrics: gpd.GeoDataFrame,
-    path: Path,
-    *,
-    ratio_col: str = "svi_coverage_ratio",
-    covered_flag: str = "has_svi_coverage",
-) -> None:
-    columns = [
-        "h3_index",
-        "h3_res",
-        "cell_area_m2",
-        "city_area_m2",
-        "in_city",
-        "road_length_m",
-        "covered_road_length_m",
-        "uncovered_road_length_m",
-        ratio_col,
-        "has_road",
-        covered_flag,
-    ]
-    metrics[columns].to_csv(path, index=False)

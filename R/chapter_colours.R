@@ -200,8 +200,9 @@ get_zoom_palette <- function(name = "mixed") {
       road_uncovered = "#cb181d",
       # Muted variant for the 4-panel schematic, where gap segments are dense
       road_uncovered_soft = "#C05A4E",
-      svi = "#D7C9BE",
-      svi_light = "#F1E4DB",
+      # Mid taupe: darker than cream roads, lighter than H3 boundary (#8B5A3C)
+      svi = "#8F7364",
+      svi_light = "#B79F90",
       svi_buffer_fill = "#9AA582",
       svi_buffer_edge = "#657359",
       svi_buffer_edge_strong = "#3F4A35",

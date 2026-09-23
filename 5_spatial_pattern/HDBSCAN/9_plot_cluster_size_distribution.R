@@ -49,12 +49,6 @@ SPECS <- list(
     sizes_csv = "Nairobi_hdbscan_cluster_sizes_gsvi.csv",
     summary_csv = "Nairobi_hdbscan_cluster_size_summary_gsvi.csv",
     subtitle = "GSVI waste-positive panoramas"
-  ),
-  list(
-    tag = "gsvi_selfcollected",
-    sizes_csv = "Nairobi_hdbscan_cluster_sizes_gsvi_selfcollected.csv",
-    summary_csv = "Nairobi_hdbscan_cluster_size_summary_gsvi_selfcollected.csv",
-    subtitle = "GSVI panoramas + self-collected locations"
   )
 )
 

@@ -1,32 +1,52 @@
 from pathlib import Path
 import os
+import sys
 
+# Paths come from chapter_paths.py (single source of truth shared with the
+# step scripts); config.yaml only carries tunable parameters. Override the data
+# root with `snakemake --config phd_data_root=...` or PHD_DATA_ROOT in the env.
 _basedir = Path(workflow.basedir).resolve()
 REPO_ROOT = _basedir.parent if _basedir.name == "workflow" else _basedir
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 configfile: str(REPO_ROOT / "workflow" / "config.yaml")
 
-PHD_DATA = Path(config["phd_data_root"])
-CHAPTER = PHD_DATA / "Chapter_waste"
-FIG = REPO_ROOT / "Figure"
+if config.get("phd_data_root"):
+    os.environ["PHD_DATA_ROOT"] = str(config["phd_data_root"])
 
-PREP = CHAPTER / "1prepare_chapter_data"
-COV = CHAPTER / "2coverage_analysis"
-GRID100 = CHAPTER / "3_100m"
-EXT = CHAPTER / "0_extend_grid"
-CMP = CHAPTER / "4_compare"
-PAT = CHAPTER / "5_spatial_pattern"
-
-H3_RES = int(config.get("h3_res", 8))
-ROAD_BUF = int(config.get("road_buffer_m", 50))
-SVI_BUFFERS = [int(b) for b in config.get("svi_buffers_m", [50, 75, 100])]
-INCLUDE_OSMNX = bool(config.get("include_osmnx", True))
 USE_EXTENDED = bool(config.get("use_extended_grid", True))
 USE_EXTENDED_FLAG = "1" if USE_EXTENDED else "0"
-CITYROAD_TAG = f"h3_res{H3_RES}_buf{ROAD_BUF}m"
-
-os.environ["PHD_DATA_ROOT"] = str(PHD_DATA)
 os.environ["USE_EXTENDED_GRID"] = USE_EXTENDED_FLAG
+
+from chapter_paths import (
+    active_grid_gpkg,
+    compare_dir,
+    coverage_dir,
+    extend_dir,
+    figure_dir,
+    grid100_dir,
+    pattern_dir,
+    phd_data_root,
+    prep_dir,
+    waste_id_dir,
+)
+from lib.arms import ARMS, ARM_KEYS
+
+PHD_DATA = phd_data_root()
+FIG = figure_dir()
+PREP = prep_dir()
+EXT = extend_dir()
+COV = coverage_dir()
+GRID100 = grid100_dir()
+CMP = compare_dir()
+PAT = pattern_dir()
+
+ROAD_BUF = int(config.get("road_buffer_m", 50))
+SVI_BUF = int(config.get("svi_buffer_m", 50))
+INCLUDE_OSMNX = bool(config.get("include_osmnx", True))
+ROAD_TAG = f"buf{ROAD_BUF}m"
+
 os.environ["PYTHONPATH"] = str(REPO_ROOT) + (
     os.pathsep + os.environ["PYTHONPATH"] if os.environ.get("PYTHONPATH") else ""
 )
@@ -35,38 +55,47 @@ shell.prefix('export PYTHONPATH="' + str(REPO_ROOT) + '":"${{PYTHONPATH:-}}"; ')
 
 wildcard_constraints:
     buffer=r"[0-9]+",
+    arm="|".join(ARM_KEYS),
 
 
-def roadsvi_figdir(buffer):
-    if int(buffer) == 50:
-        return FIG / "2coverage_analysis"
-    return FIG / "2coverage_analysis" / "buffer"
-
-
+# Steps are added back here as they are rebuilt; each rule file defines
+# <STEP>_DATA / <STEP>_FIGS lists that feed the aggregate targets below.
 include: "rules/01_prepare.smk"
 include: "rules/00_extend_grid.smk"
 include: "rules/02_coverage.smk"
-include: "rules/03_grid.smk"
-include: "rules/04_compare.smk"
+include: "rules/03_waste_identification.smk"
+include: "rules/04_100m.smk"
 include: "rules/05_spatial.smk"
+
+STEP_LISTS = [
+    ("PREPARE_DATA", "PREPARE_FIGS", True),
+    ("OSMNX_DATA", "OSMNX_FIGS", INCLUDE_OSMNX),
+    ("EXTEND_DATA", "EXTEND_FIGS", USE_EXTENDED),
+    ("COVERAGE_DATA", "COVERAGE_FIGS", True),
+    ("WASTE_ID_DATA", "WASTE_ID_FIGS", True),
+    ("GRID100M_DATA", "GRID100M_FIGS", True),
+    ("SPATIAL_DATA", "SPATIAL_FIGS", True),
+    ("GRID_DATA", "GRID_FIGS", True),
+    ("COMPARE_DATA", "COMPARE_FIGS", True),
+    ("SPATIAL_DATA", "SPATIAL_FIGS", True),
+]
+
+
+def _collect(which):
+    files = []
+    for data_name, fig_name, enabled in STEP_LISTS:
+        name = data_name if which == "data" else fig_name
+        if enabled and name in globals():
+            files += list(globals()[name])
+    return files
 
 
 def _all_data():
-    files = list(PREPARE_DATA) + list(COVERAGE_DATA) + list(GRID_DATA) + list(COMPARE_DATA) + list(SPATIAL_DATA)
-    if USE_EXTENDED:
-        files += list(EXTEND_DATA)
-    if INCLUDE_OSMNX:
-        files += list(OSMNX_DATA)
-    return files
+    return _collect("data")
 
 
 def _all_figures():
-    files = list(PREPARE_FIGS) + list(COVERAGE_FIGS) + list(GRID_FIGS) + list(COMPARE_FIGS) + list(SPATIAL_FIGS)
-    if USE_EXTENDED:
-        files += list(EXTEND_FIGS)
-    if INCLUDE_OSMNX:
-        files += list(OSMNX_FIGS)
-    return files
+    return _collect("figs")
 
 
 rule all:

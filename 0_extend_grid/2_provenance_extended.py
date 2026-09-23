@@ -2,7 +2,8 @@
 """
 Indicator provenance on the Mollweide-extended 100 m grid (standalone).
 
-Reuses 3_100m pipeline helpers without modifying that folder's outputs.
+Runs once per analysis arm (GSVI only / GSVI + self-collected) and writes
+``Nairobi_indicator_provenance_{cells,summary}_extended_{arm}.csv``.
 """
 
 from __future__ import annotations
@@ -18,21 +19,25 @@ _REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_p
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from chapter_paths import extend_dir, prep_dir  # noqa: E402
+from chapter_paths import extend_dir  # noqa: E402
+from lib.arms import ARMS, Arm  # noqa: E402
 from lib.ideamaps import (  # noqa: E402
     load_gsvi_submission_jenks_breaks,
     run_ideamaps_grid_pipeline,
 )
 from lib.provenance import DEFINITIONS, PROVENANCE_ORDER, assign_provenance  # noqa: E402
 
-INPUT_DIR = prep_dir()
 EXT_DIR = extend_dir()
 
 GRID_GPKG = EXT_DIR / "Nairobi_grid_100m_extended_32737.gpkg"
-SVI_GPKG = INPUT_DIR / "Nairobi_SVI_image_gsvi_32737.gpkg"
-WASTE_GPKG = INPUT_DIR / "Nairobi_Waste_point_gsvi_32737.gpkg"
-CELLS_CSV = EXT_DIR / "Nairobi_indicator_provenance_cells_extended.csv"
-SUMMARY_CSV = EXT_DIR / "Nairobi_indicator_provenance_summary_extended.csv"
+
+
+def cells_csv(arm: Arm) -> Path:
+    return EXT_DIR / f"Nairobi_indicator_provenance_cells_extended_{arm.key}.csv"
+
+
+def summary_csv(arm: Arm) -> Path:
+    return EXT_DIR / f"Nairobi_indicator_provenance_summary_extended_{arm.key}.csv"
 
 
 def build_summary(cells: gpd.GeoDataFrame) -> pd.DataFrame:
@@ -67,17 +72,10 @@ def build_summary(cells: gpd.GeoDataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def main() -> None:
-    if not GRID_GPKG.exists():
-        raise FileNotFoundError(
-            f"Missing {GRID_GPKG}\nRun first: python 0_extend_grid/1_extend_grid.py"
-        )
-
-    print("Provenance on Mollweide-extended 100 m grid...")
-    grid = gpd.read_file(GRID_GPKG)
-    breaks = load_gsvi_submission_jenks_breaks()
+def run_arm(grid: gpd.GeoDataFrame, arm: Arm, breaks) -> None:
+    print(f"\n[{arm.key}] {arm.label}")
     scored = run_ideamaps_grid_pipeline(
-        grid, SVI_GPKG, WASTE_GPKG, jenks_breaks=breaks
+        grid, arm.svi_image_gpkg(), arm.waste_gpkg(), jenks_breaks=breaks
     )
     scored["grid_source"] = grid["grid_source"].to_numpy()
     scored = assign_provenance(scored)
@@ -99,12 +97,26 @@ def main() -> None:
         "result",
         "indicator_provenance",
     ]
-    scored[keep_cols].to_csv(CELLS_CSV, index=False)
-    summary.to_csv(SUMMARY_CSV, index=False)
+    scored[keep_cols].to_csv(cells_csv(arm), index=False)
+    summary.to_csv(summary_csv(arm), index=False)
 
     print(summary.to_string(index=False))
-    print(f"\nWrote {CELLS_CSV}")
-    print(f"Wrote {SUMMARY_CSV}")
+    print(f"Wrote {cells_csv(arm)}")
+    print(f"Wrote {summary_csv(arm)}")
+
+
+def main() -> None:
+    if not GRID_GPKG.exists():
+        raise FileNotFoundError(
+            f"Missing {GRID_GPKG}\nRun first: python 0_extend_grid/1_extend_grid.py"
+        )
+
+    print("Provenance on Mollweide-extended 100 m grid...")
+    grid = gpd.read_file(GRID_GPKG)
+    # Same Jenks breaks for both arms so provenance classes stay comparable
+    breaks = load_gsvi_submission_jenks_breaks()
+    for arm in ARMS.values():
+        run_arm(grid, arm, breaks)
 
 
 if __name__ == "__main__":

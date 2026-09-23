@@ -1,11 +1,8 @@
 PREPARE_DATA = [
     PREP / "Nairobi_boundary_polygon_32737.gpkg",
-    PREP / "Nairobi_Waste_point_gsvi_32737.gpkg",
-    PREP / "Nairobi_Waste_point_gsvi_selfcollected_32737.gpkg",
-    PREP / "Nairobi_SVI_point_gsvi_32737.gpkg",
-    PREP / "Nairobi_SVI_point_gsvi_selfcollected_32737.gpkg",
-    PREP / "Nairobi_SVI_image_gsvi_32737.gpkg",
-    PREP / "Nairobi_SVI_image_gsvi_selfcollected_32737.gpkg",
+    *[arm.waste_gpkg() for arm in ARMS.values()],
+    *[arm.svi_point_gpkg() for arm in ARMS.values()],
+    *[arm.svi_image_gpkg() for arm in ARMS.values()],
     PREP / "Nairobi_slum_polygon_32737.gpkg",
     PREP / "Nairobi_grid_100m_32737.gpkg",
     PREP / "Nairobi_validation_grid_32737.gpkg",
@@ -41,8 +38,8 @@ rule prepare_chapter_data:
 
 rule plot_prepare_maps:
     input:
-        PREP / "Nairobi_Waste_point_gsvi_32737.gpkg",
-        PREP / "Nairobi_SVI_point_gsvi_32737.gpkg",
+        ARMS["gsvi"].waste_gpkg(),
+        ARMS["gsvi"].svi_point_gpkg(),
         PREP / "Nairobi_boundary_polygon_32737.gpkg",
         PREP / "Nairobi_slum_polygon_32737.gpkg",
     output:
@@ -66,7 +63,7 @@ if INCLUDE_OSMNX:
         input:
             PREP / "Nairobi_boundary_polygon_32737.gpkg",
             PREP / "Nairobi_road_03_local_cleaned_32737.gpkg",
-            PREP / "Nairobi_SVI_point_gsvi_32737.gpkg",
+            ARMS["gsvi"].svi_point_gpkg(),
         output:
             OSMNX_DATA,
         shell:
