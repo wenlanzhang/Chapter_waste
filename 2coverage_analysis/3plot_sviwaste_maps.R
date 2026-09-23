@@ -12,16 +12,19 @@ args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
 source(file.path(script_dir, "..", "R", "chapter_paths.R"))
+source(file.path(script_dir, "..", "R", "chapter_arms.R"))
 source(file.path(script_dir, "..", "R", "map_theme.R"))
+
+ARM <- parse_arm_arg()
 
 DATA_DIR <- file.path(chapter_data_root, "2coverage_analysis")
 INPUT_DIR <- file.path(chapter_data_root, "1prepare_chapter_data")
 FIG_DIR <- file.path(script_dir, "..", "Figure", "2coverage_analysis")
 CRS_EA <- 32737
 
-points <- st_read(file.path(DATA_DIR, "Nairobi_sviwaste_points.gpkg"), quiet = TRUE) |>
+points <- st_read(file.path(DATA_DIR, arm_filename("3_Nairobi_sviwaste_points", ARM)), quiet = TRUE) |>
   st_transform(CRS_EA)
-summary <- read.csv(file.path(DATA_DIR, "Nairobi_sviwaste_summary.csv"))
+summary <- read.csv(file.path(DATA_DIR, arm_filename("3_Nairobi_sviwaste_summary", ARM, suffix = "", ext = "csv")))
 boundary <- st_read(
   file.path(INPUT_DIR, "Nairobi_boundary_polygon_32737.gpkg"),
   quiet = TRUE
@@ -30,7 +33,8 @@ boundary <- st_read(
 waste_positive <- points |> filter(waste_positive == 1)
 
 subtitle <- sprintf(
-  "%s SVI sampling panoids | %s waste-positive (%.2f%%)",
+  "%s | %s SVI sampling points | %s waste-positive (%.2f%%)",
+  arm_label(ARM),
   comma(summary$total_svi_panoids),
   comma(summary$svi_waste_positive_panoids),
   summary$pct_svi_with_waste
@@ -52,7 +56,11 @@ p <- ggplot() +
   labs(
     title = "SVI sampling and waste-positive panoids",
     subtitle = subtitle,
-    caption = "SVI = unique panoids | Waste positive = panoid in waste dataset",
+    caption = if (ARM == "gsvi") {
+      "SVI = unique panoids | Waste positive = panoid in waste dataset"
+    } else {
+      "SVI = unique panoids + self-collected images | Waste positive = sampling point in waste dataset"
+    },
     x = "Longitude",
     y = "Latitude"
   ) +
@@ -61,8 +69,8 @@ p <- ggplot() +
 
 message("Writing figures to ", FIG_DIR)
 
-report_path <- file.path(FIG_DIR, "Nairobi_sviwaste_positive.png")
-hires_path <- file.path(FIG_DIR, "Nairobi_sviwaste_positive_hires.png")
+report_path <- file.path(FIG_DIR, paste0("3_Nairobi_sviwaste_positive", arm_fig_suffix(ARM), ".png"))
+hires_path <- file.path(FIG_DIR, paste0("3_Nairobi_sviwaste_positive", arm_fig_suffix(ARM), "_hires.png"))
 
 save_map(p, report_path, limits = boundary, base_size = 10, dpi = 300, bg = "transparent")
 save_map(p, hires_path, limits = boundary, base_size = 20, dpi = 600, bg = "transparent")

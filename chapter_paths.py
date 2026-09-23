@@ -40,11 +40,22 @@ def coverage_dir() -> Path:
 
 
 def grid100_dir() -> Path:
-    return chapter_data_root() / "3_100m"
+    """Step 4: the 100 m visible-waste indicator (observed, interpolated, validated)."""
+    return chapter_data_root() / "4_100m"
+
+
+def waste_id_dir() -> Path:
+    """Step 3: waste identification (YOLO + VLM) on the independent held-out set."""
+    return chapter_data_root() / "3_waste_identification"
 
 
 def extend_dir() -> Path:
     return chapter_data_root() / "0_extend_grid"
+
+
+def figure_dir() -> Path:
+    """Repo-side figure root (tracked in git, unlike the data dirs)."""
+    return REPO_ROOT / "Figure"
 
 
 def compare_dir() -> Path:

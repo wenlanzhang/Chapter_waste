@@ -22,6 +22,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from chapter_paths import phd_data_root, prep_dir, waste_raw_dir  # noqa: E402
+from lib.arms import ARMS, SELF_SOURCES  # noqa: E402
 from lib.roads import ROAD_FILES, clean_road_segments, node_road_segments, prepare_raw_local  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -41,7 +42,7 @@ VALIDATION_CSV = waste_raw_dir() / "IDEAMaps/260701validation/validation-dataset
 WGS84 = "EPSG:4326"
 PROJECTED_CRS = "EPSG:32737"
 
-EXCLUDED_IMG_DIRS = {"ZWL/", "Faith/"}
+EXCLUDED_IMG_DIRS = {f"{src}/" for src in SELF_SOURCES}  # self-collected img_dir prefixes
 SVI_DROP_COLUMNS = [
     "year",
     "month",
@@ -55,13 +56,11 @@ SVI_DROP_COLUMNS = [
     "Construction",
 ]
 
+# Per-arm layers take their names from lib.arms so downstream steps and Step 1 agree
 OUTPUT_FILES = {
-    "waste_gsvi": "Nairobi_Waste_point_gsvi_32737.gpkg",
-    "waste_gsvi_selfcollected": "Nairobi_Waste_point_gsvi_selfcollected_32737.gpkg",
-    "svi_gsvi": "Nairobi_SVI_point_gsvi_32737.gpkg",
-    "svi_gsvi_selfcollected": "Nairobi_SVI_point_gsvi_selfcollected_32737.gpkg",
-    "svi_image_gsvi": "Nairobi_SVI_image_gsvi_32737.gpkg",
-    "svi_image_gsvi_selfcollected": "Nairobi_SVI_image_gsvi_selfcollected_32737.gpkg",
+    **{f"waste_{arm.key}": arm.waste_gpkg().name for arm in ARMS.values()},
+    **{f"svi_{arm.key}": arm.svi_point_gpkg().name for arm in ARMS.values()},
+    **{f"svi_image_{arm.key}": arm.svi_image_gpkg().name for arm in ARMS.values()},
     "road": "Nairobi_road_line_32737.gpkg",
     "boundary": "Nairobi_boundary_polygon_32737.gpkg",
     "slum": "Nairobi_slum_polygon_32737.gpkg",

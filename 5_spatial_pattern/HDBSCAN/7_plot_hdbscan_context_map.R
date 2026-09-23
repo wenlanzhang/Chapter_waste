@@ -60,12 +60,6 @@ MAP_SPECS <- list(
     gpkg = "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
     title = "HDBSCAN Hotspots of Waste-Positive GSVI Panoids",
     subtitle = "Urban-poor settlements, major areas, and Dandora landfill"
-  ),
-  list(
-    tag = "gsvi_selfcollected",
-    gpkg = "Nairobi_waste_hdbscan_gsvi_selfcollected_32737.gpkg",
-    title = "HDBSCAN Hotspots (GSVI Panoids + Self-Collected)",
-    subtitle = "Urban-poor settlements, major areas, and Dandora landfill"
   )
 )
 

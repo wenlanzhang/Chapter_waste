@@ -1,6 +1,6 @@
 """Panorama-level waste locations for Step 5 spatial pattern analysis.
 
-GSVI arm: waste-positive panoids from Step 2c (Nairobi_sviwaste_points.gpkg).
+GSVI arm: waste-positive panoids from Step 2c (3_Nairobi_sviwaste_points_gsvi_32737.gpkg).
 GSVI + self-collected: those panoids plus Faith/ZWL waste locations (no panoid).
 
 Primary spatial unit is the panorama (panoid): Y=1 if at least one directional
@@ -17,6 +17,7 @@ import pandas as pd
 from shapely.ops import unary_union
 
 from chapter_paths import coverage_dir, pattern_dir, phd_data_root, prep_dir, waste_raw_dir
+from lib.arms import ARMS, SELF_SOURCES
 
 DATA_ROOT = phd_data_root()
 CHAPTER_DIR = DATA_ROOT / "Chapter_waste"
@@ -24,15 +25,14 @@ INPUT_DIR = prep_dir()
 COVERAGE_DIR = coverage_dir()
 PATTERN_DIR = pattern_dir()
 
-SVIWASTE_GPKG = COVERAGE_DIR / "Nairobi_sviwaste_points.gpkg"
-WASTE_GSVI_GPKG = INPUT_DIR / "Nairobi_Waste_point_gsvi_32737.gpkg"
-WASTE_SELF_GPKG = INPUT_DIR / "Nairobi_Waste_point_gsvi_selfcollected_32737.gpkg"
+SVIWASTE_GPKG = COVERAGE_DIR / ARMS["gsvi"].filename("3_Nairobi_sviwaste_points")
+WASTE_GSVI_GPKG = ARMS["gsvi"].waste_gpkg()
+WASTE_SELF_GPKG = ARMS["gsvi_selfcollected"].waste_gpkg()
 BOUNDARY_GPKG = INPUT_DIR / "Nairobi_boundary_polygon_32737.gpkg"
 SLUM_GPKG = INPUT_DIR / "Nairobi_slum_polygon_32737.gpkg"
 SVI_CSV = waste_raw_dir() / "img" / "Combined_SVI.csv"
 
-SELF_SOURCES = {"Faith", "ZWL"}
-EXCLUDED_IMG_DIRS = {"ZWL/", "Faith/"}
+EXCLUDED_IMG_DIRS = {f"{src}/" for src in SELF_SOURCES}
 
 
 def _ensure_32737(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:

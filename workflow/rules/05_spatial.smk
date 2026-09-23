@@ -1,397 +1,237 @@
-HDB = PAT / "HDBSCAN"
-SETL = PAT / "settlement"
-DECAY = PAT / "Distance_decay"
-SIG = PAT / "Signed_distance"
-POP = PAT / "pop_adjusted"
-KDE = PAT / "KDE"
+# Step 5 — spatial pattern of waste-positive GSVI panoramas (GSVI arm only).
+# The GSVI-vs-self-collected mitigation comparison stays archived: with one arm
+# there is nothing to compare.
+PAT_HDB = PAT / "HDBSCAN"
+PAT_SET = PAT / "settlement"
+PAT_SD = PAT / "Signed_distance"
+PAT_POP = PAT_SD / "pop_adjusted"
+PAT_HDB_PER = PAT_HDB / "period_stratified_robustness"
+PAT_SD_PER = PAT_SD / "period_stratified_robustness"
+PAT_POP_2020 = PAT_POP / "worldpop_2020"
+PAT_FIG = FIG / "5_spatial_pattern"
 
 SPATIAL_DATA = [
-    SETL / "Nairobi_nnr_observation_frame_summary.csv",
-    SETL / "Nairobi_settlement_chisquare.csv",
-    SETL / "Nairobi_temporal_robustness_by_year.csv",
-    DECAY / "Nairobi_negexp_params.csv",
-    SIG / "Nairobi_signed_distance_gam_summary.csv",
-    SIG / "period_stratified_robustness" / "Nairobi_period_signed_distance_gam_summary.csv",
-    POP / "Nairobi_pop_adjusted_summary.csv",
-    POP / "worldpop_2020" / "Nairobi_pop_adjusted_summary.csv",
-    HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
-    HDB / "thesis_table" / "Nairobi_mitigation_comparison_table.csv",
-    HDB / "Nairobi_hdbscan_n_positive_views_summary.csv",
-    HDB / "Nairobi_hdbscan_100m_sensitivity_summary.csv",
-    HDB / "Nairobi_hdbscan_settlement_context_summary_comparison.csv",
-    HDB / "Nairobi_hdbscan_cluster_size_summary_comparison.csv",
-    HDB / "period_stratified_robustness" / "Nairobi_period_hdbscan_summary.csv",
-    KDE / "Nairobi_kde_params.csv",
+    PAT_HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
+    PAT_HDB / "Nairobi_waste_hdbscan_gsvi_settlement_context_32737.gpkg",
+    PAT_HDB / "Nairobi_hdbscan_cluster_sizes_gsvi.csv",
+    PAT_SET / "Nairobi_nnr_observation_frame_summary.csv",
+    PAT_SET / "thesis_table" / "settlement_association.csv",
+    PAT_SD / "Nairobi_signed_distance_gam_summary.csv",
+    PAT_POP / "Nairobi_pop_adjusted_model_metrics.csv",
+    # sensitivity / robustness
+    PAT_HDB / "Nairobi_hdbscan_param_sweep.csv",
+    PAT_HDB_PER / "Nairobi_period_hdbscan_summary.csv",
+    PAT_SD_PER / "Nairobi_period_signed_distance_gam_summary.csv",
+    PAT_POP_2020 / "Nairobi_pop_adjusted_model_metrics.csv",
+    PAT_POP / "thesis_table" / "settlement_by_density_band.csv",
 ]
 
 SPATIAL_FIGS = [
-    FIG / "5_spatial_pattern" / "settlement" / "NNR_observation_frame_null.png",
-    FIG / "5_spatial_pattern" / "settlement" / "Temporal_waste_positive_rate_by_year.png",
-    FIG / "5_spatial_pattern" / "Distance_decay" / "Distance_decay_negexp.png",
-    FIG / "5_spatial_pattern" / "Distance_decay" / "NegExp_Panoids_vs_WastePositive.png",
-    FIG / "5_spatial_pattern" / "Signed_distance" / "Signed_distance_gam_curve.png",
-    FIG / "5_spatial_pattern" / "Signed_distance" / "period_stratified_robustness" / "Period_signed_distance_gam_curve.png",
-    FIG / "5_spatial_pattern" / "pop_adjusted" / "Pop_adjusted_gam_effects.png",
-    FIG / "5_spatial_pattern" / "pop_adjusted" / "Pop_adjusted_mdp_residual_map.png",
-    FIG / "5_spatial_pattern" / "pop_adjusted" / "worldpop_2020" / "Pop_adjusted_gam_effects.png",
-    FIG / "5_spatial_pattern" / "pop_adjusted" / "worldpop_2020" / "Pop_adjusted_mdp_residual_map.png",
-    FIG / "5_spatial_pattern" / "HDBSCAN" / "Waste_HDBSCAN_gsvi.png",
-    FIG / "5_spatial_pattern" / "HDBSCAN" / "Hotspot_area_difference_gsvi_selfcollected.png",
-    FIG / "5_spatial_pattern" / "HDBSCAN" / "Mitigation_new_obs_stacked_bar.png",
-    FIG / "5_spatial_pattern" / "HDBSCAN" / "HDBSCAN_100m_cell_sensitivity.png",
-    FIG / "5_spatial_pattern" / "HDBSCAN" / "Waste_HDBSCAN_context_gsvi.png",
-    FIG / "5_spatial_pattern" / "HDBSCAN" / "Cluster_Composition_By_Distance_gsvi.png",
-    FIG / "5_spatial_pattern" / "HDBSCAN" / "Cluster_Size_Distribution_gsvi.png",
-    FIG / "5_spatial_pattern" / "HDBSCAN" / "period_stratified_robustness" / "Period_HDBSCAN_comparison.png",
-    FIG / "5_spatial_pattern" / "KDE" / "KDE_hotspot_comparison.png",
+    PAT_FIG / "HDBSCAN" / "Waste_HDBSCAN_context_gsvi.png",
+    PAT_FIG / "HDBSCAN" / "Cluster_Size_Distribution_gsvi.png",
+    PAT_FIG / "HDBSCAN" / "Cluster_Composition_By_Distance_gsvi.png",
+    PAT_FIG / "settlement" / "Settlement_waste_positive_rate.png",
+    PAT_FIG / "settlement" / "Settlement_waste_positive_share.png",
+    PAT_FIG / "settlement" / "Settlement_area_normalised_density.png",
+    PAT_FIG / "settlement" / "Settlement_rate_vs_composition.png",
+    PAT_FIG / "settlement" / "NNR_observation_frame_null.png",
+    PAT_FIG / "settlement" / "Temporal_waste_positive_rate_by_year.png",
+    PAT_FIG / "settlement" / "Temporal_prevalence_ratio_by_year.png",
+    PAT_FIG / "Signed_distance" / "Signed_distance_gam_curve.png",
+    PAT_FIG / "Signed_distance" / "Signed_distance_gam_curve_inset.png",
+    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_effects.png",
+    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_distance.png",
+    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_population.png",
+    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_mdp_residual_map.png",
+    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_mdp_excess_prob_map.png",
+    PAT_FIG / "HDBSCAN" / "period_stratified_robustness" / "Period_HDBSCAN_comparison.png",
+    PAT_FIG / "Signed_distance" / "period_stratified_robustness" / "Period_signed_distance_gam_curve.png",
+    PAT_FIG / "Signed_distance" / "pop_adjusted" / "worldpop_2020" / "Pop_adjusted_gam_effects.png",
+    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Settlement_by_density_band.png",
 ]
 
+SPATIAL_SRC = f"{REPO_ROOT}/5_spatial_pattern"
 
-rule nnr_observation_frame:
+
+rule hdbscan_cluster:
     input:
-        COV / "Nairobi_sviwaste_points.gpkg",
-        PREP / "Nairobi_boundary_polygon_32737.gpkg",
+        COV / "3_Nairobi_sviwaste_points_gsvi_32737.gpkg",
     output:
-        SETL / "Nairobi_nnr_observation_frame_summary.csv",
+        PAT_HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
+        PAT_HDB / "Nairobi_waste_hdbscan_summary_gsvi.csv",
     shell:
-        "python {REPO_ROOT}/5_spatial_pattern/settlement/1_nnr_observation_frame.py"
-
-
-rule settlement_association:
-    input:
-        COV / "Nairobi_sviwaste_points.gpkg",
-        PREP / "Nairobi_slum_polygon_32737.gpkg",
-        PREP / "Nairobi_boundary_polygon_32737.gpkg",
-    output:
-        SETL / "Nairobi_settlement_chisquare.csv",
-    shell:
-        "python {REPO_ROOT}/5_spatial_pattern/settlement/2_settlement_association.py"
-
-
-rule plot_settlement_association:
-    input:
-        SETL / "Nairobi_nnr_observation_frame_summary.csv",
-        SETL / "Nairobi_settlement_chisquare.csv",
-    output:
-        FIG / "5_spatial_pattern" / "settlement" / "NNR_observation_frame_null.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/settlement/3_plot_settlement_association.R"
-
-
-rule temporal_robustness:
-    input:
-        COV / "Nairobi_sviwaste_points.gpkg",
-        PREP / "Nairobi_slum_polygon_32737.gpkg",
-    output:
-        SETL / "Nairobi_temporal_robustness_by_year.csv",
-    shell:
-        "python {REPO_ROOT}/5_spatial_pattern/settlement/5_temporal_robustness.py"
-
-
-rule plot_temporal_robustness:
-    input:
-        SETL / "Nairobi_temporal_robustness_by_year.csv",
-    output:
-        FIG / "5_spatial_pattern" / "settlement" / "Temporal_waste_positive_rate_by_year.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/settlement/6_plot_temporal_robustness.R"
-
-
-rule distance_decay:
-    input:
-        COV / "Nairobi_sviwaste_points.gpkg",
-        PREP / "Nairobi_slum_polygon_32737.gpkg",
-    output:
-        DECAY / "Nairobi_negexp_params.csv",
-    shell:
-        "python {REPO_ROOT}/5_spatial_pattern/Distance_decay/1_distance_decay_negexp.py"
-
-
-rule plot_distance_decay:
-    input:
-        DECAY / "Nairobi_negexp_params.csv",
-    output:
-        FIG / "5_spatial_pattern" / "Distance_decay" / "Distance_decay_negexp.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/Distance_decay/2_plot_distance_decay.R"
-
-
-rule plot_negexp_notebook_style:
-    input:
-        DECAY / "Nairobi_negexp_params.csv",
-    output:
-        FIG / "5_spatial_pattern" / "Distance_decay" / "NegExp_Panoids_vs_WastePositive.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/Distance_decay/3_plot_negexp_notebook_style.R"
-
-
-rule signed_distance_gam:
-    input:
-        COV / "Nairobi_sviwaste_points.gpkg",
-        PREP / "Nairobi_slum_polygon_32737.gpkg",
-    output:
-        SIG / "Nairobi_signed_distance_gam_summary.csv",
-    shell:
-        "python {REPO_ROOT}/5_spatial_pattern/Signed_distance/1_signed_distance_gam.py"
-
-
-rule plot_signed_distance_gam:
-    input:
-        SIG / "Nairobi_signed_distance_gam_summary.csv",
-    output:
-        FIG / "5_spatial_pattern" / "Signed_distance" / "Signed_distance_gam_curve.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/Signed_distance/2_plot_signed_distance_gam.R"
-
-
-rule period_signed_distance_gam:
-    input:
-        COV / "Nairobi_sviwaste_points.gpkg",
-        PREP / "Nairobi_slum_polygon_32737.gpkg",
-    output:
-        SIG / "period_stratified_robustness" / "Nairobi_period_signed_distance_gam_summary.csv",
-    shell:
-        "python {REPO_ROOT}/5_spatial_pattern/Signed_distance/period_stratified_robustness/1_period_signed_distance_gam.py"
-
-
-rule plot_period_signed_distance_gam:
-    input:
-        SIG / "period_stratified_robustness" / "Nairobi_period_signed_distance_gam_summary.csv",
-    output:
-        FIG / "5_spatial_pattern" / "Signed_distance" / "period_stratified_robustness" / "Period_signed_distance_gam_curve.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/Signed_distance/period_stratified_robustness/2_plot_period_signed_distance_gam.R"
-
-
-rule pop_adjusted_gam:
-    input:
-        COV / "Nairobi_sviwaste_points.gpkg",
-        PREP / "Nairobi_slum_polygon_32737.gpkg",
-    output:
-        POP / "Nairobi_pop_adjusted_summary.csv",
-    shell:
-        "python {REPO_ROOT}/5_spatial_pattern/pop_adjusted/1_pop_adjusted_gam.py"
-
-
-rule plot_pop_adjusted_gam:
-    input:
-        POP / "Nairobi_pop_adjusted_summary.csv",
-    output:
-        FIG / "5_spatial_pattern" / "pop_adjusted" / "Pop_adjusted_gam_effects.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/pop_adjusted/2_plot_pop_adjusted_gam.R"
-
-
-rule plot_mdp_residual_map:
-    input:
-        POP / "Nairobi_pop_adjusted_summary.csv",
-        PREP / "Nairobi_boundary_polygon_32737.gpkg",
-    output:
-        FIG / "5_spatial_pattern" / "pop_adjusted" / "Pop_adjusted_mdp_residual_map.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/pop_adjusted/3_plot_mdp_residual_map.R"
-
-
-rule pop_adjusted_gam_worldpop_2020:
-    input:
-        COV / "Nairobi_sviwaste_points.gpkg",
-        PREP / "Nairobi_slum_polygon_32737.gpkg",
-    output:
-        POP / "worldpop_2020" / "Nairobi_pop_adjusted_summary.csv",
-    shell:
-        "python {REPO_ROOT}/5_spatial_pattern/pop_adjusted/worldpop_2020/1_pop_adjusted_gam.py"
-
-
-rule plot_pop_adjusted_gam_worldpop_2020:
-    input:
-        POP / "worldpop_2020" / "Nairobi_pop_adjusted_summary.csv",
-    output:
-        FIG / "5_spatial_pattern" / "pop_adjusted" / "worldpop_2020" / "Pop_adjusted_gam_effects.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/pop_adjusted/worldpop_2020/2_plot_pop_adjusted_gam.R"
-
-
-rule plot_mdp_residual_map_worldpop_2020:
-    input:
-        POP / "worldpop_2020" / "Nairobi_pop_adjusted_summary.csv",
-        PREP / "Nairobi_boundary_polygon_32737.gpkg",
-    output:
-        FIG / "5_spatial_pattern" / "pop_adjusted" / "worldpop_2020" / "Pop_adjusted_mdp_residual_map.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/pop_adjusted/3_plot_mdp_residual_map.R --data-subdir=worldpop_2020 --fig-subdir=worldpop_2020"
-
-
-rule hdbscan_waste:
-    input:
-        COV / "Nairobi_sviwaste_points.gpkg",
-        PREP / "Nairobi_Waste_point_gsvi_selfcollected_32737.gpkg",
-    output:
-        HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
-        HDB / "Nairobi_waste_hdbscan_gsvi_selfcollected_32737.gpkg",
-    shell:
-        "python {REPO_ROOT}/5_spatial_pattern/HDBSCAN/3_hdbscan_waste.py"
-
-
-rule hdbscan_mitigation_comparison:
-    input:
-        HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
-        HDB / "Nairobi_waste_hdbscan_gsvi_selfcollected_32737.gpkg",
-        COV / "Nairobi_sviwaste_points.gpkg",
-    output:
-        HDB / "thesis_table" / "Nairobi_mitigation_comparison_table.csv",
-        HDB / "Nairobi_waste_hotspot_polygons_gsvi_32737.gpkg",
-    shell:
-        "python {REPO_ROOT}/5_spatial_pattern/HDBSCAN/4_mitigation_comparison.py"
-
-
-rule hdbscan_cluster_views:
-    input:
-        HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
-        PREP / "Nairobi_Waste_point_gsvi_32737.gpkg",
-    output:
-        HDB / "Nairobi_hdbscan_n_positive_views_summary.csv",
-    shell:
-        "python {REPO_ROOT}/5_spatial_pattern/HDBSCAN/5_hdbscan_cluster_views.py"
-
-
-rule hdbscan_100m_sensitivity:
-    input:
-        HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
-        HDB / "Nairobi_waste_hotspot_polygons_gsvi_32737.gpkg",
-        STEP3_GRID,
-        COV / "Nairobi_sviwaste_points.gpkg",
-    output:
-        HDB / "Nairobi_hdbscan_100m_sensitivity_summary.csv",
-    shell:
-        "python {REPO_ROOT}/5_spatial_pattern/HDBSCAN/6_hdbscan_100m_sensitivity.py"
+        "python {SPATIAL_SRC}/HDBSCAN/3_hdbscan_waste.py"
 
 
 rule hdbscan_settlement_context:
     input:
-        HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
-        HDB / "Nairobi_waste_hdbscan_gsvi_selfcollected_32737.gpkg",
+        PAT_HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
         PREP / "Nairobi_slum_polygon_32737.gpkg",
     output:
-        HDB / "Nairobi_hdbscan_settlement_context_summary_comparison.csv",
+        PAT_HDB / "Nairobi_waste_hdbscan_gsvi_settlement_context_32737.gpkg",
+        PAT_HDB / "Nairobi_hdbscan_cluster_distance_composition_gsvi.csv",
     shell:
-        "python {REPO_ROOT}/5_spatial_pattern/HDBSCAN/7_hdbscan_settlement_context.py"
+        "python {SPATIAL_SRC}/HDBSCAN/7_hdbscan_settlement_context.py"
 
 
-rule hdbscan_cluster_size_distribution:
+rule hdbscan_cluster_sizes:
     input:
-        HDB / "Nairobi_hdbscan_settlement_context_summary_comparison.csv",
-        HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
+        PAT_HDB / "Nairobi_waste_hdbscan_gsvi_settlement_context_32737.gpkg",
     output:
-        HDB / "Nairobi_hdbscan_cluster_size_summary_comparison.csv",
+        PAT_HDB / "Nairobi_hdbscan_cluster_sizes_gsvi.csv",
+        PAT_HDB / "Nairobi_hdbscan_cluster_size_summary_gsvi.csv",
     shell:
-        "python {REPO_ROOT}/5_spatial_pattern/HDBSCAN/9_cluster_size_distribution.py"
+        "python {SPATIAL_SRC}/HDBSCAN/9_cluster_size_distribution.py"
+
+
+rule plot_hdbscan:
+    input:
+        PAT_HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
+        PAT_HDB / "Nairobi_hdbscan_cluster_sizes_gsvi.csv",
+        PAT_HDB / "Nairobi_hdbscan_cluster_distance_composition_gsvi.csv",
+    output:
+        PAT_FIG / "HDBSCAN" / "Waste_HDBSCAN_context_gsvi.png",
+        PAT_FIG / "HDBSCAN" / "Cluster_Size_Distribution_gsvi.png",
+        PAT_FIG / "HDBSCAN" / "Cluster_Composition_By_Distance_gsvi.png",
+    shell:
+        "Rscript {SPATIAL_SRC}/HDBSCAN/7_plot_hdbscan_context_map.R && "
+        "Rscript {SPATIAL_SRC}/HDBSCAN/9_plot_cluster_size_distribution.R && "
+        "Rscript {SPATIAL_SRC}/HDBSCAN/8_plot_cluster_distance_composition.R"
+
+
+rule settlement_association:
+    input:
+        COV / "3_Nairobi_sviwaste_points_gsvi_32737.gpkg",
+        PREP / "Nairobi_slum_polygon_32737.gpkg",
+    output:
+        PAT_SET / "Nairobi_nnr_observation_frame_summary.csv",
+        PAT_SET / "thesis_table" / "settlement_association.csv",
+        PAT_SET / "thesis_table" / "settlement_zone_summary.csv",
+    shell:
+        "python {SPATIAL_SRC}/settlement/1_nnr_observation_frame.py && "
+        "python {SPATIAL_SRC}/settlement/2_settlement_association.py && "
+        "python {SPATIAL_SRC}/settlement/5_temporal_robustness.py"
+
+
+rule plot_settlement:
+    input:
+        PAT_SET / "thesis_table" / "settlement_association.csv",
+        PAT_SET / "Nairobi_nnr_observation_frame_summary.csv",
+    output:
+        PAT_FIG / "settlement" / "Settlement_waste_positive_rate.png",
+        PAT_FIG / "settlement" / "Settlement_waste_positive_share.png",
+        PAT_FIG / "settlement" / "Settlement_area_normalised_density.png",
+        PAT_FIG / "settlement" / "Settlement_rate_vs_composition.png",
+        PAT_FIG / "settlement" / "NNR_observation_frame_null.png",
+        PAT_FIG / "settlement" / "Temporal_waste_positive_rate_by_year.png",
+        PAT_FIG / "settlement" / "Temporal_prevalence_ratio_by_year.png",
+    shell:
+        "Rscript {SPATIAL_SRC}/settlement/3_plot_settlement_association.R && "
+        "Rscript {SPATIAL_SRC}/settlement/6_plot_temporal_robustness.R"
+
+
+rule signed_distance_gam:
+    input:
+        COV / "3_Nairobi_sviwaste_points_gsvi_32737.gpkg",
+        PREP / "Nairobi_slum_polygon_32737.gpkg",
+    output:
+        PAT_SD / "Nairobi_signed_distance_gam_summary.csv",
+    shell:
+        "python {SPATIAL_SRC}/Signed_distance/1_signed_distance_gam.py"
+
+
+rule plot_signed_distance_gam:
+    input:
+        PAT_SD / "Nairobi_signed_distance_gam_summary.csv",
+    output:
+        PAT_FIG / "Signed_distance" / "Signed_distance_gam_curve.png",
+        PAT_FIG / "Signed_distance" / "Signed_distance_gam_curve_inset.png",
+    shell:
+        "Rscript {SPATIAL_SRC}/Signed_distance/2_plot_signed_distance_gam.R"
+
+
+# Sensitivity of the signed-distance GAM: does the gradient survive population
+# density and a spatial field? Slow (thin-plate field over ~75k panoramas).
+rule pop_adjusted_gam:
+    input:
+        COV / "3_Nairobi_sviwaste_points_gsvi_32737.gpkg",
+        PAT_POP / "ken_pop_2024_CN_100m_R2025A_v1.tif",
+    output:
+        PAT_POP / "Nairobi_pop_adjusted_model_metrics.csv",
+        PAT_POP / "Nairobi_pop_adjusted_summary.csv",
+    shell:
+        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/1_pop_adjusted_gam.py"
+
+
+rule plot_pop_adjusted_gam:
+    input:
+        PAT_POP / "Nairobi_pop_adjusted_model_metrics.csv",
+    output:
+        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_effects.png",
+        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_distance.png",
+        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_population.png",
+        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_mdp_residual_map.png",
+        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_mdp_excess_prob_map.png",
+    shell:
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/2_plot_pop_adjusted_gam.R && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/3_plot_mdp_residual_map.R"
+
+
+# --- sensitivity / robustness -------------------------------------------------
+rule hdbscan_param_sweep:
+    input:
+        PAT_HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
+    output:
+        PAT_HDB / "Nairobi_hdbscan_param_sweep.csv",
+    shell:
+        "python {SPATIAL_SRC}/HDBSCAN/3b_hdbscan_param_sweep.py"
 
 
 rule period_hdbscan:
     input:
-        COV / "Nairobi_sviwaste_points.gpkg",
+        COV / "3_Nairobi_sviwaste_points_gsvi_32737.gpkg",
     output:
-        HDB / "period_stratified_robustness" / "Nairobi_period_hdbscan_summary.csv",
+        PAT_HDB_PER / "Nairobi_period_hdbscan_summary.csv",
+        PAT_FIG / "HDBSCAN" / "period_stratified_robustness" / "Period_HDBSCAN_comparison.png",
     shell:
-        "python {REPO_ROOT}/5_spatial_pattern/HDBSCAN/period_stratified_robustness/1_period_hdbscan.py"
+        "python {SPATIAL_SRC}/HDBSCAN/period_stratified_robustness/1_period_hdbscan.py && "
+        "Rscript {SPATIAL_SRC}/HDBSCAN/period_stratified_robustness/2_plot_period_hdbscan.R"
 
 
-rule kde_hotspots:
+rule period_signed_distance_gam:
     input:
-        COV / "Nairobi_sviwaste_points.gpkg",
-        PREP / "Nairobi_Waste_point_gsvi_selfcollected_32737.gpkg",
-        PREP / "Nairobi_boundary_polygon_32737.gpkg",
-    output:
-        KDE / "Nairobi_kde_params.csv",
-    shell:
-        "python {REPO_ROOT}/5_spatial_pattern/KDE/1_kde_hotspots.py"
-
-
-rule plot_hdbscan_map:
-    input:
-        HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
-        HDB / "Nairobi_waste_hdbscan_gsvi_selfcollected_32737.gpkg",
-        PREP / "Nairobi_boundary_polygon_32737.gpkg",
-    output:
-        FIG / "5_spatial_pattern" / "HDBSCAN" / "Waste_HDBSCAN_gsvi.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/HDBSCAN/3_plot_hdbscan_map.R"
-
-
-rule plot_hotspot_difference_map:
-    input:
-        HDB / "Nairobi_waste_hotspot_polygons_gsvi_32737.gpkg",
-        HDB / "thesis_table" / "Nairobi_mitigation_comparison_table.csv",
-        PREP / "Nairobi_boundary_polygon_32737.gpkg",
-    output:
-        FIG / "5_spatial_pattern" / "HDBSCAN" / "Hotspot_area_difference_gsvi_selfcollected.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/HDBSCAN/5_plot_hotspot_difference_map.R"
-
-
-rule plot_new_obs_stacked_bar:
-    input:
-        HDB / "thesis_table" / "Nairobi_mitigation_comparison_table.csv",
-    output:
-        FIG / "5_spatial_pattern" / "HDBSCAN" / "Mitigation_new_obs_stacked_bar.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/HDBSCAN/4_plot_new_obs_stacked_bar.R"
-
-
-rule plot_hdbscan_100m_sensitivity:
-    input:
-        HDB / "Nairobi_hdbscan_100m_sensitivity_summary.csv",
-        PREP / "Nairobi_boundary_polygon_32737.gpkg",
-    output:
-        FIG / "5_spatial_pattern" / "HDBSCAN" / "HDBSCAN_100m_cell_sensitivity.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/HDBSCAN/6_plot_hdbscan_100m_sensitivity.R"
-
-
-rule plot_hdbscan_context_map:
-    input:
-        HDB / "Nairobi_hdbscan_settlement_context_summary_comparison.csv",
-        PREP / "Nairobi_boundary_polygon_32737.gpkg",
+        COV / "3_Nairobi_sviwaste_points_gsvi_32737.gpkg",
         PREP / "Nairobi_slum_polygon_32737.gpkg",
     output:
-        FIG / "5_spatial_pattern" / "HDBSCAN" / "Waste_HDBSCAN_context_gsvi.png",
+        PAT_SD_PER / "Nairobi_period_signed_distance_gam_summary.csv",
+        PAT_FIG / "Signed_distance" / "period_stratified_robustness" / "Period_signed_distance_gam_curve.png",
     shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/HDBSCAN/7_plot_hdbscan_context_map.R"
+        "python {SPATIAL_SRC}/Signed_distance/period_stratified_robustness/1_period_signed_distance_gam.py && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/period_stratified_robustness/2_plot_period_signed_distance_gam.R"
 
 
-rule plot_cluster_distance_composition:
+# Same nested GAMs against unconstrained WorldPop 2020, to check the population
+# control is not specific to the constrained 2024 raster.
+rule pop_adjusted_gam_worldpop_2020:
     input:
-        HDB / "Nairobi_hdbscan_settlement_context_summary_comparison.csv",
+        COV / "3_Nairobi_sviwaste_points_gsvi_32737.gpkg",
     output:
-        FIG / "5_spatial_pattern" / "HDBSCAN" / "Cluster_Composition_By_Distance_gsvi.png",
+        PAT_POP_2020 / "Nairobi_pop_adjusted_model_metrics.csv",
+        PAT_FIG / "Signed_distance" / "pop_adjusted" / "worldpop_2020" / "Pop_adjusted_gam_effects.png",
     shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/HDBSCAN/8_plot_cluster_distance_composition.R"
+        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/worldpop_2020/1_pop_adjusted_gam.py && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/worldpop_2020/2_plot_pop_adjusted_gam.R"
 
 
-rule plot_cluster_size_distribution:
+# Non-parametric companion to the nested GAMs: within equal-count density bands,
+# does being inside a settlement still raise the waste rate?
+rule settlement_by_density_band:
     input:
-        HDB / "Nairobi_hdbscan_cluster_size_summary_comparison.csv",
+        PAT_POP / "Nairobi_pop_adjusted_gam_frame.csv",
     output:
-        FIG / "5_spatial_pattern" / "HDBSCAN" / "Cluster_Size_Distribution_gsvi.png",
+        PAT_POP / "Nairobi_settlement_by_density_band.csv",
+        PAT_POP / "thesis_table" / "settlement_by_density_band.csv",
+        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Settlement_by_density_band.png",
     shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/HDBSCAN/9_plot_cluster_size_distribution.R"
-
-
-rule plot_period_hdbscan:
-    input:
-        HDB / "period_stratified_robustness" / "Nairobi_period_hdbscan_summary.csv",
-        PREP / "Nairobi_boundary_polygon_32737.gpkg",
-    output:
-        FIG / "5_spatial_pattern" / "HDBSCAN" / "period_stratified_robustness" / "Period_HDBSCAN_comparison.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/HDBSCAN/period_stratified_robustness/2_plot_period_hdbscan.R"
-
-
-rule plot_kde_comparison:
-    input:
-        KDE / "Nairobi_kde_params.csv",
-        PREP / "Nairobi_boundary_polygon_32737.gpkg",
-    output:
-        FIG / "5_spatial_pattern" / "KDE" / "KDE_hotspot_comparison.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/KDE/2_plot_kde_comparison.R"
+        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/4_settlement_by_density_band.py && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/4plot_settlement_by_density_band.R"

@@ -1,9 +1,8 @@
 """
-HDBSCAN clustering of Nairobi waste locations — panorama level.
+HDBSCAN clustering of Nairobi waste locations — panorama level (GSVI arm).
 
 Arms (identical HDBSCAN settings):
   - gsvi: waste-positive GSVI panoids from Step 2c (n ≈ 2,696)
-  - gsvi_selfcollected: those panoids + Faith/ZWL locations (n ≈ 2,845)
 """
 
 from __future__ import annotations
@@ -21,7 +20,6 @@ if str(_REPO_ROOT) not in sys.path:
 from lib.hdbscan_fit import cluster_points  # noqa: E402
 from lib.panoids import (  # noqa: E402
     PATTERN_DIR,
-    load_gsvi_selfcollected_locations,
     load_gsvi_waste_panoids,
 )
 
@@ -33,14 +31,6 @@ DATASETS = {
         "loader": load_gsvi_waste_panoids,
         "output_gpkg": OUTPUT_DIR / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
         "output_summary": OUTPUT_DIR / "Nairobi_waste_hdbscan_summary_gsvi.csv",
-    },
-    "gsvi_selfcollected": {
-        "label": "GSVI panoids + self-collected locations",
-        "loader": load_gsvi_selfcollected_locations,
-        "output_gpkg": OUTPUT_DIR
-        / "Nairobi_waste_hdbscan_gsvi_selfcollected_32737.gpkg",
-        "output_summary": OUTPUT_DIR
-        / "Nairobi_waste_hdbscan_summary_gsvi_selfcollected.csv",
     },
 }
 
@@ -75,7 +65,6 @@ def main() -> None:
 
     summaries = [
         process_dataset("gsvi"),
-        process_dataset("gsvi_selfcollected"),
     ]
 
     comparison_path = OUTPUT_DIR / "Nairobi_waste_hdbscan_summary_comparison.csv"

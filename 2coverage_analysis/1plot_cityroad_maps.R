@@ -1,12 +1,14 @@
 #!/usr/bin/env Rscript
-# Plot city->road H3 metrics produced by cityroad.py
+# City -> road on the 100 m grid: three maps from 1cityroad.py
+#   (1) road access class: intersects road / within buffer / road-excluded
+#   (2) road density (km/km²) for cells with road
+#   (3) distance to nearest road for road-excluded cells
 
 suppressPackageStartupMessages({
   library(sf)
   library(ggplot2)
   library(dplyr)
   library(scales)
-  library(patchwork)
 })
 
 args_cli <- commandArgs(trailingOnly = FALSE)
@@ -14,6 +16,7 @@ file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
 source(file.path(script_dir, "..", "R", "chapter_paths.R"))
 source(file.path(script_dir, "..", "R", "map_theme.R"))
+source(file.path(script_dir, "..", "R", "chapter_colours.R"))
 
 DATA_DIR <- file.path(chapter_data_root, "2coverage_analysis")
 INPUT_DIR <- file.path(chapter_data_root, "1prepare_chapter_data")
@@ -21,322 +24,127 @@ FIG_DIR <- file.path(script_dir, "..", "Figure", "2coverage_analysis")
 CRS_EA <- 32737
 
 parse_args <- function() {
-  defaults <- list(h3_res = 8, road_buffer = 50)
-  args <- commandArgs(trailingOnly = TRUE)
-  for (arg in args) {
-    if (grepl("^--h3-res=", arg)) defaults$h3_res <- as.integer(sub("^--h3-res=", "", arg))
+  defaults <- list(road_buffer = 50)
+  for (arg in commandArgs(trailingOnly = TRUE)) {
     if (grepl("^--road-buffer-m=", arg)) defaults$road_buffer <- as.numeric(sub("^--road-buffer-m=", "", arg))
   }
   defaults
 }
 
-file_tag <- function(h3_res, road_buffer) {
-  sprintf("h3_res%d_buf%dm", h3_res, as.integer(road_buffer))
-}
-
-CORR_COLUMNS <- c(
-  "road_length_density_km_per_km2",
-  "road_intersection_density_per_km2",
-  "road_coverage_ratio",
-  "road_type_count"
-)
-
-CORR_LABELS <- c(
-  road_length_density_km_per_km2 = "Road density",
-  road_intersection_density_per_km2 = "Intersection density",
-  road_coverage_ratio = "Coverage ratio",
-  road_type_count = "Road type count"
-)
-
-plot_continuous <- function(grid, boundary, column, title, filename, label = NULL) {
-  p <- make_base_map(
-    boundary,
-    title = title,
-    subtitle = sprintf("H3 res %d | road buffer %dm", args$h3_res, as.integer(args$road_buffer)),
-    transparent_bg = TRUE
-  ) +
-    geom_sf(data = grid, aes(fill = .data[[column]]), color = NA) +
-    scale_fill_chapter_c(name = label %||% column, labels = label_number(accuracy = 0.01))
-
-  save_map(p, file.path(FIG_DIR, filename), limits = boundary, base_size = 10, bg = "transparent")
-}
-
-compute_spearman_matrix <- function(grid_df, tag) {
-  missing <- setdiff(CORR_COLUMNS, names(grid_df))
-  if (length(missing)) {
-    stop("Missing columns for correlation matrix: ", paste(missing, collapse = ", "))
-  }
-
-  corr_mat <- cor(
-    grid_df[, CORR_COLUMNS, drop = FALSE],
-    method = "spearman",
-    use = "pairwise.complete.obs"
-  )
-
-  csv_path <- file.path(DATA_DIR, paste0("Nairobi_cityroad_correlation_spearman_", tag, ".csv"))
-  write.csv(corr_mat, csv_path, row.names = TRUE)
-  message("  ", basename(csv_path))
-  corr_mat
-}
-
-plot_spearman_heatmap <- function(corr_mat, tag, n_cells) {
-  n <- length(CORR_COLUMNS)
-  labels <- CORR_LABELS[CORR_COLUMNS]
-
-  rho_range <- range(corr_mat[lower.tri(corr_mat)], na.rm = TRUE)
-  fill_low <- floor(rho_range[1] * 20) / 20 - 0.02
-  fill_high <- 1
-
-  corr_long <- data.frame(
-    row_idx = rep(seq_len(n), each = n),
-    col_idx = rep(seq_len(n), times = n),
-    rho = as.vector(corr_mat),
-    stringsAsFactors = FALSE
-  ) |>
-    mutate(
-      var_row = factor(.data$row_idx, levels = seq_len(n), labels = labels),
-      var_col = factor(.data$col_idx, levels = seq_len(n), labels = labels),
-      cell_type = case_when(
-        .data$row_idx < .data$col_idx ~ "upper",
-        .data$row_idx == .data$col_idx ~ "diag",
-        TRUE ~ "lower"
-      ),
-      fill_rho = if_else(.data$cell_type == "lower", .data$rho, NA_real_),
-      label = case_when(
-        .data$cell_type == "lower" ~ sprintf("%.2f", .data$rho),
-        .data$cell_type == "diag" ~ labels[.data$row_idx],
-        TRUE ~ ""
-      ),
-      text_color = chocolate_label_colour(
-        .data$fill_rho,
-        limits = c(fill_low, fill_high)
-      )
-    )
-
-  lower_cells <- corr_long |> filter(.data$cell_type == "lower")
-  diag_cells <- corr_long |> filter(.data$cell_type == "diag")
-
-  tile_base <- ggplot(corr_long) +
-    geom_tile(
-      aes(x = .data$var_col, y = .data$var_row),
-      fill = CHOCOLATE_EMPTY,
-      color = "white",
-      linewidth = 1.0
-    ) +
-    geom_tile(
-      aes(x = .data$var_col, y = .data$var_row, fill = .data$fill_rho),
-      color = "white",
-      linewidth = 1.0
-    ) +
-    geom_text(
-      data = lower_cells,
-      aes(x = .data$var_col, y = .data$var_row, label = .data$label, color = .data$text_color),
-      size = 3.6,
-      fontface = "bold"
-    ) +
-    geom_text(
-      data = diag_cells,
-      aes(x = .data$var_col, y = .data$var_row, label = .data$label),
-      size = 3.1,
-      color = CHAPTER_AXIS_COLOUR,
-      fontface = "plain"
-    ) +
-    scale_fill_gradientn(
-      colours = CHOCOLATE_PALETTE,
-      limits = c(fill_low, fill_high),
-      na.value = NA,
-      name = expression(Spearman~rho),
-      breaks = pretty(c(fill_low, fill_high), n = 4),
-      labels = label_number(accuracy = 0.01),
-      guide = guide_colorbar(
-        barwidth = unit(0.55, "cm"),
-        barheight = unit(3.2, "cm"),
-        frame.colour = "grey78",
-        frame.linewidth = 0.35,
-        title.position = "top",
-        title.hjust = 0.5
-      )
-    ) +
-    scale_color_identity() +
-    scale_x_discrete(position = "top", expand = expansion(add = 0.6)) +
-    scale_y_discrete(limits = rev(labels), expand = expansion(add = 0.6)) +
-    coord_fixed(ratio = 1) +
-    labs(
-      title = "Spearman correlation matrix (city-road H3 metrics)",
-      subtitle = sprintf(
-        "Nairobi | H3 res %d | %dm road buffer | n = %s cells | lower triangle",
-        args$h3_res,
-        as.integer(args$road_buffer),
-        comma(n_cells)
-      ),
-      x = NULL,
-      y = NULL,
-      caption = sprintf(
-        "Diagonal = variable labels | Colour range scaled to observed \u03C1 (%.2f\u20131.00)",
-        fill_low
-      )
-    ) +
-    theme_minimal(base_size = 11, base_family = "sans") +
-    theme(
-      plot.background = element_rect(fill = NA, color = NA),
-      panel.background = element_rect(fill = NA, color = NA),
-      panel.grid = element_blank(),
-      plot.title = element_text(face = "bold", size = 15, hjust = 0.5, color = CHAPTER_TITLE_COLOUR, margin = margin(b = 4)),
-      plot.subtitle = element_text(size = 10, hjust = 0.5, color = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 12)),
-      plot.caption = element_text(size = 8.5, hjust = 0.5, color = CHAPTER_CAPTION_COLOUR, margin = margin(t = 10)),
-      axis.text.x = element_text(
-        angle = 30,
-        hjust = 0,
-        vjust = 0,
-        color = CHAPTER_AXIS_COLOUR,
-        size = 10,
-        face = "bold",
-        margin = margin(b = 4)
-      ),
-      axis.text.y = element_text(color = CHAPTER_AXIS_COLOUR, size = 10, face = "bold", margin = margin(r = 4)),
-      axis.ticks = element_blank(),
-      legend.position = "right",
-      legend.title = element_text(face = "bold", size = 9.5, color = CHAPTER_AXIS_COLOUR),
-      legend.text = element_text(size = 8.5, color = CHAPTER_SUBTITLE_COLOUR),
-      plot.margin = margin(16, 18, 14, 14)
-    )
-
-  out_path <- file.path(FIG_DIR, paste0("Nairobi_cityroad_correlation_spearman_", tag, ".png"))
-  ggsave(out_path, plot = tile_base, width = 8.2, height = 7.4, dpi = 320, bg = "transparent")
-  message("  ", basename(out_path))
-}
-
-plot_spearman_scatter_matrix <- function(grid_df, corr_mat, tag, n_cells) {
-  pair_theme <- function(show_x = TRUE, show_y = TRUE) {
-    theme_minimal(base_size = 10, base_family = "sans") +
-      theme(
-        plot.background = element_rect(fill = NA, color = NA),
-        panel.background = element_rect(fill = NA, color = NA),
-        panel.grid.major = element_line(color = "#E6EAF0", linewidth = 0.3),
-        panel.grid.minor = element_blank(),
-        panel.border = element_rect(color = "#D5DCE6", fill = NA, linewidth = 0.35),
-        axis.title = element_text(size = 9, color = CHAPTER_AXIS_COLOUR),
-        axis.text = element_text(size = 8, color = CHAPTER_SUBTITLE_COLOUR),
-        plot.margin = margin(4, 4, 4, 4),
-        axis.title.x = if (show_x) element_text(margin = margin(t = 6)) else element_blank(),
-        axis.title.y = if (show_y) element_text(margin = margin(r = 6)) else element_blank(),
-        axis.text.x = if (show_x) element_text() else element_blank(),
-        axis.text.y = if (show_y) element_text() else element_blank(),
-        axis.ticks.x = if (show_x) element_line() else element_blank(),
-        axis.ticks.y = if (show_y) element_line() else element_blank()
-      )
-  }
-
-  make_scatter <- function(x_col, y_col, rho, show_x = TRUE, show_y = TRUE) {
-    x_vals <- grid_df[[x_col]]
-    y_vals <- grid_df[[y_col]]
-    x_lab <- CORR_LABELS[[x_col]]
-    y_lab <- CORR_LABELS[[y_col]]
-
-    ggplot(grid_df, aes(x = .data[[x_col]], y = .data[[y_col]])) +
-      geom_point(alpha = 0.38, size = 1.3, color = GSVI_COLOUR) +
-      annotate(
-        "label",
-        x = -Inf,
-        y = Inf,
-        label = sprintf("\u03C1 = %.2f", rho),
-        hjust = -0.08,
-        vjust = 1.15,
-        size = 3.2,
-        fontface = "bold",
-        fill = alpha("white", 0.92),
-        linewidth = 0.2,
-        color = CHAPTER_TITLE_COLOUR
-      ) +
-      scale_x_continuous(labels = label_number(accuracy = 0.1)) +
-      scale_y_continuous(labels = label_number(accuracy = 0.1)) +
-      labs(x = if (show_x) x_lab else NULL, y = if (show_y) y_lab else NULL) +
-      pair_theme(show_x = show_x, show_y = show_y)
-  }
-
-  # Upper-triangle layout: row 1 has 3 panels, row 2 has 2, row 3 has 1.
-  p12 <- make_scatter(CORR_COLUMNS[2], CORR_COLUMNS[1], corr_mat[1, 2], show_x = FALSE, show_y = TRUE)
-  p13 <- make_scatter(CORR_COLUMNS[3], CORR_COLUMNS[1], corr_mat[1, 3], show_x = FALSE, show_y = FALSE)
-  p14 <- make_scatter(CORR_COLUMNS[4], CORR_COLUMNS[1], corr_mat[1, 4], show_x = FALSE, show_y = FALSE)
-  p23 <- make_scatter(CORR_COLUMNS[3], CORR_COLUMNS[2], corr_mat[2, 3], show_x = FALSE, show_y = TRUE)
-  p24 <- make_scatter(CORR_COLUMNS[4], CORR_COLUMNS[2], corr_mat[2, 4], show_x = FALSE, show_y = FALSE)
-  p34 <- make_scatter(CORR_COLUMNS[4], CORR_COLUMNS[3], corr_mat[3, 4], show_x = TRUE, show_y = TRUE)
-
-  p <- wrap_plots(
-    p12, p13, p14, p23, p24, p34,
-    design = "
-    ABC
-    #DE
-    ##F
-    ",
-    guides = "keep"
-  ) +
-    plot_annotation(
-      title = "Spearman correlation scatter matrix (city-road H3 metrics)",
-      subtitle = sprintf(
-        "Nairobi | H3 res %d | %dm road buffer | n = %s cells | upper triangle: each panel = pairwise scatter with Spearman \u03C1",
-        args$h3_res,
-        as.integer(args$road_buffer),
-        comma(n_cells)
-      ),
-      theme = theme(
-        plot.title = element_text(face = "bold", size = 14, hjust = 0.5, color = CHAPTER_TITLE_COLOUR),
-        plot.subtitle = element_text(size = 9.5, hjust = 0.5, color = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 8))
-      )
-    )
-
-  out_path <- file.path(FIG_DIR, paste0("Nairobi_cityroad_correlation_spearman_", tag, "_scatter.png"))
-  ggsave(out_path, plot = p, width = 10, height = 9.5, dpi = 320, bg = "transparent")
-  message("  ", basename(out_path))
-}
-
-plot_spearman_correlation <- function(grid_df, tag, n_cells) {
-  corr_mat <- compute_spearman_matrix(grid_df, tag)
-  plot_spearman_heatmap(corr_mat, tag, n_cells)
-  plot_spearman_scatter_matrix(grid_df, corr_mat, tag, n_cells)
-}
-
-`%||%` <- function(x, y) if (is.null(x)) y else x
-
 args <- parse_args()
-tag <- file_tag(args$h3_res, args$road_buffer)
+buf <- as.integer(args$road_buffer)
+tag <- sprintf("buf%dm", buf)
 
-grid <- st_read(file.path(DATA_DIR, paste0("Nairobi_cityroad_grid_", tag, ".gpkg")), quiet = TRUE) |>
+grid <- st_read(file.path(DATA_DIR, "1_Nairobi_cityroad_grid100m_32737.gpkg"), quiet = TRUE) |>
   st_transform(CRS_EA)
+summary <- read.csv(file.path(DATA_DIR, sprintf("1_Nairobi_cityroad_summary_%s.csv", tag)))
 boundary <- st_read(file.path(INPUT_DIR, "Nairobi_boundary_polygon_32737.gpkg"), quiet = TRUE) |>
   st_transform(CRS_EA)
 
+n_cells <- nrow(grid)
+dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 message("Writing figures to ", FIG_DIR)
 
-plot_continuous(
-  grid, boundary, "road_length_density_km_per_km2",
-  "Road length density (km/km2)",
-  paste0("Nairobi_cityroad_density_", tag, ".png"),
-  "km/km2"
+# --- (1) Road access class ---------------------------------------------------
+ACCESS_LEVELS <- c("intersects", "near", "excluded")
+ACCESS_LABELS <- c(
+  intersects = "Intersects a road",
+  near = sprintf("Within %d m of a road", buf),
+  excluded = sprintf("Road-excluded (>%d m)", buf)
+)
+# Light grey = baseline, tan = near, dark brown = road-excluded
+ACCESS_COLOURS <- c(
+  intersects = ROAD_BASELINE_COLOUR,
+  near = GSVI_COLOUR,
+  excluded = WASTE_DARK_COLOUR
 )
 
-plot_continuous(
-  grid, boundary, "road_coverage_ratio",
-  "Road coverage ratio (50 m buffer)",
-  paste0("Nairobi_cityroad_coverage_", tag, ".png"),
-  "Ratio"
-)
+grid <- grid |>
+  mutate(
+    access_class = case_when(
+      intersects_road == 1 ~ "intersects",
+      road_accessible == 1 ~ "near",
+      TRUE ~ "excluded"
+    ),
+    access_class = factor(access_class, levels = ACCESS_LEVELS)
+  )
 
-plot_continuous(
-  grid, boundary, "road_intersection_density_per_km2",
-  "Road intersection density (per km2)",
-  paste0("Nairobi_cityroad_intersections_", tag, ".png"),
-  "Count/km2"
-)
+share <- grid |>
+  st_drop_geometry() |>
+  count(access_class, .drop = FALSE) |>
+  mutate(pct = 100 * n / sum(n))
+pct_of <- function(cls) share$pct[share$access_class == cls]
 
-plot_continuous(
-  grid, boundary, "road_segment_count",
-  "Road segment count per cell",
-  paste0("Nairobi_cityroad_segments_", tag, ".png"),
-  "Segments"
-)
+p_access <- make_base_map(
+  boundary,
+  title = "Road access on the 100 m grid",
+  subtitle = sprintf(
+    "%s cells | intersects %.1f%% | within %d m %.1f%% | excluded %.1f%%",
+    comma(n_cells), pct_of("intersects"), buf, pct_of("near"), pct_of("excluded")
+  ),
+  caption = "Cleaned local OSM segments (Step 1a) | cell edge distance to nearest road",
+  transparent_bg = TRUE
+) +
+  geom_sf(data = grid, aes(fill = access_class), color = NA, linewidth = 0) +
+  scale_fill_manual(name = "Road access", values = ACCESS_COLOURS, labels = ACCESS_LABELS, drop = FALSE) +
+  theme(legend.key.size = unit(0.55, "cm"), legend.text = element_text(size = 7.5))
 
-grid_df <- st_drop_geometry(grid)
-plot_spearman_correlation(grid_df, tag, nrow(grid_df))
+save_map(p_access, file.path(FIG_DIR, sprintf("1_Nairobi_cityroad_access_%s.png", tag)),
+         limits = boundary, base_size = 10, bg = "transparent")
+
+# --- (2) Road density (cells with road) -------------------------------------
+with_road <- grid |> filter(intersects_road == 1)
+p_density <- make_base_map(
+  boundary,
+  title = "Road density on the 100 m grid",
+  subtitle = sprintf(
+    "%s cells with road | mean %.1f km/km² | median road length %s m",
+    comma(nrow(with_road)),
+    summary$mean_road_density_with_road_km_per_km2,
+    comma(round(summary$median_road_length_with_road_m))
+  ),
+  caption = "Mapped road length inside each cell / cell area | cells without road in grey",
+  transparent_bg = TRUE
+) +
+  geom_sf(data = grid |> filter(intersects_road == 0), fill = ROAD_BASELINE_COLOUR, color = NA, linewidth = 0) +
+  geom_sf(data = with_road, aes(fill = road_density_km_per_km2), color = NA, linewidth = 0) +
+  scale_fill_gradientn(
+    name = "Road density\n(km/km²)",
+    colours = c(CHAPTER_SEQ_LOW, GSVI_COLOUR, WASTE_COLOUR),
+    limits = c(0, quantile(with_road$road_density_km_per_km2, 0.99)),
+    oob = squish,
+    labels = label_number(accuracy = 1)
+  )
+
+save_map(p_density, file.path(FIG_DIR, "1_Nairobi_cityroad_density_grid100m.png"),
+         limits = boundary, base_size = 10, bg = "transparent")
+
+# --- (3) Distance to nearest road (road-excluded cells) ---------------------
+excluded <- grid |> filter(road_accessible == 0)
+p_dist <- make_base_map(
+  boundary,
+  title = "Distance to nearest road, road-excluded cells",
+  subtitle = sprintf(
+    "%s excluded cells (%.1f%%) | median %s m | 90th pct %s m",
+    comma(nrow(excluded)), summary$pct_cells_road_excluded,
+    comma(round(summary$median_dist_road_edge_excluded_m)),
+    comma(round(summary$p90_dist_road_edge_excluded_m))
+  ),
+  caption = sprintf("Cell edge to nearest mapped road | road-accessible cells (≤%d m) in grey", buf),
+  transparent_bg = TRUE
+) +
+  # Accessible cells as the grey baseline; excluded cells on the same brown ramp as the density map
+  geom_sf(data = grid |> filter(road_accessible == 1), fill = ROAD_BASELINE_COLOUR, color = NA, linewidth = 0) +
+  geom_sf(data = excluded, aes(fill = dist_road_edge_m), color = NA, linewidth = 0) +
+  scale_fill_gradientn(
+    name = "Distance to\nroad (m)",
+    colours = c(CHAPTER_SEQ_LOW, GSVI_COLOUR, WASTE_COLOUR),
+    limits = c(buf, quantile(excluded$dist_road_edge_m, 0.99)),
+    oob = squish,
+    labels = label_number(accuracy = 1)
+  )
+
+save_map(p_dist, file.path(FIG_DIR, sprintf("1_Nairobi_cityroad_distance_%s.png", tag)),
+         limits = boundary, base_size = 10, bg = "transparent")
 
 message("Done.")

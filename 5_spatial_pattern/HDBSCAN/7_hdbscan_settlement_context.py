@@ -55,21 +55,6 @@ ARMS = {
         / "table_hdbscan_cluster_distance_composition_gsvi.csv",
         "label": "GSVI waste-positive panoids",
     },
-    "gsvi_selfcollected": {
-        "clustered_gpkg": OUTPUT_DIR
-        / "Nairobi_waste_hdbscan_gsvi_selfcollected_32737.gpkg",
-        "enriched_gpkg": OUTPUT_DIR
-        / "Nairobi_waste_hdbscan_gsvi_selfcollected_settlement_context_32737.gpkg",
-        "prop_csv": OUTPUT_DIR
-        / "Nairobi_hdbscan_cluster_distance_composition_gsvi_selfcollected.csv",
-        "count_csv": OUTPUT_DIR
-        / "Nairobi_hdbscan_cluster_distance_counts_gsvi_selfcollected.csv",
-        "summary_csv": OUTPUT_DIR
-        / "Nairobi_hdbscan_settlement_context_summary_gsvi_selfcollected.csv",
-        "thesis_csv": TABLE_DIR
-        / "table_hdbscan_cluster_distance_composition_gsvi_selfcollected.csv",
-        "label": "GSVI panoids + self-collected locations",
-    },
 }
 
 
@@ -203,7 +188,7 @@ def main() -> None:
 
     print("HDBSCAN × settlement context (panoid-level)...")
     slums = load_slums()
-    summaries = [process_arm("gsvi", slums), process_arm("gsvi_selfcollected", slums)]
+    summaries = [process_arm("gsvi", slums)]
 
     comparison = OUTPUT_DIR / "Nairobi_hdbscan_settlement_context_summary_comparison.csv"
     pd.DataFrame(summaries).to_csv(comparison, index=False)

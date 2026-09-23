@@ -43,17 +43,6 @@ ARMS = {
         "thesis_sizes": TABLE_DIR / "table_hdbscan_cluster_sizes_gsvi.csv",
         "label": "GSVI waste-positive panoramas",
     },
-    "gsvi_selfcollected": {
-        "enriched_gpkg": OUTPUT_DIR
-        / "Nairobi_waste_hdbscan_gsvi_selfcollected_settlement_context_32737.gpkg",
-        "sizes_csv": OUTPUT_DIR
-        / "Nairobi_hdbscan_cluster_sizes_gsvi_selfcollected.csv",
-        "summary_csv": OUTPUT_DIR
-        / "Nairobi_hdbscan_cluster_size_summary_gsvi_selfcollected.csv",
-        "thesis_sizes": TABLE_DIR
-        / "table_hdbscan_cluster_sizes_gsvi_selfcollected.csv",
-        "label": "GSVI panoramas + self-collected locations",
-    },
 }
 
 
@@ -186,7 +175,6 @@ def main() -> None:
     print("HDBSCAN cluster-size distribution tables...")
     summaries = [
         process_arm("gsvi"),
-        process_arm("gsvi_selfcollected"),
     ]
     comparison = OUTPUT_DIR / "Nairobi_hdbscan_cluster_size_summary_comparison.csv"
     pd.DataFrame(summaries).to_csv(comparison, index=False)
