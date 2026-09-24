@@ -1,24 +1,26 @@
 #!/usr/bin/env Rscript
 # Step 6.3b — is the surface with self-collected imagery any better?
 #   2_SC_validation_comparison.png
-#     (a) agreement with the IDEAMaps crowd labels, by subset and arm
-#     (b) the decisive split: among the cells that changed class, those that
-#         received imagery against those that moved through the spatial fill
-#     (c) McNemar on the same split — which arm the crowd sides with
+#     one arrow per subset: agreement with the IDEAMaps crowd labels before and
+#     after adding self-collected imagery. Arrow direction is the answer.
 #
-# 6.3 showed the surface moves. This figure says which direction it moved in,
-# and the answer depends entirely on whether the movement had evidence behind it.
+# The question is a yes/no, so the figure is built to be read as one. Everything
+# else — precision, recall, kappa, the confusion matrices — stays in
+# table_6_3_validation_comparison.csv and 2_sc_validation_detail.csv.
+#
+# Rows are ordered so the argument reads top to bottom: citywide nothing
+# happens, then the cells field collection actually reached, then the two routes
+# a changed cell can take. The last two rows point opposite ways, and that is
+# the finding.
 #
 # Inputs (6_selfcollected/3_indicator/, from 2_sc_validation.py):
 #   2_sc_validation_detail.csv
-#   thesis_table/table_6_3_validation_comparison.csv
 
 suppressPackageStartupMessages({
   library(ggplot2)
   library(dplyr)
   library(tidyr)
   library(scales)
-  library(patchwork)
 })
 
 args_cli <- commandArgs(trailingOnly = FALSE)
@@ -33,161 +35,101 @@ FIG_DIR <- file.path(script_dir, "../..", "Figure", "6_selfcollected", "3_indica
 DETAIL_CSV <- file.path(DATA_DIR, "2_sc_validation_detail.csv")
 OUT_PATH <- file.path(FIG_DIR, "2_SC_validation_comparison.png")
 
-ARM_COLOURS <- c("GSVI" = "#BDB3A8", "GSVI + SC" = "#6B4226")
-ARM_LEVELS <- c("GSVI", "GSVI + SC")
+BEFORE <- "#BDB3A8"
 BETTER <- "#6B4226"
 WORSE <- "#496142"
+FLAT <- "#9E9689"
+FLAT_PP <- 1.0   # a change smaller than this is called flat, not better or worse
 
 if (!file.exists(DETAIL_CSV)) {
   stop("Missing ", DETAIL_CSV, " — run 6_selfcollected/3_indicator/2_sc_validation.py first")
 }
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 
-detail <- read.csv(DETAIL_CSV, stringsAsFactors = FALSE) |>
-  mutate(arm = factor(arm, levels = ARM_LEVELS))
-
+detail <- read.csv(DETAIL_CSV, stringsAsFactors = FALSE)
 n_of <- function(s) detail$n[detail$subset == s & detail$arm == "GSVI"][1]
 
 SUBSETS <- c("All validated cells", "Cells holding SC imagery",
              "Changed, received imagery", "Changed through the spatial fill")
 SHORT <- c(
-  "All validated cells" = "All validated",
-  "Cells holding SC imagery" = "Holds SC imagery",
-  "Changed, received imagery" = "Changed:\nwith imagery",
-  "Changed through the spatial fill" = "Changed:\nby spatial fill"
+  "All validated cells" = "Every validated cell",
+  "Cells holding SC imagery" = "Cells field collection reached",
+  "Changed, received imagery" = "Changed cells — with imagery",
+  "Changed through the spatial fill" = "Changed cells — interpolated only"
 )
-subset_label <- function(s) {
-  vapply(s, function(x) sprintf("%s\n(n = %s)", SHORT[[x]], comma(n_of(x))), character(1))
-}
+row_label <- function(x) sprintf("%s\n(n = %s)", SHORT[[x]], comma(n_of(x)))
+LEVELS <- rev(vapply(SUBSETS, row_label, character(1)))
 
-base_theme <- function() {
-  theme_minimal(base_size = 11) +
-    theme(
-      plot.title = element_text(face = "bold", size = 11.5, colour = CHAPTER_TITLE_COLOUR),
-      plot.subtitle = element_text(size = 8.4, colour = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 6)),
-      axis.title = element_text(size = 9.5, colour = CHAPTER_AXIS_COLOUR),
-      axis.text = element_text(size = 8.6, colour = CHAPTER_AXIS_COLOUR),
-      panel.grid.minor = element_blank(),
-      panel.grid.major.x = element_blank(),
-      legend.position = "bottom"
-    )
-}
-
-# --- (a) binary + 3-class accuracy by subset ---------------------------------
-acc <- detail |>
+arrows <- detail |>
   filter(subset %in% SUBSETS) |>
-  select(subset, arm, Binary = accuracy, `3-class` = severity_accuracy) |>
-  pivot_longer(c(Binary, `3-class`), names_to = "measure", values_to = "value") |>
-  mutate(
-    subset = factor(subset_label(subset), levels = sapply(SUBSETS, subset_label)),
-    measure = factor(measure, levels = c("Binary", "3-class"))
-  )
-
-p_acc <- ggplot(acc, aes(subset, 100 * value, fill = arm)) +
-  geom_col(position = position_dodge(width = 0.72), width = 0.62) +
-  geom_text(aes(label = sprintf("%.0f", 100 * value)),
-            position = position_dodge(width = 0.72), vjust = -0.45,
-            size = 2.6, fontface = "bold", colour = CHAPTER_AXIS_COLOUR) +
-  facet_wrap(~measure, ncol = 1, scales = "free_y") +
-  scale_fill_manual(name = NULL, values = ARM_COLOURS) +
-  scale_y_continuous(limits = c(0, 112), expand = expansion(mult = c(0, 0.02))) +
-  labs(
-    title = "(a) Agreement with the crowd labels",
-    subtitle = "Accuracy against IDEAMaps validation clicks, by subset",
-    x = NULL, y = "Agreement (%)"
-  ) +
-  base_theme() +
-  theme(
-    strip.text = element_text(face = "bold", size = 8.8, colour = CHAPTER_AXIS_COLOUR),
-    axis.text.x = element_text(size = 7.8, lineheight = 0.9)
-  )
-
-# --- (b) the decisive split, as a change in agreement ------------------------
-split <- detail |>
-  filter(subset %in% c("Changed, received imagery", "Changed through the spatial fill")) |>
-  select(subset, arm, Binary = accuracy, `3-class` = severity_accuracy) |>
-  pivot_longer(c(Binary, `3-class`), names_to = "measure", values_to = "value") |>
+  select(subset, arm, Binary = accuracy, `Three-class` = severity_accuracy) |>
+  pivot_longer(c(Binary, `Three-class`), names_to = "measure", values_to = "value") |>
   pivot_wider(names_from = arm, values_from = value) |>
   mutate(
-    delta = 100 * (`GSVI + SC` - GSVI),
-    route = if_else(grepl("received", subset), "Received imagery", "Moved through the spatial fill"),
-    route = factor(route, levels = c("Received imagery", "Moved through the spatial fill")),
-    measure = factor(measure, levels = c("Binary", "3-class")),
-    direction = if_else(delta >= 0, "Agreement improves", "Agreement worsens")
-  )
-
-p_split <- ggplot(split, aes(measure, delta, fill = direction)) +
-  geom_hline(yintercept = 0, colour = "grey45", linewidth = 0.4) +
-  geom_col(width = 0.55) +
-  geom_text(aes(label = sprintf("%+.0f pp", delta),
-                vjust = if_else(delta >= 0, -0.45, 1.35)),
-            size = 2.9, fontface = "bold", colour = CHAPTER_AXIS_COLOUR) +
-  facet_wrap(~route, nrow = 1) +
-  scale_fill_manual(name = NULL, values = c("Agreement improves" = BETTER,
-                                            "Agreement worsens" = WORSE)) +
-  scale_y_continuous(limits = c(min(split$delta) * 1.35, max(split$delta) * 1.25)) +
-  labs(
-    title = "(b) Among the cells that changed class, did the change help?",
-    subtitle = sprintf(
-      "%s cells changed with imagery behind them, %s changed through interpolation alone",
-      comma(n_of("Changed, received imagery")),
-      comma(n_of("Changed through the spatial fill"))
+    before = 100 * GSVI,
+    after = 100 * `GSVI + SC`,
+    delta = after - before,
+    verdict = case_when(
+      delta > FLAT_PP ~ "Agreement improves",
+      delta < -FLAT_PP ~ "Agreement worsens",
+      TRUE ~ "No meaningful change"
     ),
-    x = NULL, y = "Change in agreement (pp)"
-  ) +
-  base_theme() +
-  theme(strip.text = element_text(face = "bold", size = 9, colour = CHAPTER_AXIS_COLOUR))
-
-# --- (c) recall vs precision, the mechanism ----------------------------------
-mech <- detail |>
-  filter(subset %in% c("Changed, received imagery", "Changed through the spatial fill")) |>
-  select(subset, arm, Precision = precision, Recall = recall) |>
-  pivot_longer(c(Precision, Recall), names_to = "measure", values_to = "value") |>
-  mutate(
-    route = if_else(grepl("received", subset), "Received imagery", "Moved through the spatial fill"),
-    route = factor(route, levels = c("Received imagery", "Moved through the spatial fill")),
-    measure = factor(measure, levels = c("Precision", "Recall"))
+    verdict = factor(verdict, levels = c("Agreement improves", "No meaningful change",
+                                         "Agreement worsens")),
+    label = factor(vapply(subset, row_label, character(1)), levels = LEVELS),
+    measure = factor(measure, levels = c("Binary", "Three-class"))
   )
 
-p_mech <- ggplot(mech, aes(measure, 100 * value, fill = arm)) +
-  geom_col(position = position_dodge(width = 0.7), width = 0.58) +
-  geom_text(aes(label = sprintf("%.0f", 100 * value)),
-            position = position_dodge(width = 0.7), vjust = -0.45,
-            size = 2.7, fontface = "bold", colour = CHAPTER_AXIS_COLOUR) +
-  facet_wrap(~route, nrow = 1) +
-  scale_fill_manual(name = NULL, values = ARM_COLOURS) +
-  scale_y_continuous(limits = c(0, 118), expand = expansion(mult = c(0, 0.02))) +
+fig <- ggplot(arrows, aes(y = label)) +
+  geom_segment(aes(x = before, xend = after, yend = label, colour = verdict),
+               linewidth = 1.4,
+               arrow = arrow(length = unit(0.2, "cm"), type = "closed")) +
+  geom_point(aes(x = before), colour = BEFORE, size = 3.2) +
+  geom_point(aes(x = before), colour = "white", size = 1.4) +
+  geom_text(aes(x = pmin(before, after) - 3, label = sprintf("%.0f", before)),
+            hjust = 1, size = 2.9, colour = "grey45") +
+  geom_text(aes(x = pmax(before, after) + 3,
+                label = sprintf("%.0f  (%+.0f pp)", after, delta), colour = verdict),
+            hjust = 0, size = 2.9, fontface = "bold", show.legend = FALSE) +
+  facet_wrap(~measure, ncol = 2) +
+  scale_colour_manual(name = NULL, values = c(
+    "Agreement improves" = BETTER,
+    "No meaningful change" = FLAT,
+    "Agreement worsens" = WORSE
+  ), drop = FALSE) +
+  scale_x_continuous(limits = c(-16, 126), breaks = seq(0, 100, 25),
+                     labels = label_percent(scale = 1)) +
   labs(
-    title = "(c) Why — the interpolated cells are over-called",
-    subtitle = "Recall rises to 100% in both routes, but only the imagery route keeps its precision",
-    x = NULL, y = "Binary metric (%)"
-  ) +
-  base_theme() +
-  theme(strip.text = element_text(face = "bold", size = 9, colour = CHAPTER_AXIS_COLOUR))
-
-fig <- (p_acc | (p_split / p_mech)) +
-  plot_layout(widths = c(1, 1.25)) +
-  plot_annotation(
     title = "Does self-collected imagery make the 100 m indicator more accurate?",
-    subtitle = sprintf(
-      "Both arms scored against %s IDEAMaps crowd-validated cells | %s of them hold self-collected imagery, %s changed published class",
-      comma(n_of("All validated cells")), comma(n_of("Cells holding SC imagery")),
-      comma(n_of("Changed, received imagery") + n_of("Changed through the spatial fill"))
+    subtitle = paste0(
+      "Agreement with the IDEAMaps crowd validation | grey dot = GSVI, arrowhead = GSVI + SC\n",
+      "Only where field collection actually reached a cell does the indicator get better."
     ),
+    x = "Agreement with the crowd labels", y = NULL,
     caption = paste0(
-      "Where field collection reached a validated cell the change is almost always right (3-class agreement 0% → 86%, McNemar p = 0.039). ",
-      "Where the class moved through interpolation alone it is not (3-class 52% → 20%, p = 0.864).\n",
-      "Citywide the two arms are indistinguishable (binary 73.2% → 73.4%), because the cells with evidence behind them are too few to move the total.\n",
-      "Subset sizes are small: this is directional evidence about a 1% increase in imagery, not a powered test of field collection in general."
-    ),
-    theme = theme(
-      plot.title = element_text(face = "bold", size = 14, hjust = 0.5, colour = CHAPTER_TITLE_COLOUR),
-      plot.subtitle = element_text(size = 9, hjust = 0.5, colour = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 8)),
-      plot.caption = element_text(size = 8.2, hjust = 0, colour = CHAPTER_CAPTION_COLOUR,
-                                  lineheight = 1.3, margin = margin(t = 8))
+      "2,286 crowd-validated 100 m cells. A changed cell is one whose published class differs between the arms; it either received an image or moved through the spatial fill.\n",
+      "Changed cells with imagery behind them: three-class agreement 0% → 86%, McNemar p = 0.039. Changed cells moved by interpolation alone: 52% → 20%, p = 0.864.\n",
+      "Subset sizes are small and this concerns a 1% increase in imagery — directional evidence, not a powered test. Precision, recall, κ and the confusion matrices are in table_6_3_validation_comparison.csv."
     )
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13.5, colour = CHAPTER_TITLE_COLOUR),
+    plot.subtitle = element_text(size = 9, colour = CHAPTER_SUBTITLE_COLOUR,
+                                 lineheight = 1.25, margin = margin(b = 10)),
+    plot.caption = element_text(size = 7.8, hjust = 0, colour = CHAPTER_CAPTION_COLOUR,
+                                lineheight = 1.3, margin = margin(t = 10)),
+    strip.text = element_text(face = "bold", size = 10, colour = CHAPTER_AXIS_COLOUR),
+    axis.title.x = element_text(size = 9.5, colour = CHAPTER_AXIS_COLOUR, margin = margin(t = 6)),
+    axis.text.y = element_text(size = 9, colour = CHAPTER_AXIS_COLOUR, lineheight = 0.95, hjust = 0),
+    axis.text.x = element_text(size = 8.6, colour = CHAPTER_AXIS_COLOUR),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.spacing.x = unit(1.4, "lines"),
+    legend.position = "bottom",
+    legend.text = element_text(size = 9)
   )
 
-ggsave(OUT_PATH, fig, width = 13.5, height = 7, dpi = 400, bg = "white")
+ggsave(OUT_PATH, fig, width = 12.5, height = 5.2, dpi = 400, bg = "white")
 message("Wrote ", OUT_PATH)
 message("Done.")
