@@ -7,8 +7,7 @@
 # If density explained the settlement association, the two series in (a) would
 # coincide and every ratio in (b) would sit on 1.
 #
-# Input: Signed_distance/pop_adjusted/Nairobi_settlement_by_density_band.csv
-#        (4_settlement_by_density_band.py)
+# Input: settlement/Nairobi_settlement_by_density_band.csv (4_settlement_by_density_band.py)
 
 suppressPackageStartupMessages({
   library(ggplot2)
@@ -21,17 +20,16 @@ suppressPackageStartupMessages({
 args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
-source(file.path(script_dir, "../../..", "R", "chapter_paths.R"))
-source(file.path(script_dir, "../../..", "R", "chapter_colours.R"))
+source(file.path(script_dir, "../..", "R", "chapter_paths.R"))
+source(file.path(script_dir, "../..", "R", "chapter_colours.R"))
 
-DATA_DIR <- file.path(chapter_data_root, "5_spatial_pattern", "Signed_distance", "pop_adjusted")
+DATA_DIR <- file.path(chapter_data_root, "5_spatial_pattern", "settlement")
 BAND_CSV <- file.path(DATA_DIR, "Nairobi_settlement_by_density_band.csv")
-FIG_DIR <- file.path(script_dir, "../../..", "Figure", "5_spatial_pattern",
-                     "Signed_distance", "pop_adjusted")
+FIG_DIR <- file.path(script_dir, "../..", "Figure", "5_spatial_pattern", "settlement")
 
 if (!file.exists(BAND_CSV)) {
   stop("Missing ", BAND_CSV,
-       " — run 5_spatial_pattern/Signed_distance/pop_adjusted/4_settlement_by_density_band.py first")
+       " — run 5_spatial_pattern/settlement/4_settlement_by_density_band.py first")
 }
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 

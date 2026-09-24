@@ -1,9 +1,16 @@
 #!/usr/bin/env Rscript
-# Step 3 figure 3 — YOLO + Qwen on the independent GSVI held-out set,
+# Step 6.2 — YOLO + Qwen on the independent GSVI held-out set,
 # across every self-collected share of the YOLO training set present in the table.
-#   3_Heldout_validation_binary_metrics.png  lines: each metric vs SC share
-#   3_Heldout_validation_binary_bars.png     grouped bars: metric x SC share
-# Input: thesis_table/table_4_sc_sensitivity_detail.csv (1_heldout_metrics.py)
+#   1_Heldout_sc_sensitivity_metrics.png  lines: each metric vs SC share
+#   1_Heldout_sc_sensitivity_bars.png     grouped bars: metric x SC share
+#
+# The detector is retrained at several shares of self-collected imagery and
+# every model is scored on the same held-out images, so this is the SC
+# question asked of the classifier rather than of the map. The metrics
+# themselves are computed in Step 3 (one pass over all scenarios); this
+# script only reads that table.
+#
+# Input: 3_waste_identification/thesis_table/table_4_sc_sensitivity_detail.csv
 #
 # Replaces the older two-panel Heldout_validation_binary_* charts: the
 # self-collected held-out panel is dropped, and only the YOLO -> Qwen cascade
@@ -20,13 +27,13 @@ suppressPackageStartupMessages({
 args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
-source(file.path(script_dir, "..", "R", "chapter_paths.R"))
-source(file.path(script_dir, "..", "R", "map_theme.R"))
+source(file.path(script_dir, "../..", "R", "chapter_paths.R"))
+source(file.path(script_dir, "../..", "R", "map_theme.R"))
 
 STEP3_DIR <- file.path(chapter_data_root, "3_waste_identification")
 THESIS_DIR <- file.path(STEP3_DIR, "thesis_table")
 DETAIL_CSV <- file.path(THESIS_DIR, "table_4_sc_sensitivity_detail.csv")
-FIG_DIR <- file.path(script_dir, "..", "Figure", "3_waste_identification")
+FIG_DIR <- file.path(script_dir, "../..", "Figure", "6_selfcollected", "2_identification")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 
 if (!file.exists(DETAIL_CSV)) {
@@ -186,7 +193,7 @@ p_lines <- ggplot(plot_df, aes(x = sc_share_pct, y = score_pct, colour = metric,
   base_theme() +
   theme(panel.grid.major.x = element_line(colour = "grey92", linewidth = 0.25))
 
-out_lines <- file.path(FIG_DIR, "3_Heldout_validation_binary_metrics.png")
+out_lines <- file.path(FIG_DIR, "1_Heldout_sc_sensitivity_metrics.png")
 ggsave(out_lines, plot = p_lines, width = 9, height = 5.6, dpi = 600, bg = "white")
 message("Wrote ", out_lines)
 
@@ -218,7 +225,7 @@ p_bars <- ggplot(plot_df, aes(x = metric, y = score_pct, fill = scenario)) +
   base_theme() +
   theme(panel.grid.major.x = element_blank())
 
-out_bars <- file.path(FIG_DIR, "3_Heldout_validation_binary_bars.png")
+out_bars <- file.path(FIG_DIR, "1_Heldout_sc_sensitivity_bars.png")
 ggsave(out_bars, plot = p_bars, width = 9, height = 5.6, dpi = 600, bg = "white")
 message("Wrote ", out_bars)
 

@@ -13,7 +13,7 @@ PAT_FIG = FIG / "5_spatial_pattern"
 SPATIAL_DATA = [
     PAT_HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
     PAT_HDB / "Nairobi_waste_hdbscan_gsvi_settlement_context_32737.gpkg",
-    PAT_HDB / "Nairobi_hdbscan_cluster_sizes_gsvi.csv",
+    PAT_HDB / "thesis_table" / "table_hdbscan_clustering.csv",
     PAT_SET / "Nairobi_nnr_observation_frame_summary.csv",
     PAT_SET / "thesis_table" / "settlement_association.csv",
     PAT_SD / "Nairobi_signed_distance_gam_summary.csv",
@@ -23,7 +23,7 @@ SPATIAL_DATA = [
     PAT_HDB_PER / "Nairobi_period_hdbscan_summary.csv",
     PAT_SD_PER / "Nairobi_period_signed_distance_gam_summary.csv",
     PAT_POP_2020 / "Nairobi_pop_adjusted_model_metrics.csv",
-    PAT_POP / "thesis_table" / "settlement_by_density_band.csv",
+    PAT_SET / "thesis_table" / "settlement_by_density_band.csv",
 ]
 
 SPATIAL_FIGS = [
@@ -39,6 +39,7 @@ SPATIAL_FIGS = [
     PAT_FIG / "settlement" / "Temporal_prevalence_ratio_by_year.png",
     PAT_FIG / "Signed_distance" / "Signed_distance_gam_curve.png",
     PAT_FIG / "Signed_distance" / "Signed_distance_gam_curve_inset.png",
+    PAT_FIG / "Signed_distance" / "Waste_settlement_proximity.png",
     PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_effects.png",
     PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_distance.png",
     PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_population.png",
@@ -47,7 +48,7 @@ SPATIAL_FIGS = [
     PAT_FIG / "HDBSCAN" / "period_stratified_robustness" / "Period_HDBSCAN_comparison.png",
     PAT_FIG / "Signed_distance" / "period_stratified_robustness" / "Period_signed_distance_gam_curve.png",
     PAT_FIG / "Signed_distance" / "pop_adjusted" / "worldpop_2020" / "Pop_adjusted_gam_effects.png",
-    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Settlement_by_density_band.png",
+    PAT_FIG / "settlement" / "Settlement_by_density_band.png",
 ]
 
 SPATIAL_SRC = f"{REPO_ROOT}/5_spatial_pattern"
@@ -59,6 +60,7 @@ rule hdbscan_cluster:
     output:
         PAT_HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
         PAT_HDB / "Nairobi_waste_hdbscan_summary_gsvi.csv",
+        PAT_HDB / "thesis_table" / "table_hdbscan_clustering.csv",
     shell:
         "python {SPATIAL_SRC}/HDBSCAN/3_hdbscan_waste.py"
 
@@ -87,7 +89,7 @@ rule hdbscan_cluster_sizes:
 rule plot_hdbscan:
     input:
         PAT_HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
-        PAT_HDB / "Nairobi_hdbscan_cluster_sizes_gsvi.csv",
+        PAT_HDB / "thesis_table" / "table_hdbscan_clustering.csv",
         PAT_HDB / "Nairobi_hdbscan_cluster_distance_composition_gsvi.csv",
     output:
         PAT_FIG / "HDBSCAN" / "Waste_HDBSCAN_context_gsvi.png",
@@ -230,8 +232,22 @@ rule settlement_by_density_band:
         PAT_POP / "Nairobi_pop_adjusted_gam_frame.csv",
     output:
         PAT_POP / "Nairobi_settlement_by_density_band.csv",
-        PAT_POP / "thesis_table" / "settlement_by_density_band.csv",
-        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Settlement_by_density_band.png",
+        PAT_SET / "thesis_table" / "settlement_by_density_band.csv",
+        PAT_FIG / "settlement" / "Settlement_by_density_band.png",
     shell:
         "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/4_settlement_by_density_band.py && "
         "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/4plot_settlement_by_density_band.R"
+
+
+# Descriptive twin of the GAM: the same gradient straight from the raw counts.
+rule proximity_descriptives:
+    input:
+        PAT_SD / "Nairobi_signed_distance_gam_frame.csv",
+        PAT_SD / "Nairobi_signed_distance_gam_curve.csv",
+    output:
+        PAT_SD / "Nairobi_proximity_rate_by_band.csv",
+        PAT_SD / "thesis_table" / "proximity_descriptives.csv",
+        PAT_FIG / "Signed_distance" / "Waste_settlement_proximity.png",
+    shell:
+        "python {SPATIAL_SRC}/Signed_distance/3_proximity_descriptives.py && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/3plot_waste_settlement_proximity.R"

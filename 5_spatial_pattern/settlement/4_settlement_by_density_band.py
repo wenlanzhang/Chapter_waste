@@ -20,7 +20,7 @@ a similar number of panoramas.
 Input:
   Signed_distance/pop_adjusted/Nairobi_pop_adjusted_gam_frame.csv  (1_pop_adjusted_gam.py)
 
-Outputs (Signed_distance/pop_adjusted/):
+Outputs (settlement/):
   Nairobi_settlement_by_density_band.csv        per-band counts and rates
   thesis_table/settlement_by_density_band.csv   chapter table
 """
@@ -41,9 +41,11 @@ if str(_REPO_ROOT) not in sys.path:
 
 from chapter_paths import pattern_dir  # noqa: E402
 
-OUTPUT_DIR = pattern_dir() / "Signed_distance" / "pop_adjusted"
+OUTPUT_DIR = pattern_dir() / "settlement"
 THESIS_TABLE_DIR = OUTPUT_DIR / "thesis_table"
-FRAME_CSV = OUTPUT_DIR / "Nairobi_pop_adjusted_gam_frame.csv"
+# The analysis frame (density + settlement flag per panorama) is built by the
+# population-adjusted GAM; this check only reuses it.
+FRAME_CSV = pattern_dir() / "Signed_distance" / "pop_adjusted" / "Nairobi_pop_adjusted_gam_frame.csv"
 
 DEFAULT_BANDS = 8
 # A band needs enough inside-settlement panoramas for the rate to mean anything.

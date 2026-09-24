@@ -8,8 +8,17 @@ if (!identical(Sys.getlocale("LC_CTYPE"), "en_US.UTF-8")) {
   suppressWarnings(Sys.setlocale("LC_CTYPE", "en_US.UTF-8"))
 }
 
+# Walk up from a script's directory until R/chapter_colours.R is found, so
+# scripts nested more than one level below the repo root work unchanged.
 get_repo_root <- function(script_dir) {
-  normalizePath(file.path(script_dir, ".."))
+  dir <- normalizePath(script_dir, mustWork = FALSE)
+  for (i in seq_len(6)) {
+    dir <- normalizePath(file.path(dir, ".."), mustWork = FALSE)
+    if (file.exists(file.path(dir, "R", "chapter_colours.R"))) {
+      return(dir)
+    }
+  }
+  normalizePath(file.path(script_dir, ".."), mustWork = FALSE)
 }
 
 source_chapter_colours <- function(script_dir) {
@@ -25,7 +34,7 @@ get_script_dir <- function() {
   "."
 }
 
-.chapter_colours_path <- file.path(get_script_dir(), "..", "R", "chapter_colours.R")
+.chapter_colours_path <- file.path(get_repo_root(get_script_dir()), "R", "chapter_colours.R")
 if (file.exists(.chapter_colours_path) && !exists("CHAPTER_AXIS_COLOUR")) {
   source(.chapter_colours_path)
 }

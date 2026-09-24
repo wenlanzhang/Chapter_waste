@@ -66,6 +66,11 @@ def pattern_dir() -> Path:
     return chapter_data_root() / "5_spatial_pattern"
 
 
+def selfcollected_dir() -> Path:
+    """Step 6: what self-collected imagery adds on top of the GSVI arm."""
+    return chapter_data_root() / "6_selfcollected"
+
+
 def training_dir() -> Path:
     return chapter_data_root() / "6_sensitivity_training"
 

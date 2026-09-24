@@ -67,9 +67,26 @@ def main() -> None:
         process_dataset("gsvi"),
     ]
 
-    comparison_path = OUTPUT_DIR / "Nairobi_waste_hdbscan_summary_comparison.csv"
-    pd.DataFrame(summaries).to_csv(comparison_path, index=False)
-    print(f"Wrote {comparison_path}")
+    # One arm, so a cross-arm "comparison" file would just restate the per-arm
+    # summary. Write the headline clustering numbers as a thesis table instead.
+    summary = summaries[0]
+    table_dir = OUTPUT_DIR / "thesis_table"
+    table_dir.mkdir(parents=True, exist_ok=True)
+    thesis = pd.DataFrame(
+        [
+            ("Waste-positive panoramas clustered", f"{summary['n_points']:,}", ""),
+            ("Clusters detected", f"{summary['n_clusters']:,}", ""),
+            ("Panoramas in a cluster", f"{summary['n_clustered']:,}", f"{summary['pct_waste_points_clustered']:.1f}%"),
+            ("Panoramas left as noise", f"{summary['n_noise']:,}", f"{100 * summary['noise_ratio']:.1f}%"),
+            ("min_cluster_size", str(summary["min_cluster_size"]), ""),
+            ("min_samples", str(summary["min_samples"]), ""),
+        ],
+        columns=["Variable", "Value", "Share"],
+    )
+    thesis_path = table_dir / "table_hdbscan_clustering.csv"
+    thesis.to_csv(thesis_path, index=False)
+    print(f"Wrote {thesis_path}")
+    print(thesis.to_string(index=False))
 
 
 if __name__ == "__main__":

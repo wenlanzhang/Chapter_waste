@@ -23,11 +23,11 @@ WASTE_ID_FIGS = [
     WASTE_ID_FIG / "1_Heldout_yolo_qwen_panel.png",
     WASTE_ID_FIG / "1_Heldout_qwen_only_panel.png",
     WASTE_ID_FIG / "2_Heldout_qwen_replicate_stability.png",
-    WASTE_ID_FIG / "3_Heldout_validation_binary_metrics.png",
-    WASTE_ID_FIG / "3_Heldout_validation_binary_bars.png",
-    WASTE_ID_FIG / "4_Heldout_validation_stage_metrics.png",
-    WASTE_ID_FIG / "4_Heldout_validation_stage_bars.png",
 ]
+
+# table_4_sc_sensitivity_detail.csv is written here but plotted in Step 6.2:
+# the scenario sweep is one pass over all training mixes, and the figures that
+# read it belong with the rest of the self-collected argument.
 
 
 rule heldout_metrics:
@@ -60,23 +60,3 @@ rule plot_qwen_stability:
         WASTE_ID_FIG / "2_Heldout_qwen_replicate_stability.png",
     shell:
         "Rscript {REPO_ROOT}/3_waste_identification/2plot_qwen_stability.R"
-
-
-rule plot_sc_sensitivity:
-    input:
-        WASTE_ID_THESIS / "table_4_sc_sensitivity_detail.csv",
-    output:
-        WASTE_ID_FIG / "3_Heldout_validation_binary_metrics.png",
-        WASTE_ID_FIG / "3_Heldout_validation_binary_bars.png",
-    shell:
-        "Rscript {REPO_ROOT}/3_waste_identification/3plot_sc_sensitivity.R"
-
-
-rule plot_stage_comparison:
-    input:
-        WASTE_ID_THESIS / "table_4_sc_sensitivity_detail.csv",
-    output:
-        WASTE_ID_FIG / "4_Heldout_validation_stage_metrics.png",
-        WASTE_ID_FIG / "4_Heldout_validation_stage_bars.png",
-    shell:
-        "Rscript {REPO_ROOT}/3_waste_identification/4plot_stage_comparison.R"

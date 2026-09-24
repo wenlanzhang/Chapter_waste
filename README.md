@@ -31,6 +31,9 @@ Chapter_waste/
 │   ├── HDBSCAN/                clustering + settlement context
 │   ├── settlement/             association, NNR null, temporal robustness
 │   └── Signed_distance/        GAM (+ pop_adjusted/ sensitivity)
+├── 6_selfcollected/
+│   ├── 1_sources/              what SC imagery is and what coverage it adds
+│   └── 2_identification/       SC in the YOLO training mix (plots only)
 │
 ├── Figure/<step>/              outputs, numbered by the block that produces them
 ├── drafts/                     scratch analyses kept out of the pipeline
@@ -48,7 +51,7 @@ Two arms are defined once in `lib/arms.py`:
 | `gsvi` | `gsvi` | Google | `Nairobi_{Waste_point,SVI_point,SVI_image}_gsvi_32737.gpkg` |
 | `gsvi_selfcollected` | `gsc` | Google + Faith + ZWL | `…_gsvi_selfcollected_32737.gpkg` |
 
-**The chapter uses the GSVI arm throughout.** Step 1 builds both; everything downstream reports GSVI. The self-collected comparison is the observation-opportunity argument and lives in `drafts/observation_opportunity/`.
+**Steps 2–5 use the GSVI arm throughout.** Step 1 builds both; everything downstream reports GSVI. **Step 6 is where the second arm is used**: it re-runs the relevant parts of Steps 3–5 with self-collected imagery added and reports the difference.
 
 Per-arm files carry the key as infix (`arm.filename("Nairobi_grid_coverage")` → `…_gsvi_32737.gpkg`).
 
@@ -373,8 +376,9 @@ python 3_waste_identification/2_qwen_review.py             # label the remaining
 python 3_waste_identification/1_heldout_metrics.py
 Rscript 3_waste_identification/1plot_heldout_panel.R
 Rscript 3_waste_identification/2plot_qwen_stability.R
-Rscript 3_waste_identification/3plot_sc_sensitivity.R
-Rscript 3_waste_identification/4plot_stage_comparison.R
+# The by-scenario figures live in Step 6.2 (same table, self-collected argument):
+Rscript 6_selfcollected/2_identification/1plot_sc_sensitivity.R
+Rscript 6_selfcollected/2_identification/2plot_stage_comparison.R
 ```
 
 **Inputs** (`Data/Chapter_waste/3_waste_identification/`, produced outside this pipeline). YOLO results and Qwen results live in separate folders:
@@ -430,7 +434,7 @@ Start with `--dry-run` (reports the call count, makes none), then `--limit 3` as
 
 Headline scenario `sc_100pct`, Wilson binomial 95% CIs, n = 180 (`table_2_yolo_qwen_heldout_ci.csv`). The VLM pass removes 25 of 30 YOLO false positives at the cost of 3 true positives — precision +20 pp for −3 pp recall.
 
-**Sensitivity to the SC share of the YOLO training set** (`table_1_yolo_detection.csv` box level, `table_4_sc_sensitivity.csv` image level):
+**Sensitivity to the SC share of the YOLO training set** (`table_1_yolo_detection.csv` box level, `table_4_sc_sensitivity.csv` image level). Computed here because it is one pass over all scenarios; **read and plotted in [Step 6.2](#62--the-sc-training-mix-2_identification)**:
 
 | YOLO training set | mAP@0.50 | mAP@0.50:0.95 | Accuracy | Precision | Recall | F1 | YOLO FPs |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -451,12 +455,10 @@ Adding self-collected imagery mainly buys **precision**: false positives fall fr
 | `1_Heldout_yolo_qwen_panel.png` | `1plot_heldout_panel.R` | Headline scenario, **both stages**: metric bars with 95% CI + two confusion matrices |
 | `1_Heldout_qwen_only_panel.png` | `1plot_heldout_panel.R` | Same, **YOLO + Qwen alone** — the final result without the baseline beside it |
 | `2_Heldout_qwen_replicate_stability.png` | `2plot_qwen_stability.R` | Per-replicate metrics, Yes/No votes, unanimity, pairwise agreement |
-| `3_Heldout_validation_binary_metrics.png` / `3_Heldout_validation_binary_bars.png` | `3plot_sc_sensitivity.R` | **YOLO + Qwen only**, across every SC share in the table (lines and grouped bars) |
-| `4_Heldout_validation_stage_metrics.png` / `4_Heldout_validation_stage_bars.png` | `4plot_stage_comparison.R` | **Both stages side by side**, faceted by metric, across every SC share |
 
-Figures 3 and 4 replace the archived Step 7 `Heldout_validation_binary_*` charts, which had a second panel for a self-collected held-out set; that panel is dropped, so the GSVI set is the whole figure. Adding or removing a scenario needs no edit to either script — levels, labels, fills, x-axis breaks, the detector count and the replicate note are all derived from the input table.
+The by-scenario figures are in **Step 6.2** — they are about what self-collected imagery buys, not about the held-out set.
 
-**The VLM gain**, YOLO + Qwen minus YOLO only, in percentage points — `4plot_stage_comparison.R` recomputes and prints this on every run:
+**The VLM gain**, YOLO + Qwen minus YOLO only, in percentage points — `6_selfcollected/2_identification/2plot_stage_comparison.R` recomputes and prints this on every run:
 
 | SC share | Accuracy | Precision | Recall | F1 |
 | --- | --- | --- | --- | --- |
@@ -466,7 +468,7 @@ Figures 3 and 4 replace the archived Step 7 `Heldout_validation_binary_*` charts
 | 75% | +12.8 | +21.7 | −4.5 | +10.1 |
 | 100% | +12.2 | +20.4 | −3.3 | +9.8 |
 
-The cascade can only remove positives, so precision always rises and recall always falls. The gain is **largest where the detector is weakest** (+11.7 to +12.3 pp F1 at 0–50% SC, +9.8 pp at 100%), which is why the post-cascade curves in figure 3 are nearly flat: the VLM substitutes for the self-collected training data rather than compounding with it.
+The cascade can only remove positives, so precision always rises and recall always falls. The gain is **largest where the detector is weakest** (+11.7 to +12.3 pp F1 at 0–50% SC, +9.8 pp at 100%), which is why the post-cascade curves in Step 6.2 are nearly flat: the VLM substitutes for the self-collected training data rather than compounding with it.
 
 ---
 
@@ -572,6 +574,20 @@ The **observation-frame NNR** is the important control. Rather than comparing ag
 
 `logit P(waste) = α + s(signed distance to nearest settlement) + year FE`, on all 76,605 panoramas. Against a year-only null: **LRT χ² = 2,216.7 (df 7), p < 0.001**, pseudo-R² 0.114. The gradient is not an artefact of *when* imagery was captured.
 
+`3_proximity_descriptives.py` gives the same relationship without a model — the observed rate by distance band, which panel (a) of `Waste_settlement_proximity.png` plots beside the fitted curve:
+
+| Distance to nearest settlement | Panoramas | Waste-positive |
+| --- | --- | --- |
+| Inside a settlement | 3,757 | **13.3%** |
+| 0–250 m | 10,411 | 7.8% |
+| 250–500 m | 9,602 | 5.3% |
+| 500–1,000 m | 13,585 | 3.5% |
+| 1,000–2,000 m | 16,907 | 1.6% |
+| 2,000–5,000 m | 14,596 | 0.8% |
+| >5,000 m | 7,747 | **0.3%** |
+
+A 40-fold range, monotonic, straight from the counts. `thesis_table/proximity_descriptives.csv` states the same thing compositionally: waste-positive panoramas sit a median **265 m** from a settlement against **1,090 m** for the rest, and **67.4%** are within 500 m against 29.7%.
+
 **Sensitivity (`pop_adjusted/`)** — nested models on 74,882 panoramas with WorldPop density:
 
 | Model | Terms | AIC | Pseudo-R² |
@@ -594,7 +610,7 @@ Adding distance to a population-only model improves AIC by ~850, so the settleme
 | `settlement/5_temporal_robustness.py` | Do settlement rates drift by year? | Year-by-year positive rates and prevalence ratios (`Temporal_*_by_year.png`). |
 | `Signed_distance/pop_adjusted/` | Is the gradient just population density? | No — adding distance to a population-only model gains ~850 AIC; distance curve correlates 0.92 between MDP and MDPS. |
 | `HDBSCAN/5_hdbscan_cluster_views.py` | Do repeat views of one site inflate clusters? | Per-cluster `n_positive_views` descriptives; clustering itself stays one point per panorama. |
-| `pop_adjusted/4_settlement_by_density_band.py` | Is the settlement association just density, without assuming a model? | No. Within equal-count density bands the inside-settlement rate exceeds outside in **7 of 7** reportable bands, from **11.1× down to 1.6×**. The gap narrows as density rises, so density carries real weight at the top end but never accounts for the association. |
+| `settlement/4_settlement_by_density_band.py` | Is the settlement association just density, without assuming a model? | No. Within equal-count density bands the inside-settlement rate exceeds outside in **7 of 7** reportable bands, from **11.1× down to 1.6×**. The gap narrows as density rises, so density carries real weight at the top end but never accounts for the association. |
 | `pop_adjusted/worldpop_2020/` | Does the population control depend on which raster? | Repeats the nested GAMs with unconstrained WorldPop 2020 (n = 76,578) instead of constrained 2024 (n = 74,882). Model ordering is unchanged and MDP still beats MP, so the distance effect is not raster-specific. |
 
 ```bash
@@ -603,8 +619,8 @@ python  5_spatial_pattern/HDBSCAN/period_stratified_robustness/1_period_hdbscan.
 Rscript 5_spatial_pattern/HDBSCAN/period_stratified_robustness/2_plot_period_hdbscan.R
 python  5_spatial_pattern/Signed_distance/period_stratified_robustness/1_period_signed_distance_gam.py
 Rscript 5_spatial_pattern/Signed_distance/period_stratified_robustness/2_plot_period_signed_distance_gam.R
-python  5_spatial_pattern/Signed_distance/pop_adjusted/4_settlement_by_density_band.py
-Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/4plot_settlement_by_density_band.R
+python  5_spatial_pattern/settlement/4_settlement_by_density_band.py    # needs the pop-adjusted frame
+Rscript 5_spatial_pattern/settlement/4plot_settlement_by_density_band.R
 python  5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2020/1_pop_adjusted_gam.py   # slow
 Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2020/2_plot_pop_adjusted_gam.R
 ```
@@ -632,6 +648,8 @@ Rscript 5_spatial_pattern/settlement/6_plot_temporal_robustness.R
 # 5c. signed-distance GAM
 python  5_spatial_pattern/Signed_distance/1_signed_distance_gam.py
 Rscript 5_spatial_pattern/Signed_distance/2_plot_signed_distance_gam.R
+python  5_spatial_pattern/Signed_distance/3_proximity_descriptives.py
+Rscript 5_spatial_pattern/Signed_distance/3plot_waste_settlement_proximity.R
 
 # 5c sensitivity: population-adjusted GAM (slow)
 python  5_spatial_pattern/Signed_distance/pop_adjusted/1_pop_adjusted_gam.py
@@ -643,11 +661,88 @@ Or `snakemake all`, which resolves the same order.
 
 ### Figures (`Figure/5_spatial_pattern/`)
 
-24 figures across `HDBSCAN/`, `settlement/` and `Signed_distance/` (the pop-adjusted sensitivity figures sit under `Signed_distance/pop_adjusted/`, mirroring the scripts). Three archived figures are **not** rebuilt — `Waste_HDBSCAN_comparison.png`, `Hotspot_area_difference_gsvi_selfcollected.png` and `Mitigation_new_obs_stacked_bar.png` — because each exists only to set GSVI beside GSVI+self-collected. Their scripts (`4_mitigation_comparison.py`, `4b_mitigation_param_sensitivity.py`, `5_plot_hotspot_difference_map.R`) stay in `archive/2026-09-21/5_spatial_pattern/HDBSCAN/`.
+25 figures across `HDBSCAN/`, `settlement/` and `Signed_distance/` (the pop-adjusted sensitivity figures sit under `Signed_distance/pop_adjusted/`, mirroring the scripts). Three archived figures are **not** rebuilt here — `Waste_HDBSCAN_comparison.png`, `Hotspot_area_difference_gsvi_selfcollected.png` and `Mitigation_new_obs_stacked_bar.png` — because each exists only to set GSVI beside GSVI+self-collected. That comparison is Step 6's job, so those scripts are being restored there rather than here; until then they stay in `archive/2026-09-21/5_spatial_pattern/HDBSCAN/`.
 
 `Waste_HDBSCAN_gsvi.png` is also dropped: `Waste_HDBSCAN_context_gsvi.png` shows the same 24 clusters with the same numbering and parameters, plus settlement boundaries, named settlements and the Dandora landfill — the plain version added nothing. Its script `3_plot_hdbscan_map.R` is removed.
 
 KDE and distance-decay/NegExp are also excluded by choice; they remain archived under `Distance_decay/` and `KDE/`.
+
+---
+
+## Step 6 — What self-collected imagery adds (`6_selfcollected/`)
+
+Steps 2–5 run on GSVI. Faith/ and ZWL/ imagery was collected by hand where Street View is thin, so the question Step 6 asks is not "does it change the answer" but **"what does it let us see, and does that move any conclusion"**. It re-asks Steps 3–5 with the second arm switched on.
+
+| Sub-step | Folder | Re-asks |
+| --- | --- | --- |
+| 6.1 | `1_sources/` | what the SC imagery is, and what it adds to the 100 m observation frame |
+| 6.2 | `2_identification/` | Step 3 — does SC in the YOLO training set change the classifier |
+
+Later sub-steps (the 100 m indicator and the spatial pattern with SC added) are not built yet.
+
+### 6.1 What the self-collected imagery is (`1_sources/`)
+
+**Script:** `1_sc_coverage.py` — recomputes direct 100 m observation twice, GSVI alone and GSVI + SC, and reports the difference. Self-collected images carry no panoid, so each image is its own observation location (`lib.arms.observation_key`).
+
+```bash
+python  6_selfcollected/1_sources/1_sc_coverage.py     # --far-m 500
+Rscript 6_selfcollected/1_sources/1plot_sources_comparison.R
+Rscript 6_selfcollected/1_sources/2plot_new_coverage_map.R
+```
+
+| Source | SVI images | Observation locations | Waste detections |
+| --- | ---: | ---: | ---: |
+| GSVI (Google) | 306,420 | 76,605 | 3,236 |
+| Self-collected (Faith/ + ZWL/) | 2,979 | 2,979 | 149 |
+| **GSVI + self-collected** | **309,399** | **79,584** | **3,385** |
+
+*C*<sup>GSVI</sup> → *C*<sup>GSVI+SC</sup> on the 100 m grid (`table_6_1_sc_coverage.csv`):
+
+| Metric | GSVI | GSVI + SC | Change |
+| --- | --- | --- | --- |
+| Directly observed cells | 22,725 (32.5%) | 22,852 (32.7%) | +127 (+0.2 pp) |
+| Cells >500 m from an observation | 13,149 (18.8%) | 12,855 (18.4%) | −294 (−0.4 pp) |
+| Cells containing SC imagery | — | 1,286 | — |
+| Cells observed **only** with SC | — | 127 (0.18% of the city) | +0.6% of the GSVI frame |
+
+**The marginal spatial gain is small: 1,159 of the 1,286 SC cells were already covered by GSVI.** Self-collection largely went where Street View had already been. But the 127 cells it does add are not a random sample of the city — `1_Nairobi_sc_new_cells_location.csv`:
+
+| Measure | Newly covered cells | All cells |
+| --- | --- | --- |
+| Inside a mapped settlement | **18.1%** | 2.8% |
+| Within 500 m of a settlement | **41.7%** | 18.6% |
+| Median distance to a settlement | **761 m** | 2,011 m |
+| Was >500 m from any GSVI observation | 3.1% | 18.8% |
+
+So the added cells are 6× more likely to sit inside a settlement than the city average, but they are **not** the remote cells — 96.9% were already within 500 m of a GSVI panorama. Self-collection densified the settlement edge of the existing frame; it did not extend the frame into the parts of the city Street View never reaches. That is the honest reading, and it bounds how much of the Step 4 interpolation problem field collection could realistically fix.
+
+**Figures** (`Figure/6_selfcollected/1_sources/`):
+
+| Figure | Script | Shows |
+| --- | --- | --- |
+| `1_Sources_gsvi_selfcollected.png` | `1plot_sources_comparison.R` | (A) imagery by source, (B) verified waste detections by source |
+| `2_SC_new_coverage_100m.png` | `2plot_new_coverage_map.R` | (a) SC cells split by whether GSVI reached them, (b) where the new cells sit |
+
+**Outputs** (`Data/Chapter_waste/6_selfcollected/1_sources/`): `1_Nairobi_sc_coverage_grid100m_32737.gpkg` (per cell), `1_Nairobi_sc_new_cells_32737.gpkg`, `1_Nairobi_sc_coverage_summary.csv`, `1_Nairobi_sc_new_cells_location.csv`, `thesis_table/table_6_1_sc_{sources,coverage}.csv`
+
+### 6.2 The SC training mix (`2_identification/`)
+
+**Plots only — nothing is recomputed here.** The detector was retrained at five shares of self-collected imagery and every model scored on the same held-out images; that sweep is one pass and runs in [Step 3](#step-3--waste-identification-yolo--vlm) (`1_heldout_metrics.py` → `3_waste_identification/thesis_table/table_4_sc_sensitivity_detail.csv`). Only the figures that read it live here, because the question they answer is Step 6's.
+
+```bash
+# needs 3_waste_identification/1_heldout_metrics.py to have run
+Rscript 6_selfcollected/2_identification/1plot_sc_sensitivity.R
+Rscript 6_selfcollected/2_identification/2plot_stage_comparison.R
+```
+
+| Figure | Script | Shows |
+| --- | --- | --- |
+| `1_Heldout_sc_sensitivity_{metrics,bars}.png` | `1plot_sc_sensitivity.R` | **YOLO + Qwen only**, across every SC share in the table |
+| `2_Heldout_stage_comparison_{metrics,bars}.png` | `2plot_stage_comparison.R` | **Both stages side by side**, faceted by metric, across every SC share |
+
+These replace the archived Step 7 `Heldout_validation_binary_*` charts, which had a second panel for a self-collected held-out set; that panel is dropped, so the GSVI set is the whole figure. Adding or removing a scenario needs no edit to either script — levels, labels, fills, x-axis breaks, the detector count and the replicate note are all derived from the input table.
+
+The numbers are in Step 3: SC in the training set buys **precision** (false positives 39 → 30, mAP@0.50 +6 pp) with recall flat, and the VLM cascade largely substitutes for it — the post-cascade curves are nearly flat across the five mixes.
 
 ---
 
@@ -660,7 +755,7 @@ KDE and distance-decay/NegExp are also excluded by choice; they remain archived 
 | ------------------------------------------------ | ---------------------------- |
 | Python (geopandas, osmnx, shapely, hdbscan, statsmodels, rasterio) | `conda activate geo_env_LLM` |
 | Qwen review (`segmind`) — Step 3, paid API | `pip install 'segmind>=1.1.0'`, key in `SEGMIND_API_KEY` |
-| Snakemake 7 — Steps 0–5 wrap | `conda activate geo_env_LLM` (`pip install 'snakemake==7.32.4'`) |
+| Snakemake 7 — Steps 0–6 wrap | `conda activate geo_env_LLM` (`pip install 'snakemake==7.32.4'`) |
 | R (sf, ggplot2, ggspatial, ggpattern, dplyr, scales, patchwork, cowplot) | system R (`Rscript`)         |
 | Data roots                                       | `PHD_DATA_ROOT` via `chapter_paths.py` / `R/chapter_paths.R` |
 

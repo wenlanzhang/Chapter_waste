@@ -1,10 +1,11 @@
 #!/usr/bin/env Rscript
-# Step 3 figure 4 — YOLO only vs YOLO + Qwen, by self-collected training share.
-#   4_Heldout_validation_stage_metrics.png  lines: one facet per metric, one line per stage
-#   4_Heldout_validation_stage_bars.png     grouped bars: stage pairs within each SC share
-# Input: thesis_table/table_4_sc_sensitivity_detail.csv (1_heldout_metrics.py)
+# Step 6.2 — YOLO only vs YOLO + Qwen, by self-collected training share.
+#   2_Heldout_stage_comparison_metrics.png  lines: one facet per metric, one line per stage
+#   2_Heldout_stage_comparison_bars.png     grouped bars: stage pairs within each SC share
 #
-# Companion to 3plot_sc_sensitivity.R, which shows the cascade alone. Here both
+# Input: 3_waste_identification/thesis_table/table_4_sc_sensitivity_detail.csv
+#
+# Companion to 1plot_sc_sensitivity.R, which shows the cascade alone. Here both
 # stages appear together so the size of the VLM gain can be read off at every
 # training mix.
 
@@ -18,13 +19,13 @@ suppressPackageStartupMessages({
 args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
-source(file.path(script_dir, "..", "R", "chapter_paths.R"))
-source(file.path(script_dir, "..", "R", "map_theme.R"))
+source(file.path(script_dir, "../..", "R", "chapter_paths.R"))
+source(file.path(script_dir, "../..", "R", "map_theme.R"))
 
 STEP3_DIR <- file.path(chapter_data_root, "3_waste_identification")
 THESIS_DIR <- file.path(STEP3_DIR, "thesis_table")
 DETAIL_CSV <- file.path(THESIS_DIR, "table_4_sc_sensitivity_detail.csv")
-FIG_DIR <- file.path(script_dir, "..", "Figure", "3_waste_identification")
+FIG_DIR <- file.path(script_dir, "../..", "Figure", "6_selfcollected", "2_identification")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 
 if (!file.exists(DETAIL_CSV)) {
@@ -183,7 +184,7 @@ p_lines <- ggplot(plot_df, aes(x = sc_share_pct, y = score_pct, colour = stage_l
   base_theme() +
   theme(panel.grid.major.x = element_line(colour = "grey92", linewidth = 0.25))
 
-out_lines <- file.path(FIG_DIR, "4_Heldout_validation_stage_metrics.png")
+out_lines <- file.path(FIG_DIR, "2_Heldout_stage_comparison_metrics.png")
 ggsave(out_lines, plot = p_lines, width = 11, height = 5.4, dpi = 600, bg = "white")
 message("Wrote ", out_lines)
 
@@ -221,7 +222,7 @@ p_bars <- ggplot(bar_df, aes(x = scenario_label, y = score_pct, fill = stage_lab
     axis.text.x = element_text(size = 8)
   )
 
-out_bars <- file.path(FIG_DIR, "4_Heldout_validation_stage_bars.png")
+out_bars <- file.path(FIG_DIR, "2_Heldout_stage_comparison_bars.png")
 ggsave(out_bars, plot = p_bars, width = 11, height = 5.4, dpi = 600, bg = "white")
 message("Wrote ", out_bars)
 
