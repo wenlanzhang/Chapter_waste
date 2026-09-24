@@ -139,7 +139,9 @@ SC_HDBSCAN_OUT = [
     SC_HDB / "1_Nairobi_sc_hotspots_gsvi_32737.gpkg",
     SC_HDB / "1_Nairobi_sc_hotspots_gsvi_selfcollected_32737.gpkg",
     SC_HDB / "1_sc_hdbscan_new_locations.csv",
+    SC_HDB / "1_sc_hdbscan_label_transitions.csv",
     SC_HDB / "thesis_table" / "table_6_4_hdbscan_comparison.csv",
+    SC_HDB / "thesis_table" / "table_6_4_hdbscan_stability.csv",
 ]
 SC_CONTEXT_OUT = [
     SC_HDB / "2_Nairobi_sc_cluster_context_gsvi_32737.gpkg",

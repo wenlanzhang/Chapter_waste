@@ -1,23 +1,29 @@
 #!/usr/bin/env Rscript
 # Step 6.4a — do the hotspots change when self-collected imagery is added?
 #   1_SC_hotspot_comparison.png
-#     (a) the two sets of convex-hull footprints, overlaid
-#     (b) where the added locations fall: inside an existing GSVI hotspot, or not
+#     (a) the two sets of convex-hull footprints, overlaid (scale only)
+#     (b) GSVI cluster x combined cluster, for the 2,696 locations both runs
+#         share — which hotspot each location's label moved to
+#     (c) what the 149 added locations join
 #
-# Panel (b) is the argument. If the added locations mostly land inside hulls the
-# platform already drew, self-collection confirms the GSVI picture rather than
-# correcting it.
+# Panel (b) is the argument, and it rests on cluster labels rather than on
+# footprint geometry: every shared location carries a label from each run, so the
+# agreement between the two labellings is measurable without choosing an overlap
+# threshold or trusting the convex hull. A clean block-diagonal means the
+# partition was preserved; rows collapsing onto one column are a merge.
 #
 # Inputs (6_selfcollected/4_pattern/HDBSCAN/, from 1_sc_hdbscan.py):
 #   1_Nairobi_sc_hotspots_{gsvi,gsvi_selfcollected}_32737.gpkg
-#   1_Nairobi_sc_hdbscan_{gsvi,gsvi_selfcollected}_32737.gpkg
+#   1_Nairobi_sc_hdbscan_gsvi_selfcollected_32737.gpkg
+#   1_sc_hdbscan_label_transitions.csv
 #   1_sc_hdbscan_new_locations.csv
-#   thesis_table/table_6_4_hdbscan_comparison.csv
+#   thesis_table/table_6_4_hdbscan_{comparison,stability}.csv
 
 suppressPackageStartupMessages({
   library(sf)
   library(ggplot2)
   library(dplyr)
+  library(tidyr)
   library(scales)
   library(patchwork)
 })
@@ -35,16 +41,17 @@ FIG_DIR <- file.path(script_dir, "../../..", "Figure", "6_selfcollected", "4_pat
 HULLS_GSVI <- file.path(DATA_DIR, "1_Nairobi_sc_hotspots_gsvi_32737.gpkg")
 HULLS_GSC <- file.path(DATA_DIR, "1_Nairobi_sc_hotspots_gsvi_selfcollected_32737.gpkg")
 PTS_GSC <- file.path(DATA_DIR, "1_Nairobi_sc_hdbscan_gsvi_selfcollected_32737.gpkg")
+TRANSITIONS_CSV <- file.path(DATA_DIR, "1_sc_hdbscan_label_transitions.csv")
 NEW_OBS_CSV <- file.path(DATA_DIR, "1_sc_hdbscan_new_locations.csv")
 COMPARISON_CSV <- file.path(DATA_DIR, "thesis_table", "table_6_4_hdbscan_comparison.csv")
+STABILITY_CSV <- file.path(DATA_DIR, "thesis_table", "table_6_4_hdbscan_stability.csv")
 OUT_PATH <- file.path(FIG_DIR, "1_SC_hotspot_comparison.png")
 
 GSVI_HULL <- "#C9A27F"
 GSC_HULL <- "#6B4226"
-INSIDE_COLOUR <- "#C9A27F"
-OUTSIDE_COLOUR <- "#6B4226"
 
-for (f in c(HULLS_GSVI, HULLS_GSC, PTS_GSC, NEW_OBS_CSV, COMPARISON_CSV)) {
+for (f in c(HULLS_GSVI, HULLS_GSC, PTS_GSC, TRANSITIONS_CSV, NEW_OBS_CSV,
+            COMPARISON_CSV, STABILITY_CSV)) {
   if (!file.exists(f)) {
     stop("Missing ", f, " — run 6_selfcollected/4_pattern/HDBSCAN/1_sc_hdbscan.py first")
   }
@@ -56,19 +63,13 @@ hulls_gsc <- st_read(HULLS_GSC, quiet = TRUE)
 pts_gsc <- st_read(PTS_GSC, quiet = TRUE)
 new_obs <- read.csv(NEW_OBS_CSV, stringsAsFactors = FALSE)
 comparison <- read.csv(COMPARISON_CSV, stringsAsFactors = FALSE, check.names = FALSE)
+stability <- read.csv(STABILITY_CSV, stringsAsFactors = FALSE, check.names = FALSE)
 boundary <- st_read(file.path(PREP_DIR, "Nairobi_boundary_polygon_32737.gpkg"), quiet = TRUE)
 slums <- st_read(file.path(PREP_DIR, "Nairobi_slum_polygon_32737.gpkg"), quiet = TRUE) |> st_union()
 
-parse_count <- function(x) as.integer(gsub(",", "", sub("^([0-9,]+).*", "\\1", x)))
-parse_pct <- function(x) as.numeric(sub(".*\\(([0-9.]+)%\\).*", "\\1", x))
-
-n_new <- parse_count(new_obs$Value[new_obs$Metric == "New locations added"])
-inside_v <- new_obs$Value[new_obs$Metric == "New locations inside existing hotspots"]
-outside_v <- new_obs$Value[new_obs$Metric == "New locations forming new hotspots"]
-retained_v <- new_obs$Value[new_obs$Metric == "Existing hotspots retained"]
-n_created <- parse_count(new_obs$Value[new_obs$Metric == "Newly created hotspots"])
-
 get_metric <- function(metric, col) comparison[[col]][comparison$Metric == metric]
+get_stat <- function(measure) stability$Value[stability$Measure == measure]
+parse_count <- function(x) as.integer(gsub(",", "", sub("^([0-9,]+).*", "\\1", x)))
 
 # --- (a) the two hotspot footprints ------------------------------------------
 sc_pts <- pts_gsc |> filter(location_kind == "self_collected")
@@ -78,8 +79,7 @@ p_map <- ggplot() +
   geom_sf(data = slums, fill = SLUM_FILL, colour = NA, alpha = 0.30) +
   geom_sf(data = hulls_gsvi, aes(fill = "GSVI hotspots", colour = "GSVI hotspots"),
           alpha = 0.40, linewidth = 0.3) +
-  geom_sf(data = hulls_gsc, aes(colour = "GSVI + SC hotspots"),
-          fill = NA, linewidth = 0.55) +
+  geom_sf(data = hulls_gsc, aes(colour = "GSVI + SC hotspots"), fill = NA, linewidth = 0.55) +
   geom_sf(data = sc_pts, aes(colour = "Self-collected waste location"), size = 0.6, alpha = 0.85) +
   scale_fill_manual(name = NULL, values = c("GSVI hotspots" = GSVI_HULL), guide = "none") +
   scale_colour_manual(name = NULL, values = c(
@@ -95,7 +95,7 @@ p_map <- ggplot() +
   labs(
     title = "(a) Hotspot footprints, both arms",
     subtitle = sprintf(
-      "%s → %s clusters | area %s → %s km² | green = mapped settlements",
+      "%s → %s clusters | area %s → %s km² (shown for scale; no result depends on the hull)",
       get_metric("Number of hotspots", "GSVI"), get_metric("Number of hotspots", "GSVI + SC"),
       get_metric("Total hotspot area (km²)", "GSVI"),
       get_metric("Total hotspot area (km²)", "GSVI + SC")
@@ -104,66 +104,114 @@ p_map <- ggplot() +
   theme_void(base_size = 11) +
   theme(
     plot.title = element_text(face = "bold", size = 11.5, colour = CHAPTER_TITLE_COLOUR),
-    plot.subtitle = element_text(size = 8.4, colour = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 6)),
+    plot.subtitle = element_text(size = 8.2, colour = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 6)),
     legend.position = "bottom",
     legend.text = element_text(size = 8.4, colour = CHAPTER_AXIS_COLOUR),
     legend.key = element_blank()
   )
 
-# --- (b) where the added locations fall ---------------------------------------
-split_df <- tibble(
-  segment = c("Inside existing GSVI hotspots", "Outside any existing hotspot"),
-  n = c(parse_count(inside_v), parse_count(outside_v)),
-  pct = c(parse_pct(inside_v), parse_pct(outside_v))
-) |>
+# --- (b) cluster label transitions -------------------------------------------
+trans_raw <- read.csv(TRANSITIONS_CSV, stringsAsFactors = FALSE, check.names = FALSE)
+names(trans_raw)[1] <- "from"
+
+lvl <- function(v) {
+  nums <- suppressWarnings(as.integer(v))
+  c(v[!is.na(nums)][order(nums[!is.na(nums)])], v[v == "Noise"])
+}
+
+trans <- trans_raw |>
+  filter(from != "Total") |>
+  pivot_longer(-from, names_to = "to", values_to = "n") |>
+  filter(to != "Total") |>
   mutate(
-    segment = factor(segment, levels = c("Outside any existing hotspot", "Inside existing GSVI hotspots")),
-    label = sprintf("%s\n(%.1f%%)", comma(n), pct)
+    from = factor(from, levels = rev(lvl(unique(from)))),
+    to = factor(to, levels = lvl(unique(to)))
   )
 
-p_bar <- ggplot(split_df, aes(x = n, y = "Self-collected waste locations", fill = segment)) +
-  geom_col(width = 0.5, colour = "white", linewidth = 0.35) +
+p_trans <- ggplot(trans, aes(to, from)) +
+  geom_tile(aes(fill = ifelse(n == 0, NA_real_, n)), colour = "white", linewidth = 0.4) +
+  geom_text(data = filter(trans, n > 0), aes(label = n, colour = n > 120),
+            size = 2.3, fontface = "bold", show.legend = FALSE) +
+  scale_fill_gradient(name = "Locations", low = "#EFE6DC", high = "#4D2D18",
+                      na.value = "#FBF9F7", labels = comma) +
+  scale_colour_manual(values = c("FALSE" = "#4D2D18", "TRUE" = "white")) +
+  scale_x_discrete(position = "top", expand = expansion(0)) +
+  scale_y_discrete(expand = expansion(0)) +
+  labs(
+    title = "(b) Where each shared location's cluster label went",
+    subtitle = sprintf(
+      "All %s locations both runs share | ARI %s, NMI %s | median destination purity %s",
+      get_stat("Locations present in both runs"),
+      get_stat("Adjusted Rand Index"), get_stat("Normalised mutual information"),
+      get_stat("Median destination purity")
+    ),
+    x = "Cluster with GSVI + SC", y = "Cluster with GSVI"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 11.5, colour = CHAPTER_TITLE_COLOUR),
+    plot.subtitle = element_text(size = 8.2, colour = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 6)),
+    axis.title = element_text(size = 9.5, colour = CHAPTER_AXIS_COLOUR),
+    axis.text = element_text(size = 7, colour = CHAPTER_AXIS_COLOUR),
+    panel.grid = element_blank(),
+    legend.position = "right",
+    legend.key.width = unit(0.32, "cm"),
+    legend.key.height = unit(0.9, "cm"),
+    legend.title = element_text(size = 8.4, colour = CHAPTER_AXIS_COLOUR),
+    legend.text = element_text(size = 7.6)
+  )
+
+# --- (c) what the added locations join ---------------------------------------
+n_new <- parse_count(new_obs$Value[new_obs$Metric == "New locations added"])
+split_df <- new_obs |>
+  filter(Metric %in% c("Joined a cluster that already held GSVI locations",
+                       "Formed a cluster with no GSVI locations in it",
+                       "Did not cluster (noise)")) |>
+  mutate(
+    segment = recode(Metric,
+      "Joined a cluster that already held GSVI locations" = "Joined an existing hotspot",
+      "Formed a cluster with no GSVI locations in it" = "Formed a new hotspot",
+      "Did not cluster (noise)" = "Did not cluster"
+    ),
+    n = parse_count(Value)
+  ) |>
+  filter(n > 0) |>
+  mutate(
+    segment = factor(segment, levels = c("Did not cluster", "Formed a new hotspot",
+                                         "Joined an existing hotspot")),
+    label = sprintf("%s (%.1f%%)", comma(n), 100 * n / n_new)
+  )
+
+p_bar <- ggplot(split_df, aes(x = n, y = "added", fill = segment)) +
+  geom_col(width = 0.4, colour = "white", linewidth = 0.35) +
   geom_text(aes(label = label), position = position_stack(vjust = 0.5),
-            size = 3.6, fontface = "bold", colour = "white", lineheight = 0.92) +
+            size = 3.1, fontface = "bold", colour = "white") +
   scale_fill_manual(name = NULL, values = c(
-    "Inside existing GSVI hotspots" = INSIDE_COLOUR,
-    "Outside any existing hotspot" = OUTSIDE_COLOUR
-  ), breaks = c("Inside existing GSVI hotspots", "Outside any existing hotspot")) +
+    "Joined an existing hotspot" = "#C9A27F",
+    "Formed a new hotspot" = "#cb181d",
+    "Did not cluster" = "#8C8078"
+  ), breaks = c("Joined an existing hotspot", "Formed a new hotspot", "Did not cluster")) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.02)), breaks = pretty_breaks(n = 4)) +
   labs(
-    title = "(b) Where the added locations fall",
-    subtitle = sprintf(
-      "%s new waste locations, split by overlap with the GSVI hotspot hulls",
-      comma(n_new)
-    ),
+    title = sprintf("(c) What the %s added locations join", comma(n_new)),
+    subtitle = "By the cluster label they receive, not by which hull they fall in",
     x = "Number of locations", y = NULL
   ) +
   theme_minimal(base_size = 11) +
   theme(
     plot.title = element_text(face = "bold", size = 11.5, colour = CHAPTER_TITLE_COLOUR),
-    plot.subtitle = element_text(size = 8.4, colour = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 6)),
+    plot.subtitle = element_text(size = 8.2, colour = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 6)),
     axis.title.x = element_text(size = 9.5, colour = CHAPTER_AXIS_COLOUR),
-    axis.text.x = element_text(size = 8.8, colour = CHAPTER_AXIS_COLOUR),
+    axis.text.x = element_text(size = 8.6, colour = CHAPTER_AXIS_COLOUR),
     axis.text.y = element_blank(),
     panel.grid.major.y = element_blank(),
     panel.grid.minor = element_blank(),
     legend.position = "bottom",
-    legend.text = element_text(size = 8.6)
+    legend.text = element_text(size = 8.2)
   )
 
-# --- (c) what happened to the 24 GSVI hotspots --------------------------------
-note <- sprintf(
-  "Existing hotspots retained: %s   |   Newly created hotspots: %s",
-  retained_v, comma(n_created)
-)
-
-p_note <- ggplot() +
-  annotate("text", x = 0, y = 0, label = note, hjust = 0.5, size = 3.5,
-           fontface = "bold", colour = CHAPTER_AXIS_COLOUR) +
-  theme_void()
-
-fig <- (p_map | (p_bar / p_note + plot_layout(heights = c(4, 1)))) +
-  plot_layout(widths = c(1.15, 1)) +
+fig <- (p_map | (p_trans / p_bar + plot_layout(heights = c(2.4, 1)))) +
+  plot_layout(widths = c(1, 1.15)) +
   plot_annotation(
     title = "Waste hotspots with and without self-collected imagery",
     subtitle = sprintf(
@@ -171,8 +219,10 @@ fig <- (p_map | (p_bar / p_note + plot_layout(heights = c(4, 1)))) +
       get_metric("Waste locations", "GSVI"), get_metric("Waste locations", "GSVI + SC")
     ),
     caption = paste0(
-      "A hotspot counts as retained when at least 30% of its GSVI hull area is re-covered by a hotspot of the combined arm.\n",
-      "The cluster count falls because neighbouring hotspots merge into larger ones, not because hotspots disappear — total footprint area rises."
+      "Stability is measured on cluster labels, so nothing depends on an overlap threshold or on the convex hull. Noise is kept as its own label in (b).\n",
+      "Each GSVI cluster's locations move to a single combined cluster (median purity 100%), and ", get_stat("GSVI clusters involved in a merge"),
+      " of them collapse into one — that merge is the whole of the 24 → 18 drop, and the reason ARI is lower than NMI.\n",
+      "No added location forms a hotspot of its own: self-collection reinforces the GSVI hotspot map rather than redrawing it."
     ),
     theme = theme(
       plot.title = element_text(face = "bold", size = 14, hjust = 0.5, colour = CHAPTER_TITLE_COLOUR),
@@ -182,6 +232,6 @@ fig <- (p_map | (p_bar / p_note + plot_layout(heights = c(4, 1)))) +
     )
   )
 
-ggsave(OUT_PATH, fig, width = 13, height = 6.6, dpi = 400, bg = "white")
+ggsave(OUT_PATH, fig, width = 14, height = 7.2, dpi = 400, bg = "white")
 message("Wrote ", OUT_PATH)
 message("Done.")

@@ -820,7 +820,25 @@ Same HDBSCAN (min_cluster_size 25, min_samples 6) on 2,696 vs 2,845 waste locati
 | Number of hotspots | 24 | **18** | −6 (−25.0%) |
 | Total hotspot area (km²) | 72.451 | 88.281 | +15.831 (+21.9%) |
 
-The cluster count falls but **23 of the 24 GSVI hotspots are retained (95.8%)** and the footprint *grows* 22% — neighbouring hotspots merge into larger ones rather than disappearing. Of the 149 added locations, **133 (89.3%) fall inside a hotspot GSVI had already drawn**; the 16 outside create exactly **1** new hotspot.
+**Stability is measured on cluster labels, not on footprint geometry.** All 2,696 GSVI locations are present in both runs, so each carries a label from each, and the agreement between the two labellings is the answer — no overlap threshold, no reliance on the convex hull, both of which are choices rather than findings.
+
+| Measure | Value |
+| --- | --- |
+| Adjusted Rand Index | 0.573 |
+| Normalised mutual information | 0.833 |
+| **Median destination purity** | **100.0%** |
+| GSVI clusters whose locations mostly became noise | 0 / 24 |
+| Combined clusters absorbing 2+ GSVI clusters | 1 |
+| GSVI clusters involved in that merge | 8 |
+| Clustered in both runs / noise in both | 1,877 / 593 |
+| Noise → clustered | 174 |
+| Clustered → noise | 52 |
+
+Every GSVI cluster's locations move to a **single** combined cluster (median purity 100%), and none dissolves into noise. One combined cluster absorbs **eight** GSVI clusters — that single merge is the whole of the 24 → 18 drop, and it is why ARI (0.573) sits well below NMI (0.833): the partition is *nested*, not scrambled. The transition matrix in the figure shows this directly as a near-diagonal with one column collecting eight rows.
+
+Of the 149 added locations, **143 (96.0%) join a cluster that already held GSVI locations**, 6 do not cluster at all, and **none forms a cluster of its own**. Self-collection reinforces the GSVI hotspot map rather than redrawing it.
+
+> An earlier version of this block asked the same question geometrically — what share of each GSVI convex hull is re-covered, at a 30% threshold — and reported "23 of 24 retained, 16 new locations outside existing hotspots, 1 new hotspot". Those numbers were artefacts of the threshold and the hull. The label-based answer supersedes them.
 
 **Are they still settlement hotspots?** (`2_sc_cluster_settlement_context.py`, same four proximity bins as Step 5a):
 
@@ -835,7 +853,7 @@ The cluster count falls but **23 of the 24 GSVI hotspots are retained (95.8%)** 
 
 The cluster-level shares dip a point or two because the denominator shrank from 24 to 18; the location-level shares all rise. Either way the hotspots stay settlement hotspots.
 
-**Figures:** `1_SC_hotspot_comparison.png` (both hull sets overlaid + where the added locations fall), `2_SC_cluster_composition.png` (one stacked bar per cluster, one panel per arm).
+**Figures:** `1_SC_hotspot_comparison.png` — (a) both hull sets, shown for scale only, (b) the GSVI × combined label transition matrix, (c) what the added locations join. `2_SC_cluster_composition.png` — one stacked bar per cluster, one panel per arm.
 
 #### 6.4b Settlement association (`settlement/`)
 
