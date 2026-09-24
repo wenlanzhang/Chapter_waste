@@ -15,7 +15,6 @@ SELFCOLLECTED_DATA = [
 ]
 
 SELFCOLLECTED_FIGS = [
-    SC_FIG_ID / "3_SC_domain_transfer.png",
     SC_FIG_SOURCES / "1_Sources_gsvi_selfcollected.png",
     SC_FIG_SOURCES / "2_SC_new_coverage_100m.png",
     SC_FIG_ID / "1_Heldout_sc_sensitivity_metrics.png",
@@ -290,35 +289,6 @@ rule plot_sc_gam:
         "Rscript {REPO_ROOT}/6_selfcollected/4_pattern/Signed_distance/1plot_sc_gam.R"
 
 
-# 6.2b — does the detector transfer to locally collected imagery? -------------
-SC_IDENT = SC / "2_identification"
-
-SELFCOLLECTED_DATA += [
-    SC_IDENT / "3_sc_domain_transfer.csv",
-    SC_IDENT / "thesis_table" / "table_6_2_domain_transfer.csv",
-]
-
-
-rule sc_domain_transfer:
-    input:
-        WASTE_ID_YOLO / "heldout_GSVI_val_summary.csv",
-        WASTE_ID_YOLO / "heldout_selfcollected_val_summary.csv",
-    output:
-        SC_IDENT / "3_sc_domain_transfer.csv",
-        SC_IDENT / "thesis_table" / "table_6_2_domain_transfer.csv",
-    shell:
-        "python {REPO_ROOT}/6_selfcollected/2_identification/3_sc_domain_transfer.py"
-
-
-rule plot_sc_domain_transfer:
-    input:
-        SC_IDENT / "3_sc_domain_transfer.csv",
-    output:
-        SC_FIG_ID / "3_SC_domain_transfer.png",
-    shell:
-        "Rscript {REPO_ROOT}/6_selfcollected/2_identification/3plot_sc_domain_transfer.R"
-
-
 # Step 6 anchor — the pipeline-wide mitigation summary ------------------------
 SELFCOLLECTED_DATA += [
     SC / "thesis_table" / "table_6_0_mitigation_summary.csv",
@@ -329,7 +299,7 @@ SELFCOLLECTED_DATA += [
 rule sc_mitigation_summary:
     input:
         SC_SOURCES / "1_Nairobi_sc_coverage_summary.csv",
-        SC_IDENT / "3_sc_domain_transfer.csv",
+        WASTE_ID_THESIS / "table_4_sc_sensitivity.csv",
         SC_IND / "1_sc_indicator_provenance.csv",
         SC_IND / "1_sc_indicator_changed_cells.csv",
         SC_IND_THESIS / "table_6_3_indicator_effect.csv",

@@ -7,9 +7,15 @@ stage; this script collects those answers into the single table the section is
 built around, reading only outputs the sub-steps already wrote.
 
   Observation   6.1  what self-collected imagery adds to the 100 m frame
-  Measurement   6.2  whether the detector transfers to locally collected imagery
+  Measurement   6.2  whether SC in the training mix improves detection
   Indicator     6.3  whether the published surface changes, and improves
   Pattern       6.4  whether the spatial conclusions move
+
+The measurement stage is scored on the GSVI held-out set, because that is the
+only independent test set the chapter uses. It therefore answers "does local
+training data make the detector better" and not "does the detector work on
+local imagery" — the latter would need a self-collected test set, which is
+deliberately out of scope.
 
 The table is deliberately blunt about direction. A row that does not move is
 reported as not moving; that is the finding for most of this pipeline.
@@ -32,15 +38,16 @@ _REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_p
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from chapter_paths import selfcollected_dir  # noqa: E402
+from chapter_paths import selfcollected_dir, waste_id_dir  # noqa: E402
 
 ROOT = selfcollected_dir()
 TABLE_DIR = ROOT / "thesis_table"
 
 SOURCES = ROOT / "1_sources"
-IDENT = ROOT / "2_identification"
 INDICATOR = ROOT / "3_indicator"
 PATTERN = ROOT / "4_pattern"
+
+SENSITIVITY_TABLE = waste_id_dir() / "thesis_table" / "table_4_sc_sensitivity.csv"
 
 SUMMARY_TABLE = TABLE_DIR / "table_6_0_mitigation_summary.csv"
 DETAIL_CSV = ROOT / "0_mitigation_summary_detail.csv"
@@ -76,31 +83,38 @@ def observation_rows() -> tuple[list[dict], dict]:
             f"{int(s['n_cells_newly_observed']):,}",
             f"+{s['pct_gain_relative']:.1f}% of the GSVI frame"),
     ]
+    # Measurement columns below are 0% vs 100% self-collected in the *training*
+    # mix, not two arms of imagery, so the header is a mild abuse of notation.
     return rows, {"n_new_cells": int(s["n_cells_newly_observed"])}
 
 
 def measurement_rows() -> list[dict]:
-    d = pd.read_csv(need(IDENT / "3_sc_domain_transfer.csv"))
-    wide = d.pivot(index="sc_share", columns="domain", values=["recall", "mAP50"])
-    wide.columns = [f"{m}_{dom}" for m, dom in wide.columns]
-    lo, hi = wide.index.min(), wide.index.max()
-    a, b = wide.loc[lo], wide.loc[hi]
-    return [
-        row("Measurement", "Recall on self-collected imagery",
-            f"{100 * a['recall_sc']:.1f}%", f"{100 * b['recall_sc']:.1f}%",
-            f"{100 * (b['recall_sc'] - a['recall_sc']):+.1f} pp"),
-        row("Measurement", "Recall gap (GSVI − self-collected)",
-            f"{100 * (a['recall_gsvi'] - a['recall_sc']):+.1f} pp",
-            f"{100 * (b['recall_gsvi'] - b['recall_sc']):+.1f} pp",
-            "No gap at any mix"),
-        row("Measurement", "mAP@0.50 on self-collected imagery",
-            f"{a['mAP50_sc']:.3f}", f"{b['mAP50_sc']:.3f}",
-            f"{100 * (b['mAP50_sc'] / a['mAP50_sc'] - 1):+.0f}%"),
-        row("Measurement", "mAP@0.50 gap (GSVI − self-collected)",
-            f"{a['mAP50_gsvi'] - a['mAP50_sc']:+.3f}",
-            f"{b['mAP50_gsvi'] - b['mAP50_sc']:+.3f}",
-            f"{100 * (1 - (b['mAP50_gsvi'] - b['mAP50_sc']) / (a['mAP50_gsvi'] - a['mAP50_sc'])):.0f}% of the gap closed"),
-    ]
+    """What self-collected training data buys, on the GSVI held-out set (Step 3)."""
+    d = pd.read_csv(need(SENSITIVITY_TABLE), dtype=str)
+    d["share"] = d["YOLO training set"].str.extract(r"^(\d+)").astype(int)
+    lo, hi = d["share"].min(), d["share"].max()
+
+    def cell(share: int, stage: str, column: str) -> str:
+        m = d[(d["share"] == share) & (d["Stage"] == stage)]
+        value = m[column].iloc[0] if len(m) else ""
+        return value if isinstance(value, str) and value.strip() else "—"
+
+    def pp(a: str, b: str) -> str:
+        try:
+            return f"{float(b.rstrip('%')) - float(a.rstrip('%')):+.1f} pp"
+        except ValueError:
+            return "—"
+
+    rows = []
+    for stage, metric, column in (
+        ("YOLO only", "Detector mAP@0.50", "mAP@0.50"),
+        ("YOLO only", "Detector precision", "Precision"),
+        ("YOLO only", "Detector recall", "Recall"),
+        ("YOLO → Qwen", "YOLO → Qwen F1", "F1"),
+    ):
+        a, b = cell(lo, stage, column), cell(hi, stage, column)
+        rows.append(row("Measurement", metric, a, b, pp(a, b)))
+    return rows
 
 
 def indicator_rows() -> list[dict]:

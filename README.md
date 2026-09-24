@@ -693,10 +693,10 @@ One table across the whole representation pipeline, assembled from the sub-steps
 | --- | --- | --- | --- | --- |
 | Observation | Directly observed 100 m cells | 22,725 (32.5%) | 22,852 (32.7%) | +127 (+0.2 pp) |
 | Observation | Cells >500 m from an observation | 13,149 (18.8%) | 12,855 (18.4%) | −294 (−0.4 pp) |
-| Measurement | Recall on self-collected imagery | 98.2% | 100.0% | +1.8 pp |
-| Measurement | Recall gap (GSVI − SC) | −3.7 pp | −5.6 pp | **no gap at any mix** |
-| Measurement | mAP@0.50 on self-collected imagery | 0.160 | 0.313 | **+96%** |
-| Measurement | mAP@0.50 gap | +0.231 | +0.138 | 40% of the gap closed |
+| Measurement | Detector mAP@0.50 | 39.1% | 45.0% | +5.9 pp |
+| Measurement | Detector precision | 68.5% | 73.9% | +5.4 pp |
+| Measurement | Detector recall | 94.4% | 94.4% | unchanged |
+| Measurement | YOLO → Qwen F1 | 91.1% | 92.7% | +1.6 pp |
 | Indicator | Direct share of represented cells | 33.2% | 33.4% | +0.2 pp |
 | Indicator | Cells beyond interpolation support | 1,594 | 1,594 | 0 |
 | Indicator | Cells classified High | 933 (1.3%) | 1,423 (2.0%) | +490 |
@@ -708,6 +708,8 @@ One table across the whole representation pipeline, assembled from the sub-steps
 | Pattern | Waste-positive rate outside settlements | 3.0% | 3.0% | unchanged |
 | Pattern | Observation-frame NNR | 0.562 | 0.554 | −0.008 |
 | Pattern | Signed-distance GAM pseudo-R² | 0.114 | 0.120 | +0.006 |
+
+The Measurement rows are 0% vs 100% self-collected in the **training mix**, scored on the GSVI held-out set — the chapter's only independent test set. They answer "does local training data make the detector better", not "does the detector work on local imagery"; the latter would need a self-collected test set, which is out of scope.
 
 Read down the Change column: **measurement is the only stage where supplementary local observation moves anything substantially.** Coverage gains 0.2 pp, the indicator's evidential basis gains 0.2 pp, and the spatial conclusions do not move at all.
 
@@ -764,8 +766,6 @@ So the added cells are 6× more likely to sit inside a settlement than the city 
 # needs 3_waste_identification/1_heldout_metrics.py to have run
 Rscript 6_selfcollected/2_identification/1plot_sc_sensitivity.R
 Rscript 6_selfcollected/2_identification/2plot_stage_comparison.R
-python  6_selfcollected/2_identification/3_sc_domain_transfer.py
-Rscript 6_selfcollected/2_identification/3plot_sc_domain_transfer.R
 ```
 
 | Figure | Script | Shows |
@@ -776,26 +776,6 @@ Rscript 6_selfcollected/2_identification/3plot_sc_domain_transfer.R
 These replace the archived Step 7 `Heldout_validation_binary_*` charts, which had a second panel for a self-collected held-out set; that panel is dropped, so the GSVI set is the whole figure. Adding or removing a scenario needs no edit to either script — levels, labels, fills, x-axis breaks, the detector count and the replicate note are all derived from the input table.
 
 The numbers are in Step 3: SC in the training set buys **precision** (false positives 39 → 30, mAP@0.50 +6 pp) with recall flat, and the VLM cascade largely substitutes for it — the post-cascade curves are nearly flat across the five mixes.
-
-#### Does the detector transfer to locally collected imagery? (`3_sc_domain_transfer.py`)
-
-The above scores every detector on the **GSVI** held-out set. The mitigation argument needs the complementary question: how does the same detector do on **self-collected** imagery, and does SC training close the gap? Two independent held-out sets, same five detectors:
-
-| SC in training | Recall GSVI | Recall SC | Recall gap | mAP@0.50 GSVI | mAP@0.50 SC | mAP gap |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0% | 94.4% | 98.2% | −3.7 pp | 0.391 | 0.160 | +0.231 |
-| 25% | 97.8% | 98.2% | −0.4 pp | 0.400 | 0.185 | +0.214 |
-| 50% | 94.4% | 100.0% | −5.6 pp | 0.405 | 0.260 | +0.146 |
-| 75% | 96.7% | 96.4% | +0.3 pp | 0.398 | 0.281 | +0.117 |
-| 100% | 94.4% | 100.0% | −5.6 pp | 0.450 | 0.313 | +0.138 |
-
-**There is no recall gap to close.** Recall on self-collected imagery is at or above GSVI at every training mix, with no SC training data at all. The domain gap is in **localisation quality**: mAP@0.50 is 0.391 against 0.160 at 0% SC, and adding SC training raises the SC figure to 0.313 (+96%), closing **40%** of the gap — while GSVI performance is unharmed (0.391 → 0.450).
-
-So the mitigation claim this supports is not "recall increased" but **supplementary local training data reduced source-specific localisation loss**. That is narrower than the recall framing and better evidenced.
-
-The two sets differ in size and composition (180 images, 90/90 vs 107 images, 55/52), so the *levels* are not directly comparable across domains; the *trends* across training mixes are. This is the n = 107 self-collected held-out set that was dropped from the Step 3 figures — it belongs here, where the cross-domain question is being asked, not there.
-
-**Figure:** `3_SC_domain_transfer.png` — (a) recall on both sets, (b) mAP@0.50 on both sets, (c) the gap itself.
 
 ### 6.3 The 100 m indicator with SC (`3_indicator/`)
 
