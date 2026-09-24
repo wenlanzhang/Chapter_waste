@@ -18,7 +18,6 @@ model — the observed rate by distance band, on both arms — so the curves can
 read against something that assumes nothing.
 
 Outputs (Data/Chapter_waste/6_selfcollected/4_pattern/Signed_distance/):
-  1_Nairobi_sc_gam_frame.csv             the combined analysis frame
   1_Nairobi_sc_gam_curve.csv             year-standardised curves, both arms
   1_Nairobi_sc_rate_by_band.csv          observed rate by distance band, both arms
   thesis_table/table_6_4_gam_comparison.csv
@@ -47,7 +46,6 @@ from sc_frames import ARM_LABELS, PATTERN_DIR, load_frames  # noqa: E402
 OUTPUT_DIR = PATTERN_DIR / "Signed_distance"
 TABLE_DIR = OUTPUT_DIR / "thesis_table"
 
-FRAME_CSV = OUTPUT_DIR / "1_Nairobi_sc_gam_frame.csv"
 CURVE_CSV = OUTPUT_DIR / "1_Nairobi_sc_gam_curve.csv"
 BAND_CSV = OUTPUT_DIR / "1_Nairobi_sc_rate_by_band.csv"
 GAM_TABLE = TABLE_DIR / "table_6_4_gam_comparison.csv"
@@ -221,9 +219,9 @@ def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     TABLE_DIR.mkdir(parents=True, exist_ok=True)
 
+    # The 80k-row analysis frame is rebuilt from Step 2c on every run, so it is
+    # not written out; only the fitted curves and band rates are.
     frames = {key: model_frame(df) for key, df in load_frames().items()}
-    frames["gsvi_selfcollected"].to_csv(FRAME_CSV, index=False)
-    print(f"Wrote {FRAME_CSV}")
 
     bands = pd.concat([rate_by_band(df, key) for key, df in frames.items()], ignore_index=True)
     bands.to_csv(BAND_CSV, index=False)

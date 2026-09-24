@@ -17,7 +17,7 @@
 #   1_Nairobi_sc_hdbscan_gsvi_selfcollected_32737.gpkg
 #   1_sc_hdbscan_label_transitions.csv
 #   1_sc_hdbscan_new_locations.csv
-#   thesis_table/table_6_4_hdbscan_{comparison,stability}.csv
+#   1_sc_hdbscan_comparison.csv, thesis_table/table_6_4_hdbscan_stability.csv
 
 suppressPackageStartupMessages({
   library(sf)
@@ -43,7 +43,7 @@ HULLS_GSC <- file.path(DATA_DIR, "1_Nairobi_sc_hotspots_gsvi_selfcollected_32737
 PTS_GSC <- file.path(DATA_DIR, "1_Nairobi_sc_hdbscan_gsvi_selfcollected_32737.gpkg")
 TRANSITIONS_CSV <- file.path(DATA_DIR, "1_sc_hdbscan_label_transitions.csv")
 NEW_OBS_CSV <- file.path(DATA_DIR, "1_sc_hdbscan_new_locations.csv")
-COMPARISON_CSV <- file.path(DATA_DIR, "thesis_table", "table_6_4_hdbscan_comparison.csv")
+COMPARISON_CSV <- file.path(DATA_DIR, "1_sc_hdbscan_comparison.csv")
 STABILITY_CSV <- file.path(DATA_DIR, "thesis_table", "table_6_4_hdbscan_stability.csv")
 OUT_PATH <- file.path(FIG_DIR, "1_SC_hotspot_comparison.png")
 

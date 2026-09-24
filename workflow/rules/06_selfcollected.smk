@@ -11,7 +11,7 @@ SELFCOLLECTED_DATA = [
     SC_SOURCES / "1_Nairobi_sc_coverage_summary.csv",
     SC_SOURCES / "1_Nairobi_sc_new_cells_location.csv",
     SC_SOURCES_THESIS / "table_6_1_sc_sources.csv",
-    SC_SOURCES_THESIS / "table_6_1_sc_coverage.csv",
+    SC_SOURCES / "1_sc_coverage_change.csv",
 ]
 
 SELFCOLLECTED_FIGS = [
@@ -169,7 +169,7 @@ SC_HDBSCAN_OUT = [
     SC_HDB / "1_Nairobi_sc_hotspots_gsvi_selfcollected_32737.gpkg",
     SC_HDB / "1_sc_hdbscan_new_locations.csv",
     SC_HDB / "1_sc_hdbscan_label_transitions.csv",
-    SC_HDB / "thesis_table" / "table_6_4_hdbscan_comparison.csv",
+    SC_HDB / "1_sc_hdbscan_comparison.csv",
     SC_HDB / "thesis_table" / "table_6_4_hdbscan_stability.csv",
 ]
 SC_CONTEXT_OUT = [
@@ -187,7 +187,6 @@ SC_SETTLEMENT_OUT = [
     SC_SET / "thesis_table" / "table_6_4_settlement_comparison.csv",
 ]
 SC_GAM_OUT = [
-    SC_SD / "1_Nairobi_sc_gam_frame.csv",
     SC_SD / "1_Nairobi_sc_gam_curve.csv",
     SC_SD / "1_Nairobi_sc_rate_by_band.csv",
     SC_SD / "thesis_table" / "table_6_4_gam_comparison.csv",
@@ -290,10 +289,7 @@ rule plot_sc_gam:
 
 
 # Step 6 anchor — the pipeline-wide mitigation summary ------------------------
-SELFCOLLECTED_DATA += [
-    SC / "thesis_table" / "table_6_0_mitigation_summary.csv",
-    SC / "0_mitigation_summary_detail.csv",
-]
+SELFCOLLECTED_DATA += [SC / "thesis_table" / "table_6_0_mitigation_summary.csv"]
 
 
 rule sc_mitigation_summary:
@@ -302,14 +298,11 @@ rule sc_mitigation_summary:
         WASTE_ID_THESIS / "table_4_sc_sensitivity.csv",
         SC_IND / "1_sc_indicator_provenance.csv",
         SC_IND / "1_sc_indicator_changed_cells.csv",
-        SC_IND_THESIS / "table_6_3_indicator_effect.csv",
         SC_IND_THESIS / "table_6_3_validation_comparison.csv",
-        SC_HDB / "thesis_table" / "table_6_4_hdbscan_comparison.csv",
-        SC_HDB / "thesis_table" / "table_6_4_hdbscan_stability.csv",
+        SC_HDB / "1_sc_hdbscan_comparison.csv",
         SC_SET / "thesis_table" / "table_6_4_settlement_comparison.csv",
         SC_SD / "thesis_table" / "table_6_4_gam_comparison.csv",
     output:
         SC / "thesis_table" / "table_6_0_mitigation_summary.csv",
-        SC / "0_mitigation_summary_detail.csv",
     shell:
         "python {REPO_ROOT}/6_selfcollected/0_mitigation_summary.py"

@@ -689,29 +689,36 @@ Steps 2–5 run on GSVI. Faith/ and ZWL/ imagery was collected by hand where Str
 
 One table across the whole representation pipeline, assembled from the sub-steps' own outputs — `thesis_table/table_6_0_mitigation_summary.csv`. Run it last.
 
-| Stage | Metric | GSVI baseline | GSVI + SC | Change |
+| Stage | Metric | GSVI baseline | After SC integration | Change |
 | --- | --- | --- | --- | --- |
 | Observation | Directly observed 100 m cells | 22,725 (32.5%) | 22,852 (32.7%) | +127 (+0.2 pp) |
-| Observation | Cells >500 m from an observation | 13,149 (18.8%) | 12,855 (18.4%) | −294 (−0.4 pp) |
-| Measurement | Detector mAP@0.50 | 39.1% | 45.0% | +5.9 pp |
-| Measurement | Detector precision | 68.5% | 73.9% | +5.4 pp |
-| Measurement | Detector recall | 94.4% | 94.4% | unchanged |
-| Measurement | YOLO → Qwen F1 | 91.1% | 92.7% | +1.6 pp |
+| | Cells >500 m from an observation | 13,149 (18.8%) | 12,855 (18.4%) | −294 (−0.4 pp) |
+| Measurement | CV–VLM F1 | 91.1% | 92.7% | +1.6 pp |
 | Indicator | Direct share of represented cells | 33.2% | 33.4% | +0.2 pp |
-| Indicator | Cells beyond interpolation support | 1,594 | 1,594 | 0 |
-| Indicator | Cells classified High | 933 (1.3%) | 1,423 (2.0%) | +490 |
-| Indicator | Cells changing published class | — | 670 (1.0%) | — |
-| Indicator | …changed without receiving an image | — | 604 (90.1%) | — |
-| Indicator | Crowd agreement, changed cells **with** an image | 0.0% | 85.7% | +85.7 pp |
-| Indicator | Crowd agreement, changed cells **interpolated** | 52.0% | 20.0% | −32.0 pp |
-| Pattern | Waste hotspots (HDBSCAN) | 24 | 18 | −6; label ARI 0.573 |
-| Pattern | Waste-positive rate outside settlements | 3.0% | 3.0% | unchanged |
-| Pattern | Observation-frame NNR | 0.562 | 0.554 | −0.008 |
-| Pattern | Signed-distance GAM pseudo-R² | 0.114 | 0.120 | +0.006 |
+| | Cells changing final indicator class | — | 670 (1.0%) | — |
+| | Changed cells affected through interpolation | — | 604 (90.1%) | — |
+| | Three-class agreement with local validation | 68.0% | 67.1% | −0.9 pp |
+| Socio-spatial pattern | HDBSCAN hotspots | 24 | 18 | −6 |
+| | Settlement prevalence ratio | 4.43 | 4.86 | +0.43 |
 
-The Measurement rows are 0% vs 100% self-collected in the **training mix**, scored on the GSVI held-out set — the chapter's only independent test set. They answer "does local training data make the detector better", not "does the detector work on local imagery"; the latter would need a self-collected test set, which is out of scope.
+The Measurement row is 0% vs 100% self-collected in the **training mix**, scored on the GSVI held-out set — the chapter's only independent test set. It answers "does local training data make the detector better", not "does the detector work on local imagery"; the latter would need a self-collected test set, which is out of scope.
 
-Read down the Change column: **measurement is the only stage where supplementary local observation moves anything substantially.** Coverage gains 0.2 pp, the indicator's evidential basis gains 0.2 pp, and the spatial conclusions do not move at all.
+Read down the Change column: nothing moves by much. Coverage gains 0.2 pp, the indicator's evidential basis gains 0.2 pp, agreement with local validation gets marginally *worse*, and the spatial conclusions are unchanged. **The one substantive number is that 90.1% of the cells whose class changed never received an image** — the surface moved through interpolation rather than evidence.
+
+### Tables
+
+Seven chapter tables, one per question. Everything else is a working output beside its script.
+
+| Table | What it answers |
+| --- | --- |
+| `thesis_table/table_6_0_mitigation_summary.csv` | the anchor, above |
+| `1_sources/…/table_6_1_sc_sources.csv` | what the self-collected imagery is |
+| `3_indicator/…/table_6_3_indicator_effect.csv` | how the published surface changes |
+| `3_indicator/…/table_6_3_validation_comparison.csv` | whether it changes for the better |
+| `4_pattern/HDBSCAN/…/table_6_4_hdbscan_stability.csv` | whether the hotspots survive |
+| `4_pattern/HDBSCAN/…/table_6_4_cluster_context.csv` | whether they are still settlement hotspots |
+| `4_pattern/settlement/…/table_6_4_settlement_comparison.csv` | the settlement association, incl. the NNR null |
+| `4_pattern/Signed_distance/…/table_6_4_gam_comparison.csv` | the distance gradient |
 
 ### 6.1 What the self-collected imagery is (`1_sources/`)
 

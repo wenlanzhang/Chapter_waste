@@ -23,8 +23,8 @@ Outputs (Data/Chapter_waste/6_selfcollected/1_sources/):
   1_Nairobi_sc_coverage_grid100m_32737.gpkg   per cell, columns above
   1_Nairobi_sc_coverage_summary.csv           one row, every number in the tables
   1_Nairobi_sc_new_cells_32737.gpkg           the newly covered cells only (for the map)
-  thesis_table/table_6_1_sc_sources.csv       images / panoramas / waste by source
-  thesis_table/table_6_1_sc_coverage.csv      GSVI -> GSVI+SC coverage change
+  thesis_table/table_6_1_sc_sources.csv       images / panoramas / waste by source (chapter)
+  1_sc_coverage_change.csv                    GSVI -> GSVI+SC coverage change
   1_Nairobi_sc_new_cells_location.csv         where the new cells are
 """
 
@@ -55,7 +55,9 @@ NEW_CELLS_GPKG = OUTPUT_DIR / "1_Nairobi_sc_new_cells_32737.gpkg"
 SUMMARY_CSV = OUTPUT_DIR / "1_Nairobi_sc_coverage_summary.csv"
 LOCATION_CSV = OUTPUT_DIR / "1_Nairobi_sc_new_cells_location.csv"
 SOURCES_TABLE = TABLE_DIR / "table_6_1_sc_sources.csv"
-COVERAGE_TABLE = TABLE_DIR / "table_6_1_sc_coverage.csv"
+# Superseded as a chapter table by table_6_0_mitigation_summary.csv; kept
+# as a working output because it carries the per-metric breakdown.
+COVERAGE_TABLE = OUTPUT_DIR / "1_sc_coverage_change.csv"
 
 SLUM_GPKG = prep_dir() / "Nairobi_slum_polygon_32737.gpkg"
 

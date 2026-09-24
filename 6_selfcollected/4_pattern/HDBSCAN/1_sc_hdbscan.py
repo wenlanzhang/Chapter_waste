@@ -32,7 +32,7 @@ Outputs (Data/Chapter_waste/6_selfcollected/4_pattern/HDBSCAN/):
   1_Nairobi_sc_hotspots_{gsvi,gsvi_selfcollected}_32737.gpkg  convex-hull footprints
   1_sc_hdbscan_label_transitions.csv                          GSVI label x combined label
   1_sc_hdbscan_new_locations.csv                              what the 149 added points join
-  thesis_table/table_6_4_hdbscan_comparison.csv               the chapter table
+  1_sc_hdbscan_comparison.csv                                 counts and hull area
 """
 
 from __future__ import annotations
@@ -62,7 +62,9 @@ TABLE_DIR = OUTPUT_DIR / "thesis_table"
 
 NEW_LOCATIONS_CSV = OUTPUT_DIR / "1_sc_hdbscan_new_locations.csv"
 TRANSITIONS_CSV = OUTPUT_DIR / "1_sc_hdbscan_label_transitions.csv"
-COMPARISON_TABLE = TABLE_DIR / "table_6_4_hdbscan_comparison.csv"
+# Counts and area are descriptive; the chapter's hotspot claim rests on the
+# stability table, so this stays a working output.
+COMPARISON_TABLE = OUTPUT_DIR / "1_sc_hdbscan_comparison.csv"
 
 ARMS = {
     "gsvi": {"column": "GSVI", "loader": load_gsvi_waste_panoids},
