@@ -19,6 +19,21 @@ Self-collected images carry no panoid, so each image is its own observation
 location (lib.arms.observation_key); "panorama" below means a GSVI panoid or a
 single self-collected image.
 
+Two cell-assignment rules exist in this chapter and they do not agree, so this
+script reports both. The Mollweide-extended grid leaves ~0.3% of the
+constituency uncovered along the boundary, and 1,528 GSVI images fall in those
+slivers — inside the city, but inside no cell.
+
+  snapped  a point in a sliver is assigned to the nearest cell within 100 m, so
+           totals reconcile with Step 1. Used by Step 2e and by this script.
+  strict   a plain within-cell join, no snapping. Used by lib/ideamaps.py, and
+           therefore by Step 4 and Step 6.3, because it is what the IDEAMaps
+           submission did and changing it would change the published indicator.
+
+The two differ by 53 cells: 22,725 snapped against 22,672 strict. Neither is
+wrong; mixing them in one table without saying so is. The summary carries both
+counts so any figure quoted downstream can be traced to its rule.
+
 Outputs (Data/Chapter_waste/6_selfcollected/1_sources/):
   1_Nairobi_sc_coverage_grid100m_32737.gpkg   per cell, columns above
   1_Nairobi_sc_coverage_summary.csv           one row, every number in the tables
@@ -111,6 +126,14 @@ def count_in_cells(grid: gpd.GeoDataFrame, points: gpd.GeoDataFrame, name: str) 
     return grid["cell_id"].map(counts).fillna(0).astype(int).rename(name)
 
 
+def count_in_cells_strict(grid: gpd.GeoDataFrame, points: gpd.GeoDataFrame, name: str) -> pd.Series:
+    """Plain within-cell join, no sliver snapping — lib/ideamaps.py's rule."""
+    joined = gpd.sjoin(points[["geometry"]], grid[["cell_id", "geometry"]],
+                       how="inner", predicate="within")
+    counts = joined["cell_id"].value_counts()
+    return grid["cell_id"].map(counts).fillna(0).astype(int).rename(name)
+
+
 def distance_to_nearest(grid: gpd.GeoDataFrame, points: gpd.GeoDataFrame) -> np.ndarray:
     tree = cKDTree(np.c_[points.geometry.x, points.geometry.y])
     centroids = grid.geometry.centroid
@@ -148,6 +171,14 @@ def compute_cells(grid: gpd.GeoDataFrame, src: dict[str, gpd.GeoDataFrame]) -> g
     cells["n_images_sc"] = count_in_cells(grid, src["images_sc"], "n_images_sc")
     cells["n_obs_gsvi"] = count_in_cells(grid, src["points_gsvi"], "n_obs_gsvi")
     cells["n_obs_sc"] = count_in_cells(grid, src["points_sc"], "n_obs_sc")
+
+    # Same counts under the strict rule, so the two frames can be reconciled.
+    cells["n_images_gsvi_strict"] = count_in_cells_strict(grid, src["images_gsvi"], "n_images_gsvi_strict")
+    cells["n_images_sc_strict"] = count_in_cells_strict(grid, src["images_sc"], "n_images_sc_strict")
+    cells["observed_gsvi_strict"] = (cells["n_images_gsvi_strict"] > 0).astype(int)
+    cells["observed_gsc_strict"] = (
+        (cells["n_images_gsvi_strict"] + cells["n_images_sc_strict"]) > 0
+    ).astype(int)
 
     cells["observed_gsvi"] = (cells["n_images_gsvi"] > 0).astype(int)
     cells["observed_gsc"] = ((cells["n_images_gsvi"] + cells["n_images_sc"]) > 0).astype(int)
@@ -202,6 +233,11 @@ def compute_summary(cells: pd.DataFrame, src: dict[str, gpd.GeoDataFrame], far_m
             "n_cells_with_sc": int((cells["n_images_sc"] > 0).sum()),
             "n_cells_observed_gsvi": obs_gsvi,
             "pct_cells_observed_gsvi": 100.0 * obs_gsvi / n,
+            # Strict (no sliver snapping) — the rule Step 4 and 6.3 use.
+            "n_cells_observed_gsvi_strict": int(cells["observed_gsvi_strict"].sum()),
+            "pct_cells_observed_gsvi_strict": 100.0 * cells["observed_gsvi_strict"].mean(),
+            "n_cells_observed_gsc_strict": int(cells["observed_gsc_strict"].sum()),
+            "snapping_cell_difference": obs_gsvi - int(cells["observed_gsvi_strict"].sum()),
             "n_cells_observed_gsc": obs_gsc,
             "pct_cells_observed_gsc": 100.0 * obs_gsc / n,
             "n_cells_newly_observed": len(new),
@@ -358,6 +394,14 @@ def main() -> None:
     coverage.to_csv(COVERAGE_TABLE, index=False)
     location = build_location_table(cells.drop(columns="geometry"), s)
     location.to_csv(LOCATION_CSV, index=False)
+
+    print(f"\nCell-assignment rules (they differ; both are reported):")
+    print(f"  snapped (this script, Step 2e): {int(s['n_cells_observed_gsvi']):,} cells "
+          f"({s['pct_cells_observed_gsvi']:.1f}%)")
+    print(f"  strict  (lib/ideamaps.py, Step 4 / 6.3): "
+          f"{int(s['n_cells_observed_gsvi_strict']):,} cells "
+          f"({s['pct_cells_observed_gsvi_strict']:.1f}%)")
+    print(f"  difference: {int(s['snapping_cell_difference']):,} cells in grid slivers")
 
     print(f"\n{sources.to_string(index=False)}")
     print(f"\n{coverage.to_string(index=False)}")

@@ -11,6 +11,15 @@ built around, reading only outputs the sub-steps already wrote.
   Indicator     6.3  whether the published surface changes, and improves
   Pattern       6.4  whether the spatial conclusions move
 
+The Observation and Indicator stages count directly observed cells under
+different rules, and the table says so rather than hiding it. Observation snaps
+points that fall in grid slivers to the nearest cell within 100 m (Step 2e's
+rule, so totals reconcile with Step 1); the Indicator uses lib/ideamaps.py's
+plain within-cell join, which reproduces the IDEAMaps submission. The two differ
+by 53 cells — 22,725 against 22,672 — which is why the Observation row reads
+32.5% while Step 6.3 reports 32.4%. Both are in
+1_sources/1_Nairobi_sc_coverage_summary.csv.
+
 The measurement stage is scored on the GSVI held-out set, because that is the
 only independent test set the chapter uses. It therefore answers "does local
 training data make the detector better" and not "does the detector work on
@@ -69,7 +78,7 @@ def observation_rows() -> list[dict]:
     s = pd.read_csv(need(SOURCES / "1_Nairobi_sc_coverage_summary.csv")).iloc[0]
     far = int(s["far_m"])
     return [
-        row("Observation", "Directly observed 100 m cells",
+        row("Observation", "Directly observed 100 m cells [snapped frame]",
             f"{int(s['n_cells_observed_gsvi']):,} ({s['pct_cells_observed_gsvi']:.1f}%)",
             f"{int(s['n_cells_observed_gsc']):,} ({s['pct_cells_observed_gsc']:.1f}%)",
             f"+{int(s['n_cells_newly_observed']):,} ({s['pct_cells_observed_gsc'] - s['pct_cells_observed_gsvi']:+.1f} pp)"),
@@ -107,7 +116,7 @@ def indicator_rows() -> list[dict]:
                 & (val["Measure"] == "3-class accuracy")].iloc[0]
 
     return [
-        row("Indicator", "Direct share of represented cells",
+        row("Indicator", "Direct share of represented cells [strict frame]",
             direct["GSVI"], direct["GSVI + SC"], direct["Change"]),
         row("Indicator", "Cells changing final indicator class", "—",
             changed_value("Cells changing published class").replace(" of grid", ""), "—"),

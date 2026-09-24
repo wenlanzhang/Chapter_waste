@@ -691,15 +691,24 @@ One table across the whole representation pipeline, assembled from the sub-steps
 
 | Stage | Metric | GSVI baseline | After SC integration | Change |
 | --- | --- | --- | --- | --- |
-| Observation | Directly observed 100 m cells | 22,725 (32.5%) | 22,852 (32.7%) | +127 (+0.2 pp) |
+| Observation | Directly observed 100 m cells † | 22,725 (32.5%) | 22,852 (32.7%) | +127 (+0.2 pp) |
 | | Cells >500 m from an observation | 13,149 (18.8%) | 12,855 (18.4%) | −294 (−0.4 pp) |
 | Measurement | CV–VLM F1 | 91.1% | 92.7% | +1.6 pp |
-| Indicator | Direct share of represented cells | 33.2% | 33.4% | +0.2 pp |
+| Indicator | Direct share of represented cells ‡ | 33.2% | 33.4% | +0.2 pp |
 | | Cells changing final indicator class | — | 670 (1.0%) | — |
 | | Changed cells affected through interpolation | — | 604 (90.1%) | — |
 | | Three-class agreement with local validation | 68.0% | 67.1% | −0.9 pp |
 | Socio-spatial pattern | HDBSCAN hotspots | 24 | 18 | −6 |
 | | Settlement prevalence ratio | 4.43 | 4.86 | +0.43 |
+
+**† and ‡ are counted under different rules, and the difference is real.** The Mollweide-extended grid leaves ~0.3% of the constituency uncovered along its boundary, and 1,528 GSVI images fall in those slivers — inside the city, inside no cell.
+
+| Rule | What it does | Used by | Directly observed cells |
+| --- | --- | --- | ---: |
+| † snapped | assigns a sliver point to the nearest cell within 100 m, so totals reconcile with Step 1 | Step 2e, Step 6.1 | 22,725 (32.5%) |
+| ‡ strict | plain within-cell join, no snapping | `lib/ideamaps.py` → Step 4, Step 6.3 | 22,672 (32.4%) |
+
+They differ by **53 cells**. Neither is wrong: the indicator *must* use the strict join, because that is what the IDEAMaps submission did and changing it would change the published surface. This is why Step 6.1 reports 32.5% and Step 6.3 reports 32.4% for the same arm. Both counts are in `1_sources/1_Nairobi_sc_coverage_summary.csv` (`n_cells_observed_gsvi`, `n_cells_observed_gsvi_strict`, `snapping_cell_difference`), so any figure quoted downstream can be traced to its rule. **Quote one rule per sentence and name it.**
 
 The Measurement row is 0% vs 100% self-collected in the **training mix**, scored on the GSVI held-out set — the chapter's only independent test set. It answers "does local training data make the detector better", not "does the detector work on local imagery"; the latter would need a self-collected test set, which is out of scope.
 
@@ -740,7 +749,7 @@ Rscript 6_selfcollected/1_sources/2plot_new_coverage_map.R
 
 | Metric | GSVI | GSVI + SC | Change |
 | --- | --- | --- | --- |
-| Directly observed cells | 22,725 (32.5%) | 22,852 (32.7%) | +127 (+0.2 pp) |
+| Directly observed cells (snapped frame) | 22,725 (32.5%) | 22,852 (32.7%) | +127 (+0.2 pp) |
 | Cells >500 m from an observation | 13,149 (18.8%) | 12,855 (18.4%) | −294 (−0.4 pp) |
 | Cells containing SC imagery | — | 1,286 | — |
 | Cells observed **only** with SC | — | 127 (0.18% of the city) | +0.6% of the GSVI frame |
@@ -799,7 +808,7 @@ Two effects are separated. **Coverage** — cells that gain direct evidence — 
 
 | Component | GSVI | GSVI + SC | Change |
 | --- | --- | --- | --- |
-| Cells with an observed value | 22,672 (32.4%) | 22,799 (32.6%) | +127 |
+| Cells with an observed value (strict frame) | 22,672 (32.4%) | 22,799 (32.6%) | +127 |
 | Cells receiving an estimated value | 45,677 (65.3%) | 45,550 (65.1%) | −127 |
 | Direct share of the represented surface | 33.2% | 33.4% | **+0.2 pp** |
 
