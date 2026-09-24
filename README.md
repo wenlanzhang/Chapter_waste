@@ -679,7 +679,7 @@ Steps 2–5 run on GSVI. Faith/ and ZWL/ imagery was collected by hand where Str
 | --- | --- | --- |
 | 6.1 | `1_sources/` | what the SC imagery is, and what it adds to the 100 m observation frame |
 | 6.2 | `2_identification/` | Step 3 — does SC in the YOLO training set change the classifier |
-| 6.3 | `3_indicator/` | Step 4 — does SC change the published 100 m surface |
+| 6.3 | `3_indicator/` | Step 4 — does SC change the published 100 m surface, and improve it |
 | 6.4 | `4_pattern/` | Step 5 — do the hotspots and the settlement gradient change |
 
 **The short answer, across all four: no conclusion in Steps 3–5 depends on the self-collected imagery.** What SC does change is worth stating precisely, and each sub-step does.
@@ -755,6 +755,8 @@ The numbers are in Step 3: SC in the training set buys **precision** (false posi
 ```bash
 python  6_selfcollected/3_indicator/1_sc_indicator.py
 Rscript 6_selfcollected/3_indicator/1plot_sc_indicator.R
+python  6_selfcollected/3_indicator/2_sc_validation.py     # needs Step 1's validation grid
+Rscript 6_selfcollected/3_indicator/2plot_sc_validation.R
 ```
 
 Two effects are separated. **Coverage** — cells that gain direct evidence — barely moves:
@@ -779,9 +781,35 @@ Only **66 of the 670** changed cells (9.9%) actually received an image; the othe
 
 This is a fragility result, not a coverage result: because the surface is mostly interpolated, a small amount of new evidence in the right places propagates widely, and the High class grows by half without the evidence base meaningfully growing.
 
-**Figure:** `Figure/6_selfcollected/3_indicator/1_SC_indicator_effect.png` — (a) map of the cells that changed class, (b) class counts before and after, (c) how those cells changed.
+**Figure:** `1_SC_indicator_effect.png` — (a) map of the cells that changed class, (b) the full 3×3 class transition matrix (the off-diagonal *is* the 670), (c) how those same cells changed.
 
-**Outputs:** `1_Nairobi_sc_indicator_grid100m_32737.gpkg` (both arms per cell), `1_sc_indicator_{provenance,class_change,changed_cells}.csv`, `thesis_table/table_6_3_indicator_effect.csv`
+#### Is the new surface any *better*? (`2_sc_validation.py`)
+
+All of the above says the surface **moved**, not that it **improved**. Both arms are therefore scored against the IDEAMaps crowd-validation clicks — the same reference Step 4b uses — on 2,286 validated cells. The decisive split is by *route*: did a changed cell receive imagery, or did it move through the spatial fill?
+
+| Subset | Measure | GSVI | GSVI + SC | Change |
+| --- | --- | ---: | ---: | ---: |
+| All validated cells (2,286) | Binary accuracy | 73.2% | 73.4% | +0.2 pp |
+| | 3-class accuracy | 68.0% | 67.1% | −0.9 pp |
+| Cells holding SC imagery (133) | Binary accuracy | 81.2% | 86.5% | +5.3 pp |
+| | 3-class accuracy | 75.9% | **85.0%** | **+9.0 pp** |
+| | Cohen's κ | 0.471 | **0.641** | **+0.170** |
+| **Changed, received imagery (14)** | Binary accuracy | 42.9% | **92.9%** | **+50.0 pp** |
+| | 3-class accuracy | 0.0% | **85.7%** | **+85.7 pp** |
+| | McNemar | 1 | 8 | **p = 0.039** |
+| **Changed through the spatial fill (100)** | Binary accuracy | 65.0% | 63.0% | −2.0 pp |
+| | 3-class accuracy | 52.0% | **20.0%** | **−32.0 pp** |
+| | McNemar | 18 | 16 | p = 0.864 |
+
+**Where the evidence landed, the change was right; where the class moved through interpolation alone, it was not.** The mechanism is visible in precision and recall: in both routes recall rises (to 93% and 100% respectively — the surface calls more cells waste), but only the imagery route keeps precision at 100%, while the interpolated route drops from 70% to 63%. The interpolated cells are simply over-called.
+
+This is the validation-side confirmation of the fragility result above: 90% of changed cells moved without evidence, and those are exactly the ones that moved the wrong way. Citywide the two arms are indistinguishable, because the 14 cells with evidence behind them cannot shift a 2,286-cell total.
+
+**A caution the numbers cannot carry themselves:** n = 14 and n = 100 are small, the κ for the 14-cell subset is undefined (its crowd labels are constant), and this concerns a **1% increase in imagery**. It is directional evidence, not a powered test of whether field collection improves indicators in general.
+
+**Figure:** `2_SC_validation_comparison.png` — (a) agreement by subset and arm, (b) the change in agreement split by route, (c) precision and recall showing the over-call.
+
+**Outputs:** `1_Nairobi_sc_indicator_grid100m_32737.gpkg` (both arms per cell), `1_sc_indicator_{provenance,class_change,changed_cells}.csv`, `2_sc_validation_{cells,confusion,detail}.csv`, `thesis_table/table_6_3_{indicator_effect,validation_comparison}.csv`
 
 ### 6.4 The spatial pattern with SC (`4_pattern/`)
 

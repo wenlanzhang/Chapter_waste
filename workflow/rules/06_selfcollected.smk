@@ -94,7 +94,17 @@ SELFCOLLECTED_DATA += [
     SC_IND / "1_sc_indicator_changed_cells.csv",
     SC_IND_THESIS / "table_6_3_indicator_effect.csv",
 ]
-SELFCOLLECTED_FIGS += [SC_FIG_IND / "1_SC_indicator_effect.png"]
+SC_VALIDATION_OUT = [
+    SC_IND / "2_sc_validation_cells.csv",
+    SC_IND / "2_sc_validation_confusion.csv",
+    SC_IND / "2_sc_validation_detail.csv",
+    SC_IND_THESIS / "table_6_3_validation_comparison.csv",
+]
+SELFCOLLECTED_DATA += SC_VALIDATION_OUT
+SELFCOLLECTED_FIGS += [
+    SC_FIG_IND / "1_SC_indicator_effect.png",
+    SC_FIG_IND / "2_SC_validation_comparison.png",
+]
 
 
 rule sc_indicator:
@@ -123,6 +133,25 @@ rule plot_sc_indicator:
         SC_FIG_IND / "1_SC_indicator_effect.png",
     shell:
         "Rscript {REPO_ROOT}/6_selfcollected/3_indicator/1plot_sc_indicator.R"
+
+
+rule sc_validation:
+    input:
+        SC_IND / "1_Nairobi_sc_indicator_grid100m_32737.gpkg",
+        PREP / "Nairobi_validation_grid_32737.gpkg",
+    output:
+        SC_VALIDATION_OUT,
+    shell:
+        "python {REPO_ROOT}/6_selfcollected/3_indicator/2_sc_validation.py"
+
+
+rule plot_sc_validation:
+    input:
+        SC_IND / "2_sc_validation_detail.csv",
+    output:
+        SC_FIG_IND / "2_SC_validation_comparison.png",
+    shell:
+        "Rscript {REPO_ROOT}/6_selfcollected/3_indicator/2plot_sc_validation.R"
 
 
 # 6.4 — spatial pattern with self-collected imagery ---------------------------
