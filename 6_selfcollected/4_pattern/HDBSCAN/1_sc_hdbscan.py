@@ -18,7 +18,7 @@ platform never reported. The split is what 2plot_new_obs_stacked_bar.R draws.
 Unit: panorama location, not image — a GSVI panoid, or one self-collected image
 (which carries no panoid). Hotspot area is the sum of per-cluster convex hulls.
 
-Outputs (Data/Chapter_waste/6_selfcollected/4_pattern/):
+Outputs (Data/Chapter_waste/6_selfcollected/4_pattern/HDBSCAN/):
   1_Nairobi_sc_hdbscan_{gsvi,gsvi_selfcollected}_32737.gpkg   clustered points
   1_Nairobi_sc_hotspots_{gsvi,gsvi_selfcollected}_32737.gpkg  convex-hull footprints
   1_sc_hdbscan_new_locations.csv                              the inside/outside split
@@ -45,7 +45,7 @@ from lib.panoids import (  # noqa: E402
     location_keys,
 )
 
-OUTPUT_DIR = selfcollected_dir() / "4_pattern"
+OUTPUT_DIR = selfcollected_dir() / "4_pattern" / "HDBSCAN"
 TABLE_DIR = OUTPUT_DIR / "thesis_table"
 
 NEW_LOCATIONS_CSV = OUTPUT_DIR / "1_sc_hdbscan_new_locations.csv"

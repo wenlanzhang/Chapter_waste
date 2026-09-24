@@ -126,33 +126,59 @@ rule plot_sc_indicator:
 
 
 # 6.4 — spatial pattern with self-collected imagery ---------------------------
+# Mirrors Step 5's three blocks so the two are read side by side.
 SC_PAT = SC / "4_pattern"
-SC_PAT_THESIS = SC_PAT / "thesis_table"
+SC_HDB = SC_PAT / "HDBSCAN"
+SC_SET = SC_PAT / "settlement"
+SC_SD = SC_PAT / "Signed_distance"
 SC_FIG_PAT = SC_FIG / "4_pattern"
 
 SC_HDBSCAN_OUT = [
-    SC_PAT / "1_Nairobi_sc_hdbscan_gsvi_32737.gpkg",
-    SC_PAT / "1_Nairobi_sc_hdbscan_gsvi_selfcollected_32737.gpkg",
-    SC_PAT / "1_Nairobi_sc_hotspots_gsvi_32737.gpkg",
-    SC_PAT / "1_Nairobi_sc_hotspots_gsvi_selfcollected_32737.gpkg",
-    SC_PAT / "1_sc_hdbscan_new_locations.csv",
-    SC_PAT_THESIS / "table_6_4_hdbscan_comparison.csv",
+    SC_HDB / "1_Nairobi_sc_hdbscan_gsvi_32737.gpkg",
+    SC_HDB / "1_Nairobi_sc_hdbscan_gsvi_selfcollected_32737.gpkg",
+    SC_HDB / "1_Nairobi_sc_hotspots_gsvi_32737.gpkg",
+    SC_HDB / "1_Nairobi_sc_hotspots_gsvi_selfcollected_32737.gpkg",
+    SC_HDB / "1_sc_hdbscan_new_locations.csv",
+    SC_HDB / "thesis_table" / "table_6_4_hdbscan_comparison.csv",
 ]
-SC_PATTERN_OUT = [
-    SC_PAT / "2_Nairobi_sc_gam_frame.csv",
-    SC_PAT / "2_Nairobi_sc_gam_curve.csv",
-    SC_PAT / "2_sc_settlement_contingency.csv",
-    SC_PAT_THESIS / "table_6_4_settlement_comparison.csv",
-    SC_PAT_THESIS / "table_6_4_gam_comparison.csv",
+SC_CONTEXT_OUT = [
+    SC_HDB / "2_Nairobi_sc_cluster_context_gsvi_32737.gpkg",
+    SC_HDB / "2_Nairobi_sc_cluster_context_gsvi_selfcollected_32737.gpkg",
+    SC_HDB / "2_Nairobi_sc_cluster_composition_gsvi.csv",
+    SC_HDB / "2_Nairobi_sc_cluster_composition_gsvi_selfcollected.csv",
+    SC_HDB / "2_sc_cluster_context_summary.csv",
+    SC_HDB / "thesis_table" / "table_6_4_cluster_context.csv",
+]
+SC_SETTLEMENT_OUT = [
+    SC_SET / "1_sc_settlement_contingency.csv",
+    SC_SET / "1_sc_settlement_zone_summary.csv",
+    SC_SET / "1_sc_settlement_nnr.csv",
+    SC_SET / "thesis_table" / "table_6_4_settlement_comparison.csv",
+]
+SC_GAM_OUT = [
+    SC_SD / "1_Nairobi_sc_gam_frame.csv",
+    SC_SD / "1_Nairobi_sc_gam_curve.csv",
+    SC_SD / "1_Nairobi_sc_rate_by_band.csv",
+    SC_SD / "thesis_table" / "table_6_4_gam_comparison.csv",
 ]
 
-SELFCOLLECTED_DATA += SC_HDBSCAN_OUT + SC_PATTERN_OUT
+SELFCOLLECTED_DATA += SC_HDBSCAN_OUT + SC_CONTEXT_OUT + SC_SETTLEMENT_OUT + SC_GAM_OUT
 SELFCOLLECTED_FIGS += [
-    SC_FIG_PAT / "1_SC_hotspot_comparison.png",
-    SC_FIG_PAT / "2_SC_settlement_gam_comparison.png",
+    SC_FIG_PAT / "HDBSCAN" / "1_SC_hotspot_comparison.png",
+    SC_FIG_PAT / "HDBSCAN" / "2_SC_cluster_composition.png",
+    SC_FIG_PAT / "settlement" / "1_SC_settlement_comparison.png",
+    SC_FIG_PAT / "Signed_distance" / "1_SC_gam_comparison.png",
+]
+
+# Both arms' Step 2c layers; the second arm is what makes the combined frame.
+SC_FRAME_INPUTS = [
+    COV / "3_Nairobi_sviwaste_points_gsvi_32737.gpkg",
+    COV / "3_Nairobi_sviwaste_points_gsvi_selfcollected_32737.gpkg",
+    PREP / "Nairobi_slum_polygon_32737.gpkg",
 ]
 
 
+# 6.4a clustering
 rule sc_hdbscan:
     input:
         COV / "3_Nairobi_sviwaste_points_gsvi_32737.gpkg",
@@ -160,7 +186,7 @@ rule sc_hdbscan:
     output:
         SC_HDBSCAN_OUT,
     shell:
-        "python {REPO_ROOT}/6_selfcollected/4_pattern/1_sc_hdbscan.py"
+        "python {REPO_ROOT}/6_selfcollected/4_pattern/HDBSCAN/1_sc_hdbscan.py"
 
 
 rule plot_sc_hotspots:
@@ -169,26 +195,64 @@ rule plot_sc_hotspots:
         PREP / "Nairobi_boundary_polygon_32737.gpkg",
         PREP / "Nairobi_slum_polygon_32737.gpkg",
     output:
-        SC_FIG_PAT / "1_SC_hotspot_comparison.png",
+        SC_FIG_PAT / "HDBSCAN" / "1_SC_hotspot_comparison.png",
     shell:
-        "Rscript {REPO_ROOT}/6_selfcollected/4_pattern/1plot_sc_hotspots.R"
+        "Rscript {REPO_ROOT}/6_selfcollected/4_pattern/HDBSCAN/1plot_sc_hotspots.R"
 
 
-rule sc_settlement_gam:
+rule sc_cluster_context:
     input:
-        COV / "3_Nairobi_sviwaste_points_gsvi_32737.gpkg",
-        COV / "3_Nairobi_sviwaste_points_gsvi_selfcollected_32737.gpkg",
+        SC_HDBSCAN_OUT,
         PREP / "Nairobi_slum_polygon_32737.gpkg",
     output:
-        SC_PATTERN_OUT,
+        SC_CONTEXT_OUT,
     shell:
-        "python {REPO_ROOT}/6_selfcollected/4_pattern/2_sc_settlement_gam.py"
+        "python {REPO_ROOT}/6_selfcollected/4_pattern/HDBSCAN/2_sc_cluster_settlement_context.py"
 
 
-rule plot_sc_settlement_gam:
+rule plot_sc_cluster_composition:
     input:
-        SC_PATTERN_OUT,
+        SC_CONTEXT_OUT,
     output:
-        SC_FIG_PAT / "2_SC_settlement_gam_comparison.png",
+        SC_FIG_PAT / "HDBSCAN" / "2_SC_cluster_composition.png",
     shell:
-        "Rscript {REPO_ROOT}/6_selfcollected/4_pattern/2plot_sc_settlement_gam.R"
+        "Rscript {REPO_ROOT}/6_selfcollected/4_pattern/HDBSCAN/2plot_sc_cluster_composition.R"
+
+
+# 6.4b settlement association (2x2, zone density, observation-frame NNR)
+rule sc_settlement_association:
+    input:
+        SC_FRAME_INPUTS,
+        PREP / "Nairobi_boundary_polygon_32737.gpkg",
+    output:
+        SC_SETTLEMENT_OUT,
+    shell:
+        "python {REPO_ROOT}/6_selfcollected/4_pattern/settlement/1_sc_settlement_association.py"
+
+
+rule plot_sc_settlement:
+    input:
+        SC_SETTLEMENT_OUT,
+    output:
+        SC_FIG_PAT / "settlement" / "1_SC_settlement_comparison.png",
+    shell:
+        "Rscript {REPO_ROOT}/6_selfcollected/4_pattern/settlement/1plot_sc_settlement.R"
+
+
+# 6.4c signed-distance GAM
+rule sc_signed_distance_gam:
+    input:
+        SC_FRAME_INPUTS,
+    output:
+        SC_GAM_OUT,
+    shell:
+        "python {REPO_ROOT}/6_selfcollected/4_pattern/Signed_distance/1_sc_signed_distance_gam.py"
+
+
+rule plot_sc_gam:
+    input:
+        SC_GAM_OUT,
+    output:
+        SC_FIG_PAT / "Signed_distance" / "1_SC_gam_comparison.png",
+    shell:
+        "Rscript {REPO_ROOT}/6_selfcollected/4_pattern/Signed_distance/1plot_sc_gam.R"

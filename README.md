@@ -35,7 +35,7 @@ Chapter_waste/
 │   ├── 1_sources/              what SC imagery is and what coverage it adds
 │   ├── 2_identification/       SC in the YOLO training mix (plots only)
 │   ├── 3_indicator/            the 100 m surface, rebuilt with SC
-│   └── 4_pattern/              hotspots, settlement association, GAM, with SC
+│   └── 4_pattern/              HDBSCAN/ settlement/ Signed_distance/, both arms
 │
 ├── Figure/<step>/              outputs, numbered by the block that produces them
 ├── drafts/                     scratch analyses kept out of the pipeline
@@ -663,7 +663,7 @@ Or `snakemake all`, which resolves the same order.
 
 ### Figures (`Figure/5_spatial_pattern/`)
 
-25 figures across `HDBSCAN/`, `settlement/` and `Signed_distance/` (the pop-adjusted sensitivity figures sit under `Signed_distance/pop_adjusted/`, mirroring the scripts). Three archived figures are **not** rebuilt here — `Waste_HDBSCAN_comparison.png`, `Hotspot_area_difference_gsvi_selfcollected.png` and `Mitigation_new_obs_stacked_bar.png` — because each exists only to set GSVI beside GSVI+self-collected. That comparison is [Step 6.4](#64-the-spatial-pattern-with-sc-4_pattern), which supersedes all three with `1_SC_hotspot_comparison.png`.
+25 figures across `HDBSCAN/`, `settlement/` and `Signed_distance/` (the pop-adjusted sensitivity figures sit under `Signed_distance/pop_adjusted/`, mirroring the scripts). Three archived figures are **not** rebuilt here — `Waste_HDBSCAN_comparison.png`, `Hotspot_area_difference_gsvi_selfcollected.png` and `Mitigation_new_obs_stacked_bar.png` — because each exists only to set GSVI beside GSVI+self-collected. That comparison is [Step 6.4a](#64a-hotspots-hdbscan), which supersedes all three with `1_SC_hotspot_comparison.png` and `2_SC_cluster_composition.png`.
 
 `Waste_HDBSCAN_gsvi.png` is also dropped: `Waste_HDBSCAN_context_gsvi.png` shows the same 24 clusters with the same numbering and parameters, plus settlement boundaries, named settlements and the Dandora landfill — the plain version added nothing. Its script `3_plot_hdbscan_map.R` is removed.
 
@@ -785,48 +785,108 @@ This is a fragility result, not a coverage result: because the surface is mostly
 
 ### 6.4 The spatial pattern with SC (`4_pattern/`)
 
-```bash
-# needs 2coverage_analysis/3sviwaste.py --arm gsvi_selfcollected
-python  6_selfcollected/4_pattern/1_sc_hdbscan.py
-Rscript 6_selfcollected/4_pattern/1plot_sc_hotspots.R
-python  6_selfcollected/4_pattern/2_sc_settlement_gam.py      # slow (~80k points, two GAMs)
-Rscript 6_selfcollected/4_pattern/2plot_sc_settlement_gam.R
+Mirrors Step 5's three blocks, so the two can be read side by side:
+
+```
+4_pattern/
+├── HDBSCAN/          hotspots + their settlement context
+├── settlement/       2×2 association, area-normalised density, observation-frame NNR
+└── Signed_distance/  observed rate by band + the year-adjusted GAM
 ```
 
-**6.4a Hotspots (`1_sc_hdbscan.py`)** — the same HDBSCAN (min_cluster_size 25, min_samples 6) on 2,696 vs 2,845 waste locations:
+```bash
+# needs 2coverage_analysis/3sviwaste.py --arm gsvi_selfcollected
+python  6_selfcollected/4_pattern/HDBSCAN/1_sc_hdbscan.py
+Rscript 6_selfcollected/4_pattern/HDBSCAN/1plot_sc_hotspots.R
+python  6_selfcollected/4_pattern/HDBSCAN/2_sc_cluster_settlement_context.py
+Rscript 6_selfcollected/4_pattern/HDBSCAN/2plot_sc_cluster_composition.R
+python  6_selfcollected/4_pattern/settlement/1_sc_settlement_association.py    # slow (999 permutations × 2)
+Rscript 6_selfcollected/4_pattern/settlement/1plot_sc_settlement.R
+python  6_selfcollected/4_pattern/Signed_distance/1_sc_signed_distance_gam.py  # slow (two GAMs on ~80k points)
+Rscript 6_selfcollected/4_pattern/Signed_distance/1plot_sc_gam.R
+```
+
+Every block re-derives the GSVI column rather than copying it from Step 5. That is deliberate: if the GSVI numbers do not reproduce Step 5 exactly, the comparison is not like for like. They do — 24 clusters, 22 of them touching a settlement, 13.3% / 3.0%, NNR 0.562, LRT 2,216.7, pseudo-R² 0.114.
+
+#### 6.4a Hotspots (`HDBSCAN/`)
+
+Same HDBSCAN (min_cluster_size 25, min_samples 6) on 2,696 vs 2,845 waste locations:
 
 | Metric | GSVI | GSVI + SC | Change |
 | --- | ---: | ---: | ---: |
 | Waste locations | 2,696 | 2,845 | +149 (+5.5%) |
 | Clustered locations | 1,929 | 2,194 | +265 (+13.7%) |
+| Noise locations | 767 | 651 | −116 (−15.1%) |
 | Number of hotspots | 24 | **18** | −6 (−25.0%) |
 | Total hotspot area (km²) | 72.451 | 88.281 | +15.831 (+21.9%) |
 
-The cluster count falls but **23 of the 24 GSVI hotspots are retained (95.8%)** and the footprint *grows* by 22% — neighbouring hotspots merge into larger ones rather than disappearing. Of the 149 added locations, **133 (89.3%) fall inside a hotspot GSVI had already drawn**; 16 fall outside, and they create exactly **1** new hotspot. Self-collection confirms the GSVI hotspot map; it does not redraw it.
+The cluster count falls but **23 of the 24 GSVI hotspots are retained (95.8%)** and the footprint *grows* 22% — neighbouring hotspots merge into larger ones rather than disappearing. Of the 149 added locations, **133 (89.3%) fall inside a hotspot GSVI had already drawn**; the 16 outside create exactly **1** new hotspot.
 
-**6.4b/c Settlement association and the GAM (`2_sc_settlement_gam.py`)** — both refitted on the combined frame (79,584 locations, 2,845 positive). SC imagery carries a capture year (ZWL 2023, Faith 2015–2016), so the year fixed effect survives; the combined frame simply gains 2015, 2016 and 2023 levels.
+**Are they still settlement hotspots?** (`2_sc_cluster_settlement_context.py`, same four proximity bins as Step 5a):
 
 | Measure | GSVI | GSVI + SC |
 | --- | --- | --- |
-| Waste-positive rate inside a settlement | 13.3% | 14.5% |
+| Clusters containing a location inside a settlement | 22 / 24 (92%) | 16 / 18 (89%) |
+| Clusters with a majority within 250 m | 17 / 24 (71%) | 12 / 18 (67%) |
+| Clusters with a majority within 500 m | 20 / 24 (83%) | 14 / 18 (78%) |
+| Clustered locations inside a settlement | 19.9% | 22.7% |
+| Clustered locations within 500 m | 71.9% | 74.6% |
+| Median distance to a settlement | 228 m | 192 m |
+
+The cluster-level shares dip a point or two because the denominator shrank from 24 to 18; the location-level shares all rise. Either way the hotspots stay settlement hotspots.
+
+**Figures:** `1_SC_hotspot_comparison.png` (both hull sets overlaid + where the added locations fall), `2_SC_cluster_composition.png` (one stacked bar per cluster, one panel per arm).
+
+#### 6.4b Settlement association (`settlement/`)
+
+All three of Step 5b's claims re-tested — the 2×2, the area-normalised density, and the observation-frame NNR null:
+
+| Measure | GSVI | GSVI + SC |
+| --- | --- | --- |
+| Waste-positive rate inside | 13.3% | 14.5% |
 | Waste-positive rate outside | 3.0% | **3.0%** |
 | Prevalence ratio | 4.43 | 4.86 |
 | Odds ratio (95% CI) | 4.95 (4.47–5.49) | 5.52 (5.01–6.08) |
-| GAM pseudo-R², year + s(distance) | 0.114 | 0.120 |
-| LRT vs year-only, χ² (df 7) | 2,216.7 | 2,475.5 |
+| Cramér's V | 0.121 | 0.137 |
+| Positive density inside (per km²) | 25.2 | 29.9 |
+| Positive density outside (per km²) | 3.3 | **3.3** |
+| Density ratio | 7.8× | 9.0× |
+| Observed mean 1-NN distance | 106.3 m | 101.0 m |
+| Observation-frame null mean 1-NN | 189.1 m | 182.5 m |
+| **Observation-frame NNR** | **0.562** | **0.554** |
+| NNR permutation p | 0.001 | 0.001 |
 
-The GSVI column reproduces Step 5 exactly, which is the check that the refit is the same model. The **rate outside settlements does not move at all**, the fitted curves lie close together, and the gradient stays overwhelmingly significant. The settlement association is not an artefact of where Street View drove.
+The NNR is the control that matters, because its null is redrawn from the frame that actually changed — 2,696 from 76,605 becomes 2,845 from 79,584. It moves by 0.008. Waste positives are clustered relative to where the platform could see, and adding imagery the platform never collected does not disturb that.
 
-One caveat belongs with the inside rate: SC imagery was collected near settlements *on purpose*, so part of the 13.3% → 14.5% rise is by construction rather than discovery. The unchanged outside rate is the cleaner evidence.
+**Figure:** `1_SC_settlement_comparison.png` — (a) rate by zone with Wilson CI, (b) positives per km², (c) observed vs null 1-NN distance.
 
-**Figures** (`Figure/6_selfcollected/4_pattern/`):
+#### 6.4c Signed-distance GAM (`Signed_distance/`)
 
-| Figure | Script | Shows |
+`logit P(waste) = α + s(signed distance) + year FE`, identical spline specification on both arms. SC imagery carries a capture year (ZWL 2023, Faith 2015–2016), so the year FE survives; the combined frame gains 2015, 2016 and 2023 levels.
+
+| Measure | GSVI | GSVI + SC |
 | --- | --- | --- |
-| `1_SC_hotspot_comparison.png` | `1plot_sc_hotspots.R` | (a) both hull sets overlaid, (b) where the added locations fall |
-| `2_SC_settlement_gam_comparison.png` | `2plot_sc_settlement_gam.R` | (a) rate by zone with Wilson CI, (b) both GAM curves |
+| Observation locations | 76,605 | 79,584 |
+| LRT vs year-only, χ² (df 7) | 2,216.7 | 2,475.5 |
+| Pseudo-R², year only | 0.019 | 0.019 |
+| Pseudo-R², year + s(distance) | 0.114 | 0.120 |
+| AIC, year + s(distance) | 20,712 | 21,630 |
 
-**Outputs:** `1_Nairobi_sc_{hdbscan,hotspots}_{gsvi,gsvi_selfcollected}_32737.gpkg`, `1_sc_hdbscan_new_locations.csv`, `2_Nairobi_sc_gam_{frame,curve}.csv`, `2_sc_settlement_contingency.csv`, `thesis_table/table_6_4_{hdbscan,settlement,gam}_comparison.csv`
+The model-free version is the more persuasive one — the observed rate by band, on both arms:
+
+| Distance to nearest settlement | GSVI | GSVI + SC |
+| --- | ---: | ---: |
+| Inside a settlement | 13.3% | **14.5%** |
+| 0–250 m | 7.8% | 7.9% |
+| 250–500 m | 5.3% | 5.2% |
+| 500–1,000 m | 3.5% | 3.4% |
+| 1,000–2,000 m | 1.6% | 1.5% |
+| 2,000–5,000 m | 0.8% | 0.8% |
+| >5,000 m | 0.3% | 0.3% |
+
+**Every band outside the settlement boundary is unchanged to within 0.1 pp.** Only the inside-settlement bar moves — and it moves partly by construction, since self-collected imagery was gathered near settlements on purpose. The unchanged outside bands are the cleaner evidence that the gradient is not an artefact of where Street View drove.
+
+**Figure:** `1_SC_gam_comparison.png` — (a) observed rate by band, both arms, (b) both fitted curves.
 
 ---
 

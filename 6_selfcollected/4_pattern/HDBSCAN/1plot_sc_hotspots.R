@@ -8,7 +8,7 @@
 # platform already drew, self-collection confirms the GSVI picture rather than
 # correcting it.
 #
-# Inputs (6_selfcollected/4_pattern/, from 1_sc_hdbscan.py):
+# Inputs (6_selfcollected/4_pattern/HDBSCAN/, from 1_sc_hdbscan.py):
 #   1_Nairobi_sc_hotspots_{gsvi,gsvi_selfcollected}_32737.gpkg
 #   1_Nairobi_sc_hdbscan_{gsvi,gsvi_selfcollected}_32737.gpkg
 #   1_sc_hdbscan_new_locations.csv
@@ -25,12 +25,12 @@ suppressPackageStartupMessages({
 args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
-source(file.path(script_dir, "../..", "R", "chapter_paths.R"))
-source(file.path(script_dir, "../..", "R", "chapter_colours.R"))
+source(file.path(script_dir, "../../..", "R", "chapter_paths.R"))
+source(file.path(script_dir, "../../..", "R", "chapter_colours.R"))
 
-DATA_DIR <- file.path(chapter_data_root, "6_selfcollected", "4_pattern")
+DATA_DIR <- file.path(chapter_data_root, "6_selfcollected", "4_pattern", "HDBSCAN")
 PREP_DIR <- file.path(chapter_data_root, "1prepare_chapter_data")
-FIG_DIR <- file.path(script_dir, "../..", "Figure", "6_selfcollected", "4_pattern")
+FIG_DIR <- file.path(script_dir, "../../..", "Figure", "6_selfcollected", "4_pattern", "HDBSCAN")
 
 HULLS_GSVI <- file.path(DATA_DIR, "1_Nairobi_sc_hotspots_gsvi_32737.gpkg")
 HULLS_GSC <- file.path(DATA_DIR, "1_Nairobi_sc_hotspots_gsvi_selfcollected_32737.gpkg")
@@ -46,7 +46,7 @@ OUTSIDE_COLOUR <- "#6B4226"
 
 for (f in c(HULLS_GSVI, HULLS_GSC, PTS_GSC, NEW_OBS_CSV, COMPARISON_CSV)) {
   if (!file.exists(f)) {
-    stop("Missing ", f, " — run 6_selfcollected/4_pattern/1_sc_hdbscan.py first")
+    stop("Missing ", f, " — run 6_selfcollected/4_pattern/HDBSCAN/1_sc_hdbscan.py first")
   }
 }
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
