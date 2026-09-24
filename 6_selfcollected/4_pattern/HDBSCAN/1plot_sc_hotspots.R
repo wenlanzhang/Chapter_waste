@@ -47,8 +47,10 @@ COMPARISON_CSV <- file.path(DATA_DIR, "thesis_table", "table_6_4_hdbscan_compari
 STABILITY_CSV <- file.path(DATA_DIR, "thesis_table", "table_6_4_hdbscan_stability.csv")
 OUT_PATH <- file.path(FIG_DIR, "1_SC_hotspot_comparison.png")
 
-GSVI_HULL <- "#C9A27F"
-GSC_HULL <- "#6B4226"
+MERGED_COLOUR <- "#6B4226"     # GSVI hotspots that collapsed into one
+PRESERVED_COLOUR <- "#C9A27F"  # GSVI hotspots that survived one-to-one
+COMBINED_EDGE <- "#2F4A33"     # the GSVI + SC footprint, drawn as an outline
+SC_POINT <- "#496142"
 
 for (f in c(HULLS_GSVI, HULLS_GSC, PTS_GSC, TRANSITIONS_CSV, NEW_OBS_CSV,
             COMPARISON_CSV, STABILITY_CSV)) {
@@ -72,33 +74,46 @@ get_stat <- function(measure) stability$Value[stability$Measure == measure]
 parse_count <- function(x) as.integer(gsub(",", "", sub("^([0-9,]+).*", "\\1", x)))
 
 # --- (a) the two hotspot footprints ------------------------------------------
+# GSVI hulls are filled by what became of their cluster label, so the map tells
+# the same story as panel (b): the eight that collapse into one are the whole of
+# the 24 -> 18 drop. The combined footprint is an outline over the top.
 sc_pts <- pts_gsc |> filter(location_kind == "self_collected")
+hulls_gsvi <- hulls_gsvi |>
+  mutate(fate = factor(fate, levels = c("Preserved one-to-one", "Merged with other hotspots")))
+n_merged <- sum(hulls_gsvi$fate == "Merged with other hotspots")
+n_preserved <- sum(hulls_gsvi$fate == "Preserved one-to-one")
 
 p_map <- ggplot() +
-  geom_sf(data = boundary, fill = "white", colour = "grey55", linewidth = 0.4) +
-  geom_sf(data = slums, fill = SLUM_FILL, colour = NA, alpha = 0.30) +
-  geom_sf(data = hulls_gsvi, aes(fill = "GSVI hotspots", colour = "GSVI hotspots"),
-          alpha = 0.40, linewidth = 0.3) +
-  geom_sf(data = hulls_gsc, aes(colour = "GSVI + SC hotspots"), fill = NA, linewidth = 0.55) +
-  geom_sf(data = sc_pts, aes(colour = "Self-collected waste location"), size = 0.6, alpha = 0.85) +
-  scale_fill_manual(name = NULL, values = c("GSVI hotspots" = GSVI_HULL), guide = "none") +
+  geom_sf(data = boundary, fill = "white", colour = "grey60", linewidth = 0.4) +
+  geom_sf(data = slums, fill = "grey86", colour = NA) +
+  geom_sf(data = hulls_gsvi, aes(fill = fate), colour = NA, alpha = 0.85) +
+  geom_sf(data = hulls_gsc, aes(colour = "GSVI + SC footprint"),
+          fill = NA, linewidth = 0.5, linetype = "42") +
+  geom_sf(data = sc_pts, aes(colour = "Self-collected waste location"),
+          size = 0.7, alpha = 0.9) +
+  scale_fill_manual(
+    name = NULL,
+    values = c("Preserved one-to-one" = PRESERVED_COLOUR,
+               "Merged with other hotspots" = MERGED_COLOUR),
+    labels = c(sprintf("GSVI hotspot, preserved one-to-one (%d)", n_preserved),
+               sprintf("GSVI hotspot, merged into one (%d)", n_merged))
+  ) +
   scale_colour_manual(name = NULL, values = c(
-    "GSVI hotspots" = GSVI_HULL,
-    "GSVI + SC hotspots" = GSC_HULL,
-    "Self-collected waste location" = "#cb181d"
-  ), breaks = c("GSVI hotspots", "GSVI + SC hotspots", "Self-collected waste location")) +
-  guides(colour = guide_legend(override.aes = list(
-    linetype = c("solid", "solid", "blank"),
-    shape = c(NA, NA, 16), size = c(0.6, 0.9, 2.2), fill = NA
-  ))) +
+    "GSVI + SC footprint" = COMBINED_EDGE,
+    "Self-collected waste location" = SC_POINT
+  )) +
+  guides(
+    fill = guide_legend(order = 1, override.aes = list(colour = NA)),
+    colour = guide_legend(order = 2, override.aes = list(
+      linetype = c("42", "blank"), shape = c(NA, 16), size = c(0.6, 2.2), fill = NA
+    ))
+  ) +
   coord_sf(datum = NA, expand = FALSE) +
   labs(
     title = "(a) Hotspot footprints, both arms",
     subtitle = sprintf(
-      "%s → %s clusters | area %s → %s km² (shown for scale; no result depends on the hull)",
-      get_metric("Number of hotspots", "GSVI"), get_metric("Number of hotspots", "GSVI + SC"),
-      get_metric("Total hotspot area (km²)", "GSVI"),
-      get_metric("Total hotspot area (km²)", "GSVI + SC")
+      "%s → %s clusters | grey = mapped settlements | hulls shown for scale, no result depends on them",
+      get_metric("Number of hotspots", "GSVI"), get_metric("Number of hotspots", "GSVI + SC")
     )
   ) +
   theme_void(base_size = 11) +
@@ -106,7 +121,10 @@ p_map <- ggplot() +
     plot.title = element_text(face = "bold", size = 11.5, colour = CHAPTER_TITLE_COLOUR),
     plot.subtitle = element_text(size = 8.2, colour = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 6)),
     legend.position = "bottom",
-    legend.text = element_text(size = 8.4, colour = CHAPTER_AXIS_COLOUR),
+    legend.box = "vertical",
+    legend.spacing.y = unit(0.02, "cm"),
+    legend.margin = margin(t = 2, b = 0),
+    legend.text = element_text(size = 8.2, colour = CHAPTER_AXIS_COLOUR),
     legend.key = element_blank()
   )
 
@@ -132,7 +150,7 @@ p_trans <- ggplot(trans, aes(to, from)) +
   geom_tile(aes(fill = ifelse(n == 0, NA_real_, n)), colour = "white", linewidth = 0.4) +
   geom_text(data = filter(trans, n > 0), aes(label = n, colour = n > 120),
             size = 2.3, fontface = "bold", show.legend = FALSE) +
-  scale_fill_gradient(name = "Locations", low = "#EFE6DC", high = "#4D2D18",
+  scale_fill_gradient(name = "Locations", low = "#F2EBE3", high = "#4D2D18",
                       na.value = "#FBF9F7", labels = comma) +
   scale_colour_manual(values = c("FALSE" = "#4D2D18", "TRUE" = "white")) +
   scale_x_discrete(position = "top", expand = expansion(0)) +
@@ -188,8 +206,8 @@ p_bar <- ggplot(split_df, aes(x = n, y = "added", fill = segment)) +
             size = 3.1, fontface = "bold", colour = "white") +
   scale_fill_manual(name = NULL, values = c(
     "Joined an existing hotspot" = "#C9A27F",
-    "Formed a new hotspot" = "#cb181d",
-    "Did not cluster" = "#8C8078"
+    "Formed a new hotspot" = "#496142",
+    "Did not cluster" = "#BDB3A8"
   ), breaks = c("Joined an existing hotspot", "Formed a new hotspot", "Did not cluster")) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.02)), breaks = pretty_breaks(n = 4)) +
   labs(

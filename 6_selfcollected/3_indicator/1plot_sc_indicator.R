@@ -39,8 +39,9 @@ CELLS_GPKG <- file.path(DATA_DIR, "1_Nairobi_sc_indicator_grid100m_32737.gpkg")
 PROVENANCE_CSV <- file.path(DATA_DIR, "1_sc_indicator_provenance.csv")
 OUT_PATH <- file.path(FIG_DIR, "1_SC_indicator_effect.png")
 
-UP_COLOUR <- "#cb181d"
-DOWN_COLOUR <- "#4575b4"
+# Chapter palette: brown = moved up (more waste), green = moved down.
+UP_COLOUR <- "#6B4226"
+DOWN_COLOUR <- "#496142"
 UNCHANGED_COLOUR <- "#EDE7E0"
 CLASS_LEVELS <- c("Low", "Medium", "High")
 
@@ -77,7 +78,7 @@ changed_pts <- st_centroid(changed) |>
 
 p_map <- ggplot() +
   geom_sf(data = boundary, fill = "white", colour = "grey55", linewidth = 0.4) +
-  geom_sf(data = slums, fill = SLUM_FILL, colour = SLUM_EDGE, linewidth = 0.12, alpha = 0.38) +
+  geom_sf(data = slums, fill = "grey86", colour = NA) +
   geom_sf(data = changed_pts, aes(colour = direction), size = 1.25, alpha = 0.9) +
   scale_colour_manual(
     name = NULL,
@@ -90,7 +91,7 @@ p_map <- ggplot() +
   labs(
     title = "(a) Where the changed cells are",
     subtitle = sprintf(
-      "All %s cells that changed class | green = mapped settlements",
+      "All %s cells that changed class | grey = mapped settlements",
       comma(n_changed)
     )
   ) +

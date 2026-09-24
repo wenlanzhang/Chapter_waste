@@ -187,6 +187,35 @@ def transition_matrix(paired: pd.DataFrame) -> pd.DataFrame:
     return ct
 
 
+def cluster_fates(paired: pd.DataFrame) -> pd.DataFrame:
+    """Per GSVI cluster: which combined cluster took its locations, and was it a merge?
+
+    Written onto the GSVI hull layer so the map can show the merge directly
+    instead of leaving it to the transition matrix alone.
+    """
+    clustered = paired[paired["cluster_gsvi"] != -1]
+    dest = clustered.groupby("cluster_gsvi")["cluster_gsc"].agg(
+        lambda s: s.value_counts().idxmax()
+    )
+    purity = clustered.groupby("cluster_gsvi")["cluster_gsc"].agg(
+        lambda s: s.value_counts().iloc[0] / len(s)
+    )
+    absorbed = dest[dest != -1].value_counts()
+    merged_dests = set(absorbed[absorbed > 1].index)
+    return pd.DataFrame(
+        {
+            "HDB_cluster": dest.index.astype(int),
+            "dest_cluster": dest.to_numpy(),
+            "dest_purity": purity.to_numpy(),
+            "fate": [
+                "Dissolved into noise" if d == -1
+                else ("Merged with other hotspots" if d in merged_dests else "Preserved one-to-one")
+                for d in dest.to_numpy()
+            ],
+        }
+    )
+
+
 def merge_summary(paired: pd.DataFrame) -> dict:
     """How the 24 GSVI clusters map onto the combined ones."""
     clustered = paired[(paired["cluster_gsvi"] != -1)]
@@ -289,6 +318,13 @@ def main() -> None:
     paired = paired_labels(gsvi["points"], combined["points"])
     scores = agreement_scores(paired)
     merges = merge_summary(paired)
+    fates = cluster_fates(paired)
+    hulls = gsvi["hulls"].merge(fates, on="HDB_cluster", how="left")
+    hulls["fate"] = hulls["fate"].fillna("Preserved one-to-one")
+    hulls.to_file(hotspots_gpkg("gsvi"), driver="GPKG")
+    print(f"\nGSVI hull fates written to {hotspots_gpkg('gsvi').name}:")
+    print(hulls["fate"].value_counts().to_string())
+
     ct = transition_matrix(paired)
     print(f"\nGSVI cluster (rows) x combined cluster (columns), shared locations:")
     print(ct.to_string())
