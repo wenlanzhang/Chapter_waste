@@ -13,6 +13,11 @@
 # a changed cell can take. The last two rows point opposite ways, and that is
 # the finding.
 #
+# Hue carries direction; opacity carries how much weight the row can bear.
+# Sample sizes here run from 2,286 down to 14, so the largest effect in the
+# figure sits on the thinnest evidence — the faded arrow says so without a
+# footnote.
+#
 # Inputs (6_selfcollected/3_indicator/, from 2_sc_validation.py):
 #   2_sc_validation_detail.csv
 
@@ -40,6 +45,12 @@ BETTER <- "#6B4226"
 WORSE <- "#496142"
 FLAT <- "#9E9689"
 FLAT_PP <- 1.0   # a change smaller than this is called flat, not better or worse
+
+# Opacity = how much weight a row can bear. Deliberately not row order: the
+# subsets run 2,286 / 133 / 14 / 100, so the eye would otherwise give the
+# 14-cell row the same standing as the 2,286-cell one.
+STRENGTH_LEVELS <- c("1,000+ cells", "100–999 cells", "under 100 cells")
+STRENGTH_ALPHA <- c("1,000+ cells" = 1.0, "100–999 cells" = 0.62, "under 100 cells" = 0.34)
 
 if (!file.exists(DETAIL_CSV)) {
   stop("Missing ", DETAIL_CSV, " — run 6_selfcollected/3_indicator/2_sc_validation.py first")
@@ -77,19 +88,29 @@ arrows <- detail |>
     verdict = factor(verdict, levels = c("Agreement improves", "No meaningful change",
                                          "Agreement worsens")),
     label = factor(vapply(subset, row_label, character(1)), levels = LEVELS),
-    measure = factor(measure, levels = c("Binary", "Three-class"))
+    measure = factor(measure, levels = c("Binary", "Three-class")),
+    n_cells = vapply(subset, n_of, numeric(1)),
+    strength = factor(
+      case_when(n_cells >= 1000 ~ STRENGTH_LEVELS[1],
+                n_cells >= 100 ~ STRENGTH_LEVELS[2],
+                TRUE ~ STRENGTH_LEVELS[3]),
+      levels = STRENGTH_LEVELS
+    )
   )
 
 fig <- ggplot(arrows, aes(y = label)) +
-  geom_segment(aes(x = before, xend = after, yend = label, colour = verdict),
+  geom_segment(aes(x = before, xend = after, yend = label, colour = verdict, alpha = strength),
                linewidth = 1.4,
                arrow = arrow(length = unit(0.2, "cm"), type = "closed")) +
-  geom_point(aes(x = before), colour = BEFORE, size = 3.2) +
+  geom_point(aes(x = before, alpha = strength), colour = BEFORE, size = 3.2,
+             show.legend = FALSE) +
   geom_point(aes(x = before), colour = "white", size = 1.4) +
-  geom_text(aes(x = pmin(before, after) - 3, label = sprintf("%.0f", before)),
-            hjust = 1, size = 2.9, colour = "grey45") +
+  geom_text(aes(x = pmin(before, after) - 3, label = sprintf("%.0f", before),
+                alpha = strength),
+            hjust = 1, size = 2.9, colour = "grey45", show.legend = FALSE) +
   geom_text(aes(x = pmax(before, after) + 3,
-                label = sprintf("%.0f  (%+.0f pp)", after, delta), colour = verdict),
+                label = sprintf("%.0f  (%+.0f pp)", after, delta),
+                colour = verdict, alpha = strength),
             hjust = 0, size = 2.9, fontface = "bold", show.legend = FALSE) +
   facet_wrap(~measure, ncol = 2) +
   scale_colour_manual(name = NULL, values = c(
@@ -97,19 +118,25 @@ fig <- ggplot(arrows, aes(y = label)) +
     "No meaningful change" = FLAT,
     "Agreement worsens" = WORSE
   ), drop = FALSE) +
+  scale_alpha_manual(name = "Cells behind the row", values = STRENGTH_ALPHA, drop = FALSE) +
+  guides(
+    colour = guide_legend(order = 1, override.aes = list(alpha = 1)),
+    alpha = guide_legend(order = 2, override.aes = list(colour = "#4D2D18", linewidth = 1.4))
+  ) +
   scale_x_continuous(limits = c(-16, 126), breaks = seq(0, 100, 25),
                      labels = label_percent(scale = 1)) +
   labs(
     title = "Does self-collected imagery make the 100 m indicator more accurate?",
     subtitle = paste0(
-      "Agreement with the IDEAMaps crowd validation | grey dot = GSVI, arrowhead = GSVI + SC\n",
-      "Only where field collection actually reached a cell does the indicator get better."
+      "Agreement with the IDEAMaps crowd validation | grey dot = GSVI, arrowhead = GSVI + SC | faded = fewer cells behind the row\n",
+      "Only where field collection actually reached a cell does the indicator get better — and the largest effect rests on the fewest cells."
     ),
     x = "Agreement with the crowd labels", y = NULL,
     caption = paste0(
       "2,286 crowd-validated 100 m cells. A changed cell is one whose published class differs between the arms; it either received an image or moved through the spatial fill.\n",
       "Changed cells with imagery behind them: three-class agreement 0% → 86%, McNemar p = 0.039. Changed cells moved by interpolation alone: 52% → 20%, p = 0.864.\n",
-      "Subset sizes are small and this concerns a 1% increase in imagery — directional evidence, not a powered test. Precision, recall, κ and the confusion matrices are in table_6_3_validation_comparison.csv."
+      "Opacity tracks sample size, not row order: the 14-cell row carries the biggest arrow and the least weight, and its κ is undefined because its crowd labels are constant.\n",
+      "This concerns a 1% increase in imagery — directional evidence, not a powered test. Precision, recall, κ and the confusion matrices are in table_6_3_validation_comparison.csv."
     )
   ) +
   theme_minimal(base_size = 11) +
@@ -127,7 +154,8 @@ fig <- ggplot(arrows, aes(y = label)) +
     panel.grid.major.y = element_blank(),
     panel.spacing.x = unit(1.4, "lines"),
     legend.position = "bottom",
-    legend.text = element_text(size = 9)
+    legend.title = element_text(size = 8.6, colour = CHAPTER_AXIS_COLOUR),
+    legend.text = element_text(size = 8.6)
   )
 
 ggsave(OUT_PATH, fig, width = 12.5, height = 5.2, dpi = 400, bg = "white")
