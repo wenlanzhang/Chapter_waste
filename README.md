@@ -32,6 +32,7 @@ Chapter_waste/
 │   ├── settlement/             association, NNR null, temporal robustness
 │   └── Signed_distance/        GAM (+ pop_adjusted/ sensitivity)
 ├── 6_selfcollected/
+│   ├── 0_mitigation_summary.py the pipeline-wide anchor table (run last)
 │   ├── 1_sources/              what SC imagery is and what coverage it adds
 │   ├── 2_identification/       SC in the YOLO training mix (plots only)
 │   ├── 3_indicator/            the 100 m surface, rebuilt with SC
@@ -684,6 +685,32 @@ Steps 2–5 run on GSVI. Faith/ and ZWL/ imagery was collected by hand where Str
 
 **The short answer, across all four: no conclusion in Steps 3–5 depends on the self-collected imagery.** What SC does change is worth stating precisely, and each sub-step does.
 
+### The section anchor (`0_mitigation_summary.py`)
+
+One table across the whole representation pipeline, assembled from the sub-steps' own outputs — `thesis_table/table_6_0_mitigation_summary.csv`. Run it last.
+
+| Stage | Metric | GSVI baseline | GSVI + SC | Change |
+| --- | --- | --- | --- | --- |
+| Observation | Directly observed 100 m cells | 22,725 (32.5%) | 22,852 (32.7%) | +127 (+0.2 pp) |
+| Observation | Cells >500 m from an observation | 13,149 (18.8%) | 12,855 (18.4%) | −294 (−0.4 pp) |
+| Measurement | Recall on self-collected imagery | 98.2% | 100.0% | +1.8 pp |
+| Measurement | Recall gap (GSVI − SC) | −3.7 pp | −5.6 pp | **no gap at any mix** |
+| Measurement | mAP@0.50 on self-collected imagery | 0.160 | 0.313 | **+96%** |
+| Measurement | mAP@0.50 gap | +0.231 | +0.138 | 40% of the gap closed |
+| Indicator | Direct share of represented cells | 33.2% | 33.4% | +0.2 pp |
+| Indicator | Cells beyond interpolation support | 1,594 | 1,594 | 0 |
+| Indicator | Cells classified High | 933 (1.3%) | 1,423 (2.0%) | +490 |
+| Indicator | Cells changing published class | — | 670 (1.0%) | — |
+| Indicator | …changed without receiving an image | — | 604 (90.1%) | — |
+| Indicator | Crowd agreement, changed cells **with** an image | 0.0% | 85.7% | +85.7 pp |
+| Indicator | Crowd agreement, changed cells **interpolated** | 52.0% | 20.0% | −32.0 pp |
+| Pattern | Waste hotspots (HDBSCAN) | 24 | 18 | −6; label ARI 0.573 |
+| Pattern | Waste-positive rate outside settlements | 3.0% | 3.0% | unchanged |
+| Pattern | Observation-frame NNR | 0.562 | 0.554 | −0.008 |
+| Pattern | Signed-distance GAM pseudo-R² | 0.114 | 0.120 | +0.006 |
+
+Read down the Change column: **measurement is the only stage where supplementary local observation moves anything substantially.** Coverage gains 0.2 pp, the indicator's evidential basis gains 0.2 pp, and the spatial conclusions do not move at all.
+
 ### 6.1 What the self-collected imagery is (`1_sources/`)
 
 **Script:** `1_sc_coverage.py` — recomputes direct 100 m observation twice, GSVI alone and GSVI + SC, and reports the difference. Self-collected images carry no panoid, so each image is its own observation location (`lib.arms.observation_key`).
@@ -737,6 +764,8 @@ So the added cells are 6× more likely to sit inside a settlement than the city 
 # needs 3_waste_identification/1_heldout_metrics.py to have run
 Rscript 6_selfcollected/2_identification/1plot_sc_sensitivity.R
 Rscript 6_selfcollected/2_identification/2plot_stage_comparison.R
+python  6_selfcollected/2_identification/3_sc_domain_transfer.py
+Rscript 6_selfcollected/2_identification/3plot_sc_domain_transfer.R
 ```
 
 | Figure | Script | Shows |
@@ -747,6 +776,26 @@ Rscript 6_selfcollected/2_identification/2plot_stage_comparison.R
 These replace the archived Step 7 `Heldout_validation_binary_*` charts, which had a second panel for a self-collected held-out set; that panel is dropped, so the GSVI set is the whole figure. Adding or removing a scenario needs no edit to either script — levels, labels, fills, x-axis breaks, the detector count and the replicate note are all derived from the input table.
 
 The numbers are in Step 3: SC in the training set buys **precision** (false positives 39 → 30, mAP@0.50 +6 pp) with recall flat, and the VLM cascade largely substitutes for it — the post-cascade curves are nearly flat across the five mixes.
+
+#### Does the detector transfer to locally collected imagery? (`3_sc_domain_transfer.py`)
+
+The above scores every detector on the **GSVI** held-out set. The mitigation argument needs the complementary question: how does the same detector do on **self-collected** imagery, and does SC training close the gap? Two independent held-out sets, same five detectors:
+
+| SC in training | Recall GSVI | Recall SC | Recall gap | mAP@0.50 GSVI | mAP@0.50 SC | mAP gap |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0% | 94.4% | 98.2% | −3.7 pp | 0.391 | 0.160 | +0.231 |
+| 25% | 97.8% | 98.2% | −0.4 pp | 0.400 | 0.185 | +0.214 |
+| 50% | 94.4% | 100.0% | −5.6 pp | 0.405 | 0.260 | +0.146 |
+| 75% | 96.7% | 96.4% | +0.3 pp | 0.398 | 0.281 | +0.117 |
+| 100% | 94.4% | 100.0% | −5.6 pp | 0.450 | 0.313 | +0.138 |
+
+**There is no recall gap to close.** Recall on self-collected imagery is at or above GSVI at every training mix, with no SC training data at all. The domain gap is in **localisation quality**: mAP@0.50 is 0.391 against 0.160 at 0% SC, and adding SC training raises the SC figure to 0.313 (+96%), closing **40%** of the gap — while GSVI performance is unharmed (0.391 → 0.450).
+
+So the mitigation claim this supports is not "recall increased" but **supplementary local training data reduced source-specific localisation loss**. That is narrower than the recall framing and better evidenced.
+
+The two sets differ in size and composition (180 images, 90/90 vs 107 images, 55/52), so the *levels* are not directly comparable across domains; the *trends* across training mixes are. This is the n = 107 self-collected held-out set that was dropped from the Step 3 figures — it belongs here, where the cross-domain question is being asked, not there.
+
+**Figure:** `3_SC_domain_transfer.png` — (a) recall on both sets, (b) mAP@0.50 on both sets, (c) the gap itself.
 
 ### 6.3 The 100 m indicator with SC (`3_indicator/`)
 
@@ -776,6 +825,8 @@ Two effects are separated. **Coverage** — cells that gain direct evidence — 
 | Low | 65,083 (93.1%) | 64,976 (92.9%) | −107 |
 | Medium | 3,927 (5.6%) | 3,544 (5.1%) | −383 |
 | High | 933 (1.3%) | **1,423 (2.0%)** | **+490 (+53%)** |
+
+The continuous values tell the same story from the other side: **97.7% of all cells shift** (Empirical Bayes and the spatial fill are global, so any new data retunes everything), but the median shift is **0.00058** and only **338 cells (0.5%)** move by more than the lower Jenks break. The surface is perturbed everywhere and meaningfully almost nowhere.
 
 Only **66 of the 670** changed cells (9.9%) actually received an image; the other **604 (90.1%) changed through the spatial fill alone**. The changed cells sit overwhelmingly near settlements (19.1% inside one against 2.8% grid-wide; median 183 m against 2,011 m).
 

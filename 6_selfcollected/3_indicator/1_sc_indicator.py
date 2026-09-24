@@ -180,6 +180,12 @@ def table_class_change(cells: pd.DataFrame) -> pd.DataFrame:
     return ct
 
 
+# A cell's continuous value has "meaningfully" changed when the shift in its
+# final waste ratio exceeds this. Set at the lower Jenks break, so it is the
+# smallest change that could move a cell between published classes.
+MEANINGFUL_RATIO_SHIFT = 0.0222
+
+
 def table_changed_cells(cells: pd.DataFrame) -> pd.DataFrame:
     """Where the cells that changed class are, and whether they got imagery."""
     changed = cells[cells["class_change"] != 0]
@@ -191,7 +197,16 @@ def table_changed_cells(cells: pd.DataFrame) -> pd.DataFrame:
 
     direct_changed = changed[changed["received_sc"] == 1]
     knock_on = changed[changed["received_sc"] == 0]
+    moved = cells["ratio_change"].abs()
+    n_any = int((moved > 0).sum())
+    n_meaningful = int((moved > MEANINGFUL_RATIO_SHIFT).sum())
     rows = [
+        ("Cells whose continuous value changes at all",
+         f"{fmt_int(n_any)} ({fmt_pct(100 * n_any / n)} of grid)"),
+        (f"Cells whose continuous value shifts >{MEANINGFUL_RATIO_SHIFT:.4f}",
+         f"{fmt_int(n_meaningful)} ({fmt_pct(100 * n_meaningful / n)} of grid)"),
+        ("Median absolute shift among cells that move",
+         f"{moved[moved > 0].median():.5f}" if n_any else "—"),
         ("Cells changing published class", f"{fmt_int(len(changed))} ({fmt_pct(100 * len(changed) / n)} of grid)"),
         ("  moving up (Low→Medium, Medium→High)", fmt_int(int((changed["class_change"] > 0).sum()))),
         ("  moving down", fmt_int(int((changed["class_change"] < 0).sum()))),
