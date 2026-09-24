@@ -17,7 +17,7 @@ import pandas as pd
 from shapely.ops import unary_union
 
 from chapter_paths import coverage_dir, pattern_dir, phd_data_root, prep_dir, waste_raw_dir
-from lib.arms import ARMS, SELF_SOURCES
+from lib.arms import ARMS, SELF_SOURCES, observation_key
 
 DATA_ROOT = phd_data_root()
 CHAPTER_DIR = DATA_ROOT / "Chapter_waste"
@@ -117,6 +117,57 @@ def signed_distance_to_slums(
     inside = dist_to_poly <= 1e-6
     signed = np.where(inside, -dist_to_boundary, dist_to_poly)
     return signed.astype(float)
+
+
+# ---------------------------------------------------------------------------
+# Combined arm (Step 6): GSVI panoramas + self-collected images in one frame
+# ---------------------------------------------------------------------------
+SVIWASTE_COMBINED_GPKG = COVERAGE_DIR / ARMS["gsvi_selfcollected"].filename(
+    "3_Nairobi_sviwaste_points"
+)
+
+
+def load_combined_sviwaste_points() -> gpd.GeoDataFrame:
+    """All 79,584 observation locations with waste_positive (Step 2c, second arm).
+
+    Produced by ``python 2coverage_analysis/3sviwaste.py --arm gsvi_selfcollected``.
+    The sampling unit is ``obs_key``: a GSVI panoid, or ``img:<img_name>`` for a
+    self-collected image, which carries no panoid (lib.arms.observation_key).
+    """
+    if not SVIWASTE_COMBINED_GPKG.exists():
+        raise FileNotFoundError(
+            f"Missing {SVIWASTE_COMBINED_GPKG.name}; run "
+            "python 2coverage_analysis/3sviwaste.py --arm gsvi_selfcollected first."
+        )
+    return _ensure_32737(gpd.read_file(SVIWASTE_COMBINED_GPKG))
+
+
+def load_combined_year_map() -> pd.Series:
+    """Capture year per observation key, GSVI and self-collected alike.
+
+    Self-collected imagery does carry a year (ZWL 2023, Faith 2015-2016), so the
+    year fixed effect stays available on the combined frame; it simply gains a
+    2023 level that the GSVI arm does not have.
+    """
+    df = pd.read_csv(
+        SVI_CSV, usecols=["panoid", "year", "img_dir", "img_name"], low_memory=False
+    )
+    keys = observation_key(df)
+    years = pd.to_numeric(df["year"], errors="coerce")
+    out = pd.DataFrame({"obs_key": keys, "year": years}).dropna(subset=["obs_key"])
+    out = out.drop_duplicates(subset=["obs_key"], keep="first")
+    return pd.Series(out["year"].to_numpy(), index=out["obs_key"].to_numpy(), name="year")
+
+
+def enrich_combined_frame(
+    points: gpd.GeoDataFrame | None = None,
+) -> gpd.GeoDataFrame:
+    """One row per observation location with waste_positive, year and source."""
+    out = (points if points is not None else load_combined_sviwaste_points()).copy()
+    out["obs_key"] = out["obs_key"].astype(str)
+    out["year"] = out["obs_key"].map(load_combined_year_map())
+    out["is_self_collected"] = out["source"].isin(SELF_SOURCES).astype(int)
+    return out
 
 
 def load_gsvi_waste_panoids(sviwaste: gpd.GeoDataFrame | None = None) -> gpd.GeoDataFrame:

@@ -33,7 +33,9 @@ Chapter_waste/
 │   └── Signed_distance/        GAM (+ pop_adjusted/ sensitivity)
 ├── 6_selfcollected/
 │   ├── 1_sources/              what SC imagery is and what coverage it adds
-│   └── 2_identification/       SC in the YOLO training mix (plots only)
+│   ├── 2_identification/       SC in the YOLO training mix (plots only)
+│   ├── 3_indicator/            the 100 m surface, rebuilt with SC
+│   └── 4_pattern/              hotspots, settlement association, GAM, with SC
 │
 ├── Figure/<step>/              outputs, numbered by the block that produces them
 ├── drafts/                     scratch analyses kept out of the pipeline
@@ -661,7 +663,7 @@ Or `snakemake all`, which resolves the same order.
 
 ### Figures (`Figure/5_spatial_pattern/`)
 
-25 figures across `HDBSCAN/`, `settlement/` and `Signed_distance/` (the pop-adjusted sensitivity figures sit under `Signed_distance/pop_adjusted/`, mirroring the scripts). Three archived figures are **not** rebuilt here — `Waste_HDBSCAN_comparison.png`, `Hotspot_area_difference_gsvi_selfcollected.png` and `Mitigation_new_obs_stacked_bar.png` — because each exists only to set GSVI beside GSVI+self-collected. That comparison is Step 6's job, so those scripts are being restored there rather than here; until then they stay in `archive/2026-09-21/5_spatial_pattern/HDBSCAN/`.
+25 figures across `HDBSCAN/`, `settlement/` and `Signed_distance/` (the pop-adjusted sensitivity figures sit under `Signed_distance/pop_adjusted/`, mirroring the scripts). Three archived figures are **not** rebuilt here — `Waste_HDBSCAN_comparison.png`, `Hotspot_area_difference_gsvi_selfcollected.png` and `Mitigation_new_obs_stacked_bar.png` — because each exists only to set GSVI beside GSVI+self-collected. That comparison is [Step 6.4](#64-the-spatial-pattern-with-sc-4_pattern), which supersedes all three with `1_SC_hotspot_comparison.png`.
 
 `Waste_HDBSCAN_gsvi.png` is also dropped: `Waste_HDBSCAN_context_gsvi.png` shows the same 24 clusters with the same numbering and parameters, plus settlement boundaries, named settlements and the Dandora landfill — the plain version added nothing. Its script `3_plot_hdbscan_map.R` is removed.
 
@@ -677,8 +679,10 @@ Steps 2–5 run on GSVI. Faith/ and ZWL/ imagery was collected by hand where Str
 | --- | --- | --- |
 | 6.1 | `1_sources/` | what the SC imagery is, and what it adds to the 100 m observation frame |
 | 6.2 | `2_identification/` | Step 3 — does SC in the YOLO training set change the classifier |
+| 6.3 | `3_indicator/` | Step 4 — does SC change the published 100 m surface |
+| 6.4 | `4_pattern/` | Step 5 — do the hotspots and the settlement gradient change |
 
-Later sub-steps (the 100 m indicator and the spatial pattern with SC added) are not built yet.
+**The short answer, across all four: no conclusion in Steps 3–5 depends on the self-collected imagery.** What SC does change is worth stating precisely, and each sub-step does.
 
 ### 6.1 What the self-collected imagery is (`1_sources/`)
 
@@ -743,6 +747,86 @@ Rscript 6_selfcollected/2_identification/2plot_stage_comparison.R
 These replace the archived Step 7 `Heldout_validation_binary_*` charts, which had a second panel for a self-collected held-out set; that panel is dropped, so the GSVI set is the whole figure. Adding or removing a scenario needs no edit to either script — levels, labels, fills, x-axis breaks, the detector count and the replicate note are all derived from the input table.
 
 The numbers are in Step 3: SC in the training set buys **precision** (false positives 39 → 30, mAP@0.50 +6 pp) with recall flat, and the VLM cascade largely substitutes for it — the post-cascade curves are nearly flat across the five mixes.
+
+### 6.3 The 100 m indicator with SC (`3_indicator/`)
+
+**Script:** `1_sc_indicator.py` — runs the same IDEAMaps pipeline (`lib/ideamaps.py`, same grid, same fixed Jenks break points) twice, GSVI alone and GSVI + SC, and compares the two surfaces cell by cell.
+
+```bash
+python  6_selfcollected/3_indicator/1_sc_indicator.py
+Rscript 6_selfcollected/3_indicator/1plot_sc_indicator.R
+```
+
+Two effects are separated. **Coverage** — cells that gain direct evidence — barely moves:
+
+| Component | GSVI | GSVI + SC | Change |
+| --- | --- | --- | --- |
+| Cells with an observed value | 22,672 (32.4%) | 22,799 (32.6%) | +127 |
+| Cells receiving an estimated value | 45,677 (65.3%) | 45,550 (65.1%) | −127 |
+| Direct share of the represented surface | 33.2% | 33.4% | **+0.2 pp** |
+
+**Collecting more imagery does not close the interpolation gap.** Step 4's headline — two thirds of the published surface is estimated — is unchanged by a 1% increase in imagery, and would need roughly two orders of magnitude more to move.
+
+**Value**, though, moves a great deal. 149 extra waste detections (+4.6%) reclassify **670 cells (1.0% of the grid)**, 611 upward:
+
+| Published class | GSVI | GSVI + SC | Change |
+| --- | --- | --- | --- |
+| Low | 65,083 (93.1%) | 64,976 (92.9%) | −107 |
+| Medium | 3,927 (5.6%) | 3,544 (5.1%) | −383 |
+| High | 933 (1.3%) | **1,423 (2.0%)** | **+490 (+53%)** |
+
+Only **66 of the 670** changed cells (9.9%) actually received an image; the other **604 (90.1%) changed through the spatial fill alone**. The changed cells sit overwhelmingly near settlements (19.1% inside one against 2.8% grid-wide; median 183 m against 2,011 m).
+
+This is a fragility result, not a coverage result: because the surface is mostly interpolated, a small amount of new evidence in the right places propagates widely, and the High class grows by half without the evidence base meaningfully growing.
+
+**Figure:** `Figure/6_selfcollected/3_indicator/1_SC_indicator_effect.png` — (a) map of the cells that changed class, (b) class counts before and after, (c) how those cells changed.
+
+**Outputs:** `1_Nairobi_sc_indicator_grid100m_32737.gpkg` (both arms per cell), `1_sc_indicator_{provenance,class_change,changed_cells}.csv`, `thesis_table/table_6_3_indicator_effect.csv`
+
+### 6.4 The spatial pattern with SC (`4_pattern/`)
+
+```bash
+# needs 2coverage_analysis/3sviwaste.py --arm gsvi_selfcollected
+python  6_selfcollected/4_pattern/1_sc_hdbscan.py
+Rscript 6_selfcollected/4_pattern/1plot_sc_hotspots.R
+python  6_selfcollected/4_pattern/2_sc_settlement_gam.py      # slow (~80k points, two GAMs)
+Rscript 6_selfcollected/4_pattern/2plot_sc_settlement_gam.R
+```
+
+**6.4a Hotspots (`1_sc_hdbscan.py`)** — the same HDBSCAN (min_cluster_size 25, min_samples 6) on 2,696 vs 2,845 waste locations:
+
+| Metric | GSVI | GSVI + SC | Change |
+| --- | ---: | ---: | ---: |
+| Waste locations | 2,696 | 2,845 | +149 (+5.5%) |
+| Clustered locations | 1,929 | 2,194 | +265 (+13.7%) |
+| Number of hotspots | 24 | **18** | −6 (−25.0%) |
+| Total hotspot area (km²) | 72.451 | 88.281 | +15.831 (+21.9%) |
+
+The cluster count falls but **23 of the 24 GSVI hotspots are retained (95.8%)** and the footprint *grows* by 22% — neighbouring hotspots merge into larger ones rather than disappearing. Of the 149 added locations, **133 (89.3%) fall inside a hotspot GSVI had already drawn**; 16 fall outside, and they create exactly **1** new hotspot. Self-collection confirms the GSVI hotspot map; it does not redraw it.
+
+**6.4b/c Settlement association and the GAM (`2_sc_settlement_gam.py`)** — both refitted on the combined frame (79,584 locations, 2,845 positive). SC imagery carries a capture year (ZWL 2023, Faith 2015–2016), so the year fixed effect survives; the combined frame simply gains 2015, 2016 and 2023 levels.
+
+| Measure | GSVI | GSVI + SC |
+| --- | --- | --- |
+| Waste-positive rate inside a settlement | 13.3% | 14.5% |
+| Waste-positive rate outside | 3.0% | **3.0%** |
+| Prevalence ratio | 4.43 | 4.86 |
+| Odds ratio (95% CI) | 4.95 (4.47–5.49) | 5.52 (5.01–6.08) |
+| GAM pseudo-R², year + s(distance) | 0.114 | 0.120 |
+| LRT vs year-only, χ² (df 7) | 2,216.7 | 2,475.5 |
+
+The GSVI column reproduces Step 5 exactly, which is the check that the refit is the same model. The **rate outside settlements does not move at all**, the fitted curves lie close together, and the gradient stays overwhelmingly significant. The settlement association is not an artefact of where Street View drove.
+
+One caveat belongs with the inside rate: SC imagery was collected near settlements *on purpose*, so part of the 13.3% → 14.5% rise is by construction rather than discovery. The unchanged outside rate is the cleaner evidence.
+
+**Figures** (`Figure/6_selfcollected/4_pattern/`):
+
+| Figure | Script | Shows |
+| --- | --- | --- |
+| `1_SC_hotspot_comparison.png` | `1plot_sc_hotspots.R` | (a) both hull sets overlaid, (b) where the added locations fall |
+| `2_SC_settlement_gam_comparison.png` | `2plot_sc_settlement_gam.R` | (a) rate by zone with Wilson CI, (b) both GAM curves |
+
+**Outputs:** `1_Nairobi_sc_{hdbscan,hotspots}_{gsvi,gsvi_selfcollected}_32737.gpkg`, `1_sc_hdbscan_new_locations.csv`, `2_Nairobi_sc_gam_{frame,curve}.csv`, `2_sc_settlement_contingency.csv`, `thesis_table/table_6_4_{hdbscan,settlement,gam}_comparison.csv`
 
 ---
 
