@@ -1,13 +1,12 @@
 #!/usr/bin/env Rscript
 # Step 6.4a — do the hotspots change when self-collected imagery is added?
-#   1_SC_hotspot_comparison.png
-#     (a) the two sets of convex-hull footprints, overlaid (scale only)
-#     (b) GSVI cluster x combined cluster, for the 2,696 locations both runs
-#         share — which hotspot each location's label moved to
-#     (c) what the 149 added locations join
+# Three standalone figures, so each can be placed independently in the text:
+#   1a_SC_hotspot_footprints.png        the two hull sets, GSVI hulls by fate
+#   1b_SC_hotspot_label_transitions.png GSVI cluster x combined cluster
+#   1c_SC_added_locations.png           what the 149 added locations join
 #
-# Panel (b) is the argument, and it rests on cluster labels rather than on
-# footprint geometry: every shared location carries a label from each run, so the
+# 1b is the argument, and it rests on cluster labels rather than on footprint
+# geometry: every shared location carries a label from each run, so the
 # agreement between the two labellings is measurable without choosing an overlap
 # threshold or trusting the convex hull. A clean block-diagonal means the
 # partition was preserved; rows collapsing onto one column are a merge.
@@ -45,7 +44,9 @@ TRANSITIONS_CSV <- file.path(DATA_DIR, "1_sc_hdbscan_label_transitions.csv")
 NEW_OBS_CSV <- file.path(DATA_DIR, "1_sc_hdbscan_new_locations.csv")
 COMPARISON_CSV <- file.path(DATA_DIR, "1_sc_hdbscan_comparison.csv")
 STABILITY_CSV <- file.path(DATA_DIR, "thesis_table", "table_6_4_hdbscan_stability.csv")
-OUT_PATH <- file.path(FIG_DIR, "1_SC_hotspot_comparison.png")
+OUT_MAP <- file.path(FIG_DIR, "1a_SC_hotspot_footprints.png")
+OUT_TRANS <- file.path(FIG_DIR, "1b_SC_hotspot_label_transitions.png")
+OUT_ADDED <- file.path(FIG_DIR, "1c_SC_added_locations.png")
 
 MERGED_COLOUR <- "#6B4226"     # GSVI hotspots that collapsed into one
 PRESERVED_COLOUR <- "#C9A27F"  # GSVI hotspots that survived one-to-one
@@ -110,10 +111,16 @@ p_map <- ggplot() +
   ) +
   coord_sf(datum = NA, expand = FALSE) +
   labs(
-    title = "(a) Hotspot footprints, both arms",
+    title = "Waste hotspot footprints, with and without self-collected imagery",
     subtitle = sprintf(
-      "%s → %s clusters | grey = mapped settlements | hulls shown for scale, no result depends on them",
+      "Same HDBSCAN parameters on both arms | %s → %s clusters | grey = mapped settlements",
       get_metric("Number of hotspots", "GSVI"), get_metric("Number of hotspots", "GSVI + SC")
+    ),
+    caption = paste0(
+      "Convex hulls are shown for spatial scale only; no result in this section depends on them. GSVI hulls are filled by what became of their cluster label.\n",
+      "The eight that collapse into a single combined cluster are the whole of the ",
+      get_metric("Number of hotspots", "GSVI"), " → ", get_metric("Number of hotspots", "GSVI + SC"),
+      " drop — the hotspots merged, they did not disappear."
     )
   ) +
   theme_void(base_size = 11) +
@@ -156,14 +163,21 @@ p_trans <- ggplot(trans, aes(to, from)) +
   scale_x_discrete(position = "top", expand = expansion(0)) +
   scale_y_discrete(expand = expansion(0)) +
   labs(
-    title = "(b) Where each shared location's cluster label went",
+    title = "Where each waste location's cluster label went",
     subtitle = sprintf(
       "All %s locations both runs share | ARI %s, NMI %s | median destination purity %s",
       get_stat("Locations present in both runs"),
       get_stat("Adjusted Rand Index"), get_stat("Normalised mutual information"),
       get_stat("Median destination purity")
     ),
-    x = "Cluster with GSVI + SC", y = "Cluster with GSVI"
+    x = "Cluster with GSVI + SC", y = "Cluster with GSVI",
+    caption = paste0(
+      "Stability measured on cluster labels, so nothing depends on an overlap threshold or on the convex hull. Noise is kept as its own label rather than dropped.\n",
+      "Each GSVI cluster's locations move to a single combined cluster (median destination purity ", get_stat("Median destination purity"),
+      "), and ", get_stat("GSVI clusters involved in a merge"), " of them collapse into one — the near-diagonal with a single collecting column.\n",
+      "That nesting is why the Adjusted Rand Index (", get_stat("Adjusted Rand Index"),
+      ") sits below the normalised mutual information (", get_stat("Normalised mutual information"), ")."
+    )
   ) +
   theme_minimal(base_size = 11) +
   theme(
@@ -211,9 +225,13 @@ p_bar <- ggplot(split_df, aes(x = n, y = "added", fill = segment)) +
   ), breaks = c("Joined an existing hotspot", "Formed a new hotspot", "Did not cluster")) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.02)), breaks = pretty_breaks(n = 4)) +
   labs(
-    title = sprintf("(c) What the %s added locations join", comma(n_new)),
-    subtitle = "By the cluster label they receive, not by which hull they fall in",
-    x = "Number of locations", y = NULL
+    title = sprintf("What the %s self-collected waste locations join", comma(n_new)),
+    subtitle = "By the cluster label each location receives, not by which hull it falls in",
+    x = "Number of locations", y = NULL,
+    caption = paste0(
+      "A location joins an existing hotspot when its combined-arm cluster also contains GSVI locations. None of the added locations forms a cluster of its own:\n",
+      "self-collection reinforces the GSVI hotspot map rather than redrawing it."
+    )
   ) +
   theme_minimal(base_size = 11) +
   theme(
@@ -228,28 +246,20 @@ p_bar <- ggplot(split_df, aes(x = n, y = "added", fill = segment)) +
     legend.text = element_text(size = 8.2)
   )
 
-fig <- (p_map | (p_trans / p_bar + plot_layout(heights = c(2.4, 1)))) +
-  plot_layout(widths = c(1, 1.15)) +
-  plot_annotation(
-    title = "Waste hotspots with and without self-collected imagery",
-    subtitle = sprintf(
-      "Same HDBSCAN parameters on both arms (min_cluster_size 25, min_samples 6) | %s → %s waste locations",
-      get_metric("Waste locations", "GSVI"), get_metric("Waste locations", "GSVI + SC")
-    ),
-    caption = paste0(
-      "Stability is measured on cluster labels, so nothing depends on an overlap threshold or on the convex hull. Noise is kept as its own label in (b).\n",
-      "Each GSVI cluster's locations move to a single combined cluster (median purity 100%), and ", get_stat("GSVI clusters involved in a merge"),
-      " of them collapse into one — that merge is the whole of the 24 → 18 drop, and the reason ARI is lower than NMI.\n",
-      "No added location forms a hotspot of its own: self-collection reinforces the GSVI hotspot map rather than redrawing it."
-    ),
-    theme = theme(
-      plot.title = element_text(face = "bold", size = 14, hjust = 0.5, colour = CHAPTER_TITLE_COLOUR),
-      plot.subtitle = element_text(size = 9, hjust = 0.5, colour = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 8)),
-      plot.caption = element_text(size = 8.2, hjust = 0, colour = CHAPTER_CAPTION_COLOUR,
-                                  lineheight = 1.3, margin = margin(t = 8))
-    )
+standalone <- function(p, title_size = 13) {
+  p + theme(
+    plot.title = element_text(face = "bold", size = title_size, colour = CHAPTER_TITLE_COLOUR),
+    plot.subtitle = element_text(size = 9, colour = CHAPTER_SUBTITLE_COLOUR,
+                                 lineheight = 1.25, margin = margin(b = 8)),
+    plot.caption = element_text(size = 8.2, hjust = 0, colour = CHAPTER_CAPTION_COLOUR,
+                                lineheight = 1.3, margin = margin(t = 8))
   )
+}
 
-ggsave(OUT_PATH, fig, width = 14, height = 7.2, dpi = 400, bg = "white")
-message("Wrote ", OUT_PATH)
+ggsave(OUT_MAP, standalone(p_map), width = 7.8, height = 7.4, dpi = 400, bg = "white")
+message("Wrote ", OUT_MAP)
+ggsave(OUT_TRANS, standalone(p_trans), width = 9, height = 6.2, dpi = 400, bg = "white")
+message("Wrote ", OUT_TRANS)
+ggsave(OUT_ADDED, standalone(p_bar), width = 8.5, height = 3.4, dpi = 400, bg = "white")
+message("Wrote ", OUT_ADDED)
 message("Done.")

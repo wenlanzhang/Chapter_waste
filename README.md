@@ -819,7 +819,13 @@ Only **66 of the 670** changed cells (9.9%) actually received an image; the othe
 
 This is a fragility result, not a coverage result: because the surface is mostly interpolated, a small amount of new evidence in the right places propagates widely, and the High class grows by half without the evidence base meaningfully growing.
 
-**Figure:** `1_SC_indicator_effect.png` — (a) map of the cells that changed class, (b) the full 3×3 class transition matrix (the off-diagonal *is* the 670), (c) how those same cells changed.
+**Figures** (standalone, so each can be placed independently):
+
+| Figure | Shows |
+| --- | --- |
+| `1a_SC_indicator_changed_map.png` | where the 670 changed cells are |
+| `1b_SC_indicator_class_transitions.png` | the 3×3 class transition matrix — the off-diagonal *is* the 670 |
+| `1c_SC_indicator_change_route.png` | how those same cells changed: imagery vs spatial fill |
 
 #### Is the new surface any *better*? (`2_sc_validation.py`)
 
@@ -845,7 +851,7 @@ This is the validation-side confirmation of the fragility result above: 90% of c
 
 **A caution the numbers cannot carry themselves:** n = 14 and n = 100 are small, the κ for the 14-cell subset is undefined (its crowd labels are constant), and this concerns a **1% increase in imagery**. It is directional evidence, not a powered test of whether field collection improves indicators in general.
 
-**Figure:** `2_SC_validation_comparison.png` — (a) agreement by subset and arm, (b) the change in agreement split by route, (c) precision and recall showing the over-call.
+**Figure:** `2_SC_validation_comparison.png` — one panel, two arrows per row: brown = binary agreement, green = three-class. Arrow direction is the answer; opacity tracks sample size.
 
 **Outputs:** `1_Nairobi_sc_indicator_grid100m_32737.gpkg` (both arms per cell), `1_sc_indicator_{provenance,class_change,changed_cells}.csv`, `2_sc_validation_{cells,confusion,detail}.csv`, `thesis_table/table_6_3_{indicator_effect,validation_comparison}.csv`
 
@@ -919,7 +925,14 @@ Of the 149 added locations, **143 (96.0%) join a cluster that already held GSVI 
 
 The cluster-level shares dip a point or two because the denominator shrank from 24 to 18; the location-level shares all rise. Either way the hotspots stay settlement hotspots.
 
-**Figures:** `1_SC_hotspot_comparison.png` — (a) both hull sets, shown for scale only, (b) the GSVI × combined label transition matrix, (c) what the added locations join. `2_SC_cluster_composition.png` — one stacked bar per cluster, one panel per arm.
+**Figures** (1a–1c standalone, so each can be placed independently):
+
+| Figure | Shows |
+| --- | --- |
+| `1a_SC_hotspot_footprints.png` | both hull sets, GSVI hulls filled by fate (merged vs preserved) |
+| `1b_SC_hotspot_label_transitions.png` | the GSVI × combined cluster label matrix |
+| `1c_SC_added_locations.png` | what the 149 added locations join |
+| `2_SC_cluster_composition.png` | one stacked bar per cluster, one panel per arm |
 
 #### 6.4b Settlement association (`settlement/`)
 

@@ -102,7 +102,9 @@ SC_VALIDATION_OUT = [
 ]
 SELFCOLLECTED_DATA += SC_VALIDATION_OUT
 SELFCOLLECTED_FIGS += [
-    SC_FIG_IND / "1_SC_indicator_effect.png",
+    SC_FIG_IND / "1a_SC_indicator_changed_map.png",
+    SC_FIG_IND / "1b_SC_indicator_class_transitions.png",
+    SC_FIG_IND / "1c_SC_indicator_change_route.png",
     SC_FIG_IND / "2_SC_validation_comparison.png",
 ]
 
@@ -130,7 +132,9 @@ rule plot_sc_indicator:
         SC_IND / "1_Nairobi_sc_indicator_grid100m_32737.gpkg",
         SC_IND / "1_sc_indicator_provenance.csv",
     output:
-        SC_FIG_IND / "1_SC_indicator_effect.png",
+        SC_FIG_IND / "1a_SC_indicator_changed_map.png",
+        SC_FIG_IND / "1b_SC_indicator_class_transitions.png",
+        SC_FIG_IND / "1c_SC_indicator_change_route.png",
     shell:
         "Rscript {REPO_ROOT}/6_selfcollected/3_indicator/1plot_sc_indicator.R"
 
@@ -194,7 +198,9 @@ SC_GAM_OUT = [
 
 SELFCOLLECTED_DATA += SC_HDBSCAN_OUT + SC_CONTEXT_OUT + SC_SETTLEMENT_OUT + SC_GAM_OUT
 SELFCOLLECTED_FIGS += [
-    SC_FIG_PAT / "HDBSCAN" / "1_SC_hotspot_comparison.png",
+    SC_FIG_PAT / "HDBSCAN" / "1a_SC_hotspot_footprints.png",
+    SC_FIG_PAT / "HDBSCAN" / "1b_SC_hotspot_label_transitions.png",
+    SC_FIG_PAT / "HDBSCAN" / "1c_SC_added_locations.png",
     SC_FIG_PAT / "HDBSCAN" / "2_SC_cluster_composition.png",
     SC_FIG_PAT / "settlement" / "1_SC_settlement_comparison.png",
     SC_FIG_PAT / "Signed_distance" / "1_SC_gam_comparison.png",
@@ -225,7 +231,9 @@ rule plot_sc_hotspots:
         PREP / "Nairobi_boundary_polygon_32737.gpkg",
         PREP / "Nairobi_slum_polygon_32737.gpkg",
     output:
-        SC_FIG_PAT / "HDBSCAN" / "1_SC_hotspot_comparison.png",
+        SC_FIG_PAT / "HDBSCAN" / "1a_SC_hotspot_footprints.png",
+        SC_FIG_PAT / "HDBSCAN" / "1b_SC_hotspot_label_transitions.png",
+        SC_FIG_PAT / "HDBSCAN" / "1c_SC_added_locations.png",
     shell:
         "Rscript {REPO_ROOT}/6_selfcollected/4_pattern/HDBSCAN/1plot_sc_hotspots.R"
 

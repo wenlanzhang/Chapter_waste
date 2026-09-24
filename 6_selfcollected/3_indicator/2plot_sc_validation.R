@@ -1,8 +1,9 @@
 #!/usr/bin/env Rscript
 # Step 6.3b — is the surface with self-collected imagery any better?
 #   2_SC_validation_comparison.png
-#     one arrow per subset: agreement with the IDEAMaps crowd labels before and
-#     after adding self-collected imagery. Arrow direction is the answer.
+#     one panel, two arrows per subset: agreement with the IDEAMaps crowd labels
+#     before and after adding self-collected imagery, for the binary and the
+#     three-class reading. Arrow direction is the answer; colour is the measure.
 #
 # The question is a yes/no, so the figure is built to be read as one. Everything
 # else — precision, recall, kappa, the confusion matrices — stays in
@@ -41,10 +42,10 @@ DETAIL_CSV <- file.path(DATA_DIR, "2_sc_validation_detail.csv")
 OUT_PATH <- file.path(FIG_DIR, "2_SC_validation_comparison.png")
 
 BEFORE <- "#BDB3A8"
-BETTER <- "#6B4226"
-WORSE <- "#496142"
-FLAT <- "#9E9689"
-FLAT_PP <- 1.0   # a change smaller than this is called flat, not better or worse
+# Colour is the measure, not the direction — an arrow already carries direction.
+BINARY_COL <- "#6B4226"
+THREE_COL <- "#496142"
+MEASURES <- c("Binary", "Three-class")
 
 # Opacity = how much weight a row can bear. Deliberately not row order: the
 # subsets run 2,286 / 133 / 14 / 100, so the eye would otherwise give the
@@ -80,44 +81,37 @@ arrows <- detail |>
     before = 100 * GSVI,
     after = 100 * `GSVI + SC`,
     delta = after - before,
-    verdict = case_when(
-      delta > FLAT_PP ~ "Agreement improves",
-      delta < -FLAT_PP ~ "Agreement worsens",
-      TRUE ~ "No meaningful change"
-    ),
-    verdict = factor(verdict, levels = c("Agreement improves", "No meaningful change",
-                                         "Agreement worsens")),
+    measure = factor(measure, levels = MEASURES),
     label = factor(vapply(subset, row_label, character(1)), levels = LEVELS),
-    measure = factor(measure, levels = c("Binary", "Three-class")),
     n_cells = vapply(subset, n_of, numeric(1)),
     strength = factor(
       case_when(n_cells >= 1000 ~ STRENGTH_LEVELS[1],
                 n_cells >= 100 ~ STRENGTH_LEVELS[2],
                 TRUE ~ STRENGTH_LEVELS[3]),
       levels = STRENGTH_LEVELS
-    )
+    ),
+    # Two arrows share a row, so nudge them apart.
+    y = as.numeric(label) + if_else(measure == "Binary", 0.17, -0.17)
   )
 
-fig <- ggplot(arrows, aes(y = label)) +
-  geom_segment(aes(x = before, xend = after, yend = label, colour = verdict, alpha = strength),
+fig <- ggplot(arrows) +
+  geom_segment(aes(x = before, xend = after, y = y, yend = y,
+                   colour = measure, alpha = strength),
                linewidth = 1.4,
                arrow = arrow(length = unit(0.2, "cm"), type = "closed")) +
-  geom_point(aes(x = before, alpha = strength), colour = BEFORE, size = 3.2,
+  geom_point(aes(x = before, y = y, alpha = strength), colour = BEFORE, size = 3,
              show.legend = FALSE) +
-  geom_point(aes(x = before), colour = "white", size = 1.4) +
-  geom_text(aes(x = pmin(before, after) - 3, label = sprintf("%.0f", before),
+  geom_point(aes(x = before, y = y), colour = "white", size = 1.3) +
+  geom_text(aes(x = pmin(before, after) - 2.5, y = y, label = sprintf("%.0f", before),
                 alpha = strength),
-            hjust = 1, size = 2.9, colour = "grey45", show.legend = FALSE) +
-  geom_text(aes(x = pmax(before, after) + 3,
+            hjust = 1, size = 2.8, colour = "grey45", show.legend = FALSE) +
+  geom_text(aes(x = pmax(before, after) + 2.5, y = y,
                 label = sprintf("%.0f  (%+.0f pp)", after, delta),
-                colour = verdict, alpha = strength),
-            hjust = 0, size = 2.9, fontface = "bold", show.legend = FALSE) +
-  facet_wrap(~measure, ncol = 2) +
-  scale_colour_manual(name = NULL, values = c(
-    "Agreement improves" = BETTER,
-    "No meaningful change" = FLAT,
-    "Agreement worsens" = WORSE
-  ), drop = FALSE) +
+                colour = measure, alpha = strength),
+            hjust = 0, size = 2.8, fontface = "bold", show.legend = FALSE) +
+  scale_colour_manual(name = NULL, values = setNames(c(BINARY_COL, THREE_COL), MEASURES),
+                      labels = c("Binary agreement (waste / no waste)",
+                                 "Three-class agreement (Low / Medium / High)")) +
   scale_alpha_manual(name = "Cells behind the row", values = STRENGTH_ALPHA, drop = FALSE) +
   guides(
     colour = guide_legend(order = 1, override.aes = list(alpha = 1)),
@@ -125,6 +119,8 @@ fig <- ggplot(arrows, aes(y = label)) +
   ) +
   scale_x_continuous(limits = c(-16, 126), breaks = seq(0, 100, 25),
                      labels = label_percent(scale = 1)) +
+  scale_y_continuous(breaks = seq_along(LEVELS), labels = LEVELS,
+                     limits = c(0.4, length(LEVELS) + 0.6), expand = expansion(0)) +
   labs(
     title = "Does self-collected imagery make the 100 m indicator more accurate?",
     subtitle = paste0(
@@ -133,10 +129,14 @@ fig <- ggplot(arrows, aes(y = label)) +
     ),
     x = "Agreement with the crowd labels", y = NULL,
     caption = paste0(
-      "2,286 crowd-validated 100 m cells. A changed cell is one whose published class differs between the arms; it either received an image or moved through the spatial fill.\n",
-      "Changed cells with imagery behind them: three-class agreement 0% → 86%, McNemar p = 0.039. Changed cells moved by interpolation alone: 52% → 20%, p = 0.864.\n",
-      "Opacity tracks sample size, not row order: the 14-cell row carries the biggest arrow and the least weight, and its κ is undefined because its crowd labels are constant.\n",
-      "This concerns a 1% increase in imagery — directional evidence, not a powered test. Precision, recall, κ and the confusion matrices are in table_6_3_validation_comparison.csv."
+      "2,286 crowd-validated 100 m cells. A changed cell is one whose published class differs between the\n",
+      "arms; it either received an image or moved through the spatial fill.\n",
+      "Changed cells with imagery behind them: three-class agreement 0% → 86%, McNemar p = 0.039.\n",
+      "Changed cells moved by interpolation alone: 52% → 20%, p = 0.864.\n",
+      "Opacity tracks sample size, not row order: the 14-cell row carries the biggest arrow and the least\n",
+      "weight, and its κ is undefined because its crowd labels are constant. This concerns a 1% increase in\n",
+      "imagery — directional evidence, not a powered test. Precision, recall, κ and the confusion matrices\n",
+      "are in table_6_3_validation_comparison.csv."
     )
   ) +
   theme_minimal(base_size = 11) +
@@ -146,18 +146,18 @@ fig <- ggplot(arrows, aes(y = label)) +
                                  lineheight = 1.25, margin = margin(b = 10)),
     plot.caption = element_text(size = 7.8, hjust = 0, colour = CHAPTER_CAPTION_COLOUR,
                                 lineheight = 1.3, margin = margin(t = 10)),
-    strip.text = element_text(face = "bold", size = 10, colour = CHAPTER_AXIS_COLOUR),
     axis.title.x = element_text(size = 9.5, colour = CHAPTER_AXIS_COLOUR, margin = margin(t = 6)),
     axis.text.y = element_text(size = 9, colour = CHAPTER_AXIS_COLOUR, lineheight = 0.95, hjust = 0),
     axis.text.x = element_text(size = 8.6, colour = CHAPTER_AXIS_COLOUR),
     panel.grid.minor = element_blank(),
     panel.grid.major.y = element_blank(),
-    panel.spacing.x = unit(1.4, "lines"),
     legend.position = "bottom",
+    legend.box = "vertical",
+    legend.spacing.y = unit(0.02, "cm"),
     legend.title = element_text(size = 8.6, colour = CHAPTER_AXIS_COLOUR),
     legend.text = element_text(size = 8.6)
   )
 
-ggsave(OUT_PATH, fig, width = 12.5, height = 5.2, dpi = 400, bg = "white")
+ggsave(OUT_PATH, fig, width = 10, height = 6.6, dpi = 400, bg = "white")
 message("Wrote ", OUT_PATH)
 message("Done.")

@@ -1,16 +1,14 @@
 #!/usr/bin/env Rscript
 # Step 6.3 — what self-collected imagery does to the 100 m indicator.
-#   1_SC_indicator_effect.png
-#     (a) map of the cells whose published class changed, up or down
-#     (b) the full 3x3 class transition matrix — every cell of the grid, with
-#         the off-diagonal (the 670 that moved) called out
-#     (c) those same 670 split by how they moved: received imagery, or shifted
-#         through the spatial fill
+# Three standalone figures, so each can be placed independently in the text:
+#   1a_SC_indicator_changed_map.png     where the cells that changed class are
+#   1b_SC_indicator_class_transitions.png  the full 3x3 class transition matrix
+#   1c_SC_indicator_change_route.png    how those same cells changed
 #
-# Panels (b) and (c) describe the same 670 cells. (b) says which classes they
-# moved between and reconciles to the net change per class; (c) says how they
-# got there. The contrast with the subtitle is the point of the figure: direct
-# coverage barely moves, yet the published classes move a great deal.
+# 1b and 1c describe the same 670 cells. 1b says which classes they moved
+# between and reconciles to the net change per class; 1c says how they got
+# there. Each figure repeats the framing it needs, since they may appear pages
+# apart.
 #
 # Inputs (6_selfcollected/3_indicator/, from 1_sc_indicator.py):
 #   1_Nairobi_sc_indicator_grid100m_32737.gpkg
@@ -37,7 +35,12 @@ FIG_DIR <- file.path(script_dir, "../..", "Figure", "6_selfcollected", "3_indica
 
 CELLS_GPKG <- file.path(DATA_DIR, "1_Nairobi_sc_indicator_grid100m_32737.gpkg")
 PROVENANCE_CSV <- file.path(DATA_DIR, "1_sc_indicator_provenance.csv")
-OUT_PATH <- file.path(FIG_DIR, "1_SC_indicator_effect.png")
+OUT_MAP <- file.path(FIG_DIR, "1a_SC_indicator_changed_map.png")
+OUT_TRANS <- file.path(FIG_DIR, "1b_SC_indicator_class_transitions.png")
+OUT_ROUTE <- file.path(FIG_DIR, "1c_SC_indicator_change_route.png")
+
+# Repeated on each figure, since they will not sit together on the page.
+CONTEXT <- sprintf("Direct evidence carries %%s of the represented surface before and %%s after (%%s)")
 
 # Chapter palette: brown = moved up (more waste), green = moved down.
 UP_COLOUR <- "#6B4226"
@@ -89,16 +92,23 @@ p_map <- ggplot() +
   guides(colour = guide_legend(override.aes = list(size = 2.6))) +
   coord_sf(datum = NA, expand = FALSE) +
   labs(
-    title = "(a) Where the changed cells are",
+    title = "Where the 100 m cells that changed class are",
     subtitle = sprintf(
-      "All %s cells that changed class | grey = mapped settlements",
-      comma(n_changed)
+      "All %s cells whose published class differs between the two arms | grey = mapped settlements\n%s",
+      comma(n_changed),
+      sprintf(CONTEXT, direct_share$GSVI, direct_share$`GSVI + SC`, direct_share$Change)
+    ),
+    caption = paste0(
+      "Same IDEAMaps pipeline, same grid and same fixed Jenks break points on both arms; only the imagery differs.\n",
+      "The changed cells sit close to mapped settlements: 19.1% fall inside one against 2.8% of the grid as a whole."
     )
   ) +
   theme_void(base_size = 11) +
   theme(
     plot.title = element_text(face = "bold", size = 11.5, colour = CHAPTER_TITLE_COLOUR),
     plot.subtitle = element_text(size = 8.4, colour = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 6)),
+    plot.caption = element_text(size = 8.2, hjust = 0, colour = CHAPTER_CAPTION_COLOUR,
+                                lineheight = 1.3, margin = margin(t = 8)),
     legend.position = "bottom",
     legend.text = element_text(size = 8.6, colour = CHAPTER_AXIS_COLOUR),
     legend.key = element_blank()
@@ -146,7 +156,7 @@ p_trans <- ggplot(trans, aes(to, from_rev)) +
   scale_x_discrete(position = "top", expand = expansion(0)) +
   scale_y_discrete(expand = expansion(0)) +
   labs(
-    title = "(b) Which classes they moved between",
+    title = "Published class before and after adding self-collected imagery",
     subtitle = sprintf(
       "All %s cells | off-diagonal = the %s that changed | net: Low %s, Medium %s, High %s",
       comma(nrow(flat)), comma(n_changed),
@@ -154,7 +164,12 @@ p_trans <- ggplot(trans, aes(to, from_rev)) +
       sprintf("%+d", net$net[net$to == "Medium"]),
       sprintf("%+d", net$net[net$to == "High"])
     ),
-    x = "Class with GSVI + SC", y = "Class with GSVI"
+    x = "Class with GSVI + SC", y = "Class with GSVI",
+    caption = paste0(
+      "Every 100 m cell appears once. The diagonal is unchanged; the six off-diagonal entries are the cells whose published class moved, and sum to ",
+      comma(n_changed), ".\n",
+      "The Medium → High flow is what drives the High class up by half."
+    )
   ) +
   theme_minimal(base_size = 11) +
   theme(
@@ -187,9 +202,13 @@ p_route <- ggplot(route, aes(x = n, y = "route", fill = route)) +
   ), breaks = c("Received self-collected imagery", "Changed through the spatial fill")) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.02)), labels = comma) +
   labs(
-    title = sprintf("(c) How those same %s cells got there", comma(n_changed)),
-    subtitle = "Nine in ten never received an image — their class moved through interpolation",
-    x = "100 m cells", y = NULL
+    title = sprintf("How the %s cells that changed class got there", comma(n_changed)),
+    subtitle = "Nine in ten never received an image — their class moved through the spatial fill",
+    x = "100 m cells", y = NULL,
+    caption = paste0(
+      "A cell counts as having received imagery when it holds at least one self-collected image; otherwise its value changed only because the\n",
+      "Empirical Bayes step and the linear spatial fill were retuned on the larger dataset. More imagery moves the published classes, and mostly in cells that were never observed."
+    )
   ) +
   theme_minimal(base_size = 11) +
   theme(
@@ -204,27 +223,20 @@ p_route <- ggplot(route, aes(x = n, y = "route", fill = route)) +
     legend.text = element_text(size = 8.4)
   )
 
-fig <- (p_map | (p_trans / p_route + plot_layout(heights = c(2.1, 1)))) +
-  plot_layout(widths = c(1, 1.05)) +
-  plot_annotation(
-    title = "Adding self-collected imagery to the 100 m indicator",
-    subtitle = sprintf(
-      "Direct evidence carries %s of the represented surface before and %s after (%s) | 2,979 extra images, 149 extra waste detections",
-      direct_share$GSVI, direct_share$`GSVI + SC`, direct_share$Change
-    ),
-    caption = paste0(
-      "Same IDEAMaps pipeline, same grid and same fixed Jenks break points on both arms; only the imagery differs. ",
-      "Panels (b) and (c) describe the same ", comma(n_changed), " cells.\n",
-      "More imagery does not close the interpolation gap — but it does move the published classes, and mostly in cells that were never observed."
-    ),
-    theme = theme(
-      plot.title = element_text(face = "bold", size = 14, hjust = 0.5, colour = CHAPTER_TITLE_COLOUR),
-      plot.subtitle = element_text(size = 9, hjust = 0.5, colour = CHAPTER_SUBTITLE_COLOUR, margin = margin(b = 8)),
-      plot.caption = element_text(size = 8.2, hjust = 0, colour = CHAPTER_CAPTION_COLOUR,
-                                  lineheight = 1.3, margin = margin(t = 8))
-    )
+standalone <- function(p, title_size = 13) {
+  p + theme(
+    plot.title = element_text(face = "bold", size = title_size, colour = CHAPTER_TITLE_COLOUR),
+    plot.subtitle = element_text(size = 9, colour = CHAPTER_SUBTITLE_COLOUR,
+                                 lineheight = 1.25, margin = margin(b = 8)),
+    plot.caption = element_text(size = 8.2, hjust = 0, colour = CHAPTER_CAPTION_COLOUR,
+                                lineheight = 1.3, margin = margin(t = 8))
   )
+}
 
-ggsave(OUT_PATH, fig, width = 13, height = 6.8, dpi = 400, bg = "white")
-message("Wrote ", OUT_PATH)
+ggsave(OUT_MAP, standalone(p_map), width = 7.5, height = 7.2, dpi = 400, bg = "white")
+message("Wrote ", OUT_MAP)
+ggsave(OUT_TRANS, standalone(p_trans), width = 8, height = 5.4, dpi = 400, bg = "white")
+message("Wrote ", OUT_TRANS)
+ggsave(OUT_ROUTE, standalone(p_route), width = 8, height = 3.4, dpi = 400, bg = "white")
+message("Wrote ", OUT_ROUTE)
 message("Done.")
