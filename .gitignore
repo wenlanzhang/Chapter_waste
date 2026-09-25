@@ -7,9 +7,6 @@
 __pycache__/
 *.py[cod]
 
-# Network/download cache (build artefact, 30 MB+)
-cache/
-
 # Thumbnails
 ._*
 

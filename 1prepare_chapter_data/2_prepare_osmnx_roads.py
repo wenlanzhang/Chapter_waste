@@ -5,6 +5,15 @@ Produces numbered road layers:
   02 osmnx raw   — download, project, truncate (no simplify)
   04 osmnx cleaned — simplify + standard cleaning
   05 comparison  — overlap / local_only / osmnx_only on cleaned layers
+
+These feed Step 1c's local-vs-OSMnx road comparison only. Step 2's coverage
+analysis runs on the local extract (lib.roads.ROAD_FILES["coverage"]).
+
+OSMnx caches the raw Overpass response, and that cache is kept deliberately:
+OpenStreetMap changes daily, so a re-download would return a different snapshot
+and silently change these layers. The cache is pinned under the data root
+rather than left in the repo working directory, next to the road layers it
+produced.
 """
 
 from __future__ import annotations
@@ -33,6 +42,14 @@ from lib.roads import (  # noqa: E402
 
 INPUT_DIR = prep_dir()
 OUTPUT_DIR = INPUT_DIR
+
+# Pin OSMnx's Overpass cache beside the layers it produces. Without this it
+# defaults to ./cache relative to the working directory, so the snapshot ends up
+# wherever the script happened to be run from.
+CACHE_DIR = INPUT_DIR / "osmnx_cache"
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+ox.settings.cache_folder = str(CACHE_DIR)
+ox.settings.use_cache = True
 
 BOUNDARY_GPKG = INPUT_DIR / "Nairobi_boundary_polygon_32737.gpkg"
 SVI_GPKG = INPUT_DIR / "Nairobi_SVI_point_gsvi_32737.gpkg"

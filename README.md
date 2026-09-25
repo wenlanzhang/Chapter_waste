@@ -40,7 +40,6 @@ Chapter_waste/
 │   └── 4_pattern/              HDBSCAN/ settlement/ Signed_distance/, both arms
 │
 ├── Figure/<step>/              outputs, numbered by the block that produces them
-└── drafts/                     scratch analyses kept out of the pipeline
 ```
 
 Data lives outside the repo under `$PHD_DATA_ROOT/Chapter_waste/<step>/`, mirroring these names. Each step writes its chapter tables to `<step>/thesis_table/` and its working outputs beside them.
@@ -170,7 +169,9 @@ Downloads Nairobi roads via OSMnx (`network_type='all'`), producing:
 | `Nairobi_road_02_osmnx_raw_32737.gpkg`     | Download, project, truncate (no simplify) | ~587,562 | ~14,917 km |
 | `Nairobi_road_04_osmnx_cleaned_32737.gpkg` | `simplify_graph` + `clean_road_segments`  | ~181,287 | ~14,917 km |
 
-**Used by all step-2 coverage scripts:** `Nairobi_road_03_local_cleaned_32737.gpkg` (`ROAD_FILES["coverage"]` in `lib.roads`).
+**Used by all step-2 coverage scripts:** `Nairobi_road_03_local_cleaned_32737.gpkg` (`ROAD_FILES["coverage"]` in `lib.roads`). The OSMnx layers feed the Step 1c comparison only.
+
+**OSMnx cache.** `2_prepare_osmnx_roads.py` pins OSMnx's Overpass cache to `$PHD_DATA_ROOT/Chapter_waste/1prepare_chapter_data/osmnx_cache/` (35 MB, one response, OSM base `2026-09-21T18:06:51Z`). It is kept on purpose: OpenStreetMap changes daily, so deleting it and re-running would return a different snapshot and silently change the 02 / 04 / 05 layers and their figures. Without the pin OSMnx writes to `./cache` relative to the working directory, so the snapshot would land wherever the script was run from.
 
 
 Also writes comparison tables and a spatial overlap layer:
