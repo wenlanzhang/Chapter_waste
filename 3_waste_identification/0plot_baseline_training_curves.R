@@ -9,11 +9,22 @@
 # checkpoint carried forward is the one Ultralytics selected, rather than a
 # stopping point chosen after seeing the test results.
 #
-# The validation curve here is Ultralytics' own internal split of the training
-# set, not the independent held-out set used in figures 1-2. The two are not
-# comparable and the caption says so.
+# The "validation" curve here is Ultralytics' own internal split, not the
+# independent held-out set used in figures 1-2. Verified from the run's config
+# and the surviving split lists rather than assumed:
 #
-# Input:  Waste/img/train_SVI_Yolo/results.csv   (raw Ultralytics training log)
+#   args.yaml          data: Data/Train0315_695/Waste.yaml, split: val
+#   dataSet/train.txt  625 images
+#   dataSet/val.txt     70 images, zero overlap with train, all inside the 695 pool
+#
+# So the val columns are 70 of the same 695 training images. The held-out set is
+# independent of both: 0 of its 180 images appear in that val split or anywhere
+# in the 695 pool, and sampling/heldout_GSVI_p100_test.csv flags in_training_695
+# as False for all 180. The two mAP figures are therefore not comparable, and
+# the caption says which is which.
+#
+# Input:  Waste/img/train_SVI_Yolo/results.csv   (raw Ultralytics training log,
+#         an artefact of the training run itself — not produced by this pipeline)
 # Writes: 3_waste_identification/0_baseline_yolo_training_checkpoint.csv
 
 suppressPackageStartupMessages({
@@ -91,7 +102,17 @@ meta <- tibble(
   selected_mAP50_95 = best_row$mAP50_95[[1]],
   selected_precision = best_row$precision[[1]],
   selected_recall = best_row$recall[[1]],
-  training_note = "Baseline YOLO11x on Train0315_695 (610 GSVI + 85 SC; 100% SC-slot retention)"
+  training_note = "Baseline YOLO11x on Train0315_695 (610 GSVI + 85 SC; 100% SC-slot retention)",
+  # Split provenance, so the figure's "validation" is traceable without opening
+  # the training machine's config.
+  data_yaml = "Waste/img/Train0315_695/Waste.yaml",
+  n_train_images = 625L,
+  n_internal_val_images = 70L,
+  val_split_note = paste(
+    "Internal split of the 695-image training pool (dataSet/train.txt + val.txt,",
+    "no overlap). Not the independent held-out set used in figures 1-2, which",
+    "shares no images with this pool."
+  )
 )
 dir.create(dirname(OUT_META), recursive = TRUE, showWarnings = FALSE)
 write_csv(meta, OUT_META)
@@ -195,7 +216,8 @@ panel <- (p_loss / p_map) +
     subtitle = "Train0315_695 — 610 GSVI + 85 self-collected images; dashed line marks the selected best.pt checkpoint",
     caption = paste0(
       "Source: the raw Ultralytics training log (Waste/img/train_SVI_Yolo/results.csv). Checkpoint selected by maximum validation mAP@0.50, Ultralytics' own best.pt rule.\n",
-      "The validation split here is internal to training. It is not the independent held-out set used in figures 1 and 2, and the two sets of numbers are not comparable.\n",
+      "\"Validation\" here is an internal split — 70 of the same 695 training images (dataSet/val.txt). It is not the independent held-out set used in figures 1 and 2,\n",
+      "which shares no images with this training pool, so the mAP values in the two places are not comparable.\n",
       "Early-epoch val/cls loss spikes into the hundreds and the y-axis in (A) is clipped so the converged region stays readable."
     ),
     theme = theme(
