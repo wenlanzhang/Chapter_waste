@@ -39,7 +39,8 @@ Outputs (Data/Chapter_waste/6_selfcollected/1_sources/):
   1_Nairobi_sc_coverage_summary.csv           one row, every number in the tables
   1_Nairobi_sc_new_cells_32737.gpkg           the newly covered cells only (for the map)
   thesis_table/table_6_1_sc_sources.csv       images / panoramas / waste by source (chapter)
-  1_sc_coverage_change.csv                    GSVI -> GSVI+SC coverage change
+  1_sc_coverage_change.csv                    GSVI -> GSVI+SC coverage change,
+                                              including P_new and E_cov
   1_Nairobi_sc_new_cells_location.csv         where the new cells are
 """
 
@@ -219,6 +220,8 @@ def compute_summary(cells: pd.DataFrame, src: dict[str, gpd.GeoDataFrame], far_m
     new = cells.loc[cells["newly_observed"] == 1]
     far_gsvi = int((cells["dist_nearest_obs_gsvi_m"] > far_m).sum())
     far_gsc = int((cells["dist_nearest_obs_gsc_m"] > far_m).sum())
+    n_sc_cells = int((cells["n_images_sc"] > 0).sum())
+    n_images_sc = len(src["images_sc"])
 
     return pd.Series(
         {
@@ -243,6 +246,15 @@ def compute_summary(cells: pd.DataFrame, src: dict[str, gpd.GeoDataFrame], far_m
             "n_cells_newly_observed": len(new),
             "pct_cells_newly_observed": 100.0 * len(new) / n,
             "pct_gain_relative": 100.0 * len(new) / obs_gsvi if obs_gsvi else np.nan,
+            # How much new coverage the collecting effort actually bought.
+            # P_new: of the cells self-collection reached, what share had no
+            #        GSVI image before. Its complement is redundant effort.
+            # E_cov: newly observed cells per self-collected image. Reported
+            #        also as its reciprocal, which reads more naturally.
+            "pct_sc_cells_previously_unobserved": 100.0 * len(new) / n_sc_cells if n_sc_cells else np.nan,
+            "pct_sc_cells_redundant": 100.0 * (n_sc_cells - len(new)) / n_sc_cells if n_sc_cells else np.nan,
+            "newly_observed_cells_per_sc_image": len(new) / n_images_sc if n_images_sc else np.nan,
+            "sc_images_per_newly_observed_cell": n_images_sc / len(new) if len(new) else np.nan,
             "n_cells_beyond_far_gsvi": far_gsvi,
             "pct_cells_beyond_far_gsvi": 100.0 * far_gsvi / n,
             "n_cells_beyond_far_gsc": far_gsc,
@@ -317,6 +329,19 @@ def build_coverage_table(s: pd.Series) -> pd.DataFrame:
             "—",
             f"{fmt_int(s['n_cells_newly_observed'])} ({s['pct_cells_newly_observed']:.2f}% of the city)",
             f"+{s['pct_gain_relative']:.1f}% of the GSVI frame",
+        ),
+        # What the collecting effort bought, rather than how much of it there was.
+        (
+            "Self-collected cells that were previously unobserved (P_new)",
+            "—",
+            f"{s['pct_sc_cells_previously_unobserved']:.1f}%",
+            f"{s['pct_sc_cells_redundant']:.1f}% already observed",
+        ),
+        (
+            "Self-collected images per newly observed cell (1 / E_cov)",
+            "—",
+            f"{s['sc_images_per_newly_observed_cell']:.0f}",
+            f"E_cov = {s['newly_observed_cells_per_sc_image']:.3f} cells per image",
         ),
     ]
     return pd.DataFrame(
@@ -394,6 +419,13 @@ def main() -> None:
     coverage.to_csv(COVERAGE_TABLE, index=False)
     location = build_location_table(cells.drop(columns="geometry"), s)
     location.to_csv(LOCATION_CSV, index=False)
+
+    print(f"\nWhat the collecting effort bought:")
+    print(f"  {int(s['n_cells_with_sc']):,} cells received self-collected imagery; "
+          f"{s['pct_sc_cells_previously_unobserved']:.1f}% of them had no GSVI image before "
+          f"({s['pct_sc_cells_redundant']:.1f}% already observed)")
+    print(f"  {s['sc_images_per_newly_observed_cell']:.0f} self-collected images per newly "
+          f"observed cell (E_cov = {s['newly_observed_cells_per_sc_image']:.3f})")
 
     print(f"\nCell-assignment rules (they differ; both are reported):")
     print(f"  snapped (this script, Step 2e): {int(s['n_cells_observed_gsvi']):,} cells "

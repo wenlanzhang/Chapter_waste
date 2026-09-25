@@ -727,6 +727,8 @@ One table across the whole representation pipeline, assembled from the sub-steps
 | --- | --- | --- | --- | --- |
 | Observation | Directly observed 100 m cells † | 22,725 (32.5%) | 22,852 (32.7%) | +127 (+0.2 pp) |
 | | Cells >500 m from an observation | 13,149 (18.8%) | 12,855 (18.4%) | −294 (−0.4 pp) |
+| | Cells reached by SC that were previously unobserved (P_new) | — | 9.9% | 90.1% already observed |
+| | Self-collected images per newly observed cell | — | **23** | E_cov = 0.043 |
 | Measurement | CV–VLM F1 | 91.1% | 92.7% | +1.6 pp |
 | Indicator | Direct share of represented cells ‡ | 33.2% | 33.4% | +0.2 pp |
 | | Cells changing final indicator class | — | 670 (1.0%) | — |
@@ -746,7 +748,9 @@ They differ by **53 cells**. Neither is wrong: the indicator *must* use the stri
 
 The Measurement row is 0% vs 100% self-collected in the **training mix**, scored on the GSVI held-out set — the chapter's only independent test set. It answers "does local training data make the detector better", not "does the detector work on local imagery"; the latter would need a self-collected test set, which is out of scope.
 
-Read down the Change column: nothing moves by much. Coverage gains 0.2 pp, the indicator's evidential basis gains 0.2 pp, agreement with local validation gets marginally *worse*, and the spatial conclusions are unchanged. **The one substantive number is that 90.1% of the cells whose class changed never received an image** — the surface moved through interpolation rather than evidence.
+Read down the Change column: nothing moves by much. Coverage gains 0.2 pp, the indicator's evidential basis gains 0.2 pp, agreement with local validation gets marginally *worse*, and the spatial conclusions are unchanged.
+
+Two rows carry the argument. **Of the 1,286 cells field collection reached, only 9.9% had no GSVI image before** — nine in ten photographs went where the platform had already been, so it took about **23 self-collected images to light up one new 100 m cell**. And at the indicator stage, **90.1% of the cells whose class changed never received an image**: the surface moved through interpolation rather than evidence. Collecting more imagery is not, on this evidence, an efficient route to closing a representation gap.
 
 ### Tables
 

@@ -87,6 +87,15 @@ def observation_rows() -> list[dict]:
             f"{int(s['n_cells_beyond_far_gsc']):,} ({s['pct_cells_beyond_far_gsc']:.1f}%)",
             f"{int(s['n_cells_beyond_far_gsc'] - s['n_cells_beyond_far_gsvi']):+,} "
             f"({s['pct_cells_beyond_far_gsc'] - s['pct_cells_beyond_far_gsvi']:+.1f} pp)"),
+        # Not how much imagery was collected, but what it bought. P_new is the
+        # share of reached cells that were new; the reciprocal of E_cov says how
+        # many photographs one newly observed cell cost.
+        row("Observation", "Cells reached by SC that were previously unobserved (P_new)",
+            "—", f"{s['pct_sc_cells_previously_unobserved']:.1f}%",
+            f"{s['pct_sc_cells_redundant']:.1f}% already observed"),
+        row("Observation", "Self-collected images per newly observed cell",
+            "—", f"{s['sc_images_per_newly_observed_cell']:.0f}",
+            f"E_cov = {s['newly_observed_cells_per_sc_image']:.3f}"),
     ]
 
 
