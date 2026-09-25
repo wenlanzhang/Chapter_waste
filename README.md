@@ -680,7 +680,19 @@ Rscript 5_spatial_pattern/Signed_distance/3plot_waste_settlement_proximity.R
 python  5_spatial_pattern/Signed_distance/pop_adjusted/1_pop_adjusted_gam.py
 Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/2_plot_pop_adjusted_gam.R
 Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/3_plot_mdp_residual_map.R
+Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/4plot_pop_scaling_null.R
 ```
+
+**The proportional-growth null** (`4plot_pop_scaling_null.R` → `Pop_scaling_null.png`) answers the obvious question about the population curve: what would it look like if waste simply scaled with people? That is an elasticity of exactly 1 — a straight line of slope 1 on log-log axes. The fitted elasticity is **0.52**, so prevalence rises roughly as the square root of density: a tenfold denser cell carries about 3.3× the prevalence, not 10×.
+
+| Density | Fitted | If proportional | Ratio |
+| ---: | ---: | ---: | ---: |
+| 5,000 /km² | 1.62% | 4.80% | 3.0× |
+| 10,000 /km² | 2.70% | 9.34% | 3.5× |
+| 30,000 /km² | 4.82% | 28.31% | 5.9× |
+| 50,000 /km² | 6.46% | 46.99% | 7.3× |
+
+Panel (b) is where the comparison can be read, since a constant elasticity is straight only on log-log axes; panel (a) shows the same curves on the axes `Pop_adjusted_gam_effects.png` uses, where the null accelerates off the panel. Read it with care: the outcome is a binary per-panorama indicator and therefore saturates, so part of the shortfall from 1 may be that ceiling rather than less waste per person.
 
 Or `snakemake all`, which resolves the same order.
 

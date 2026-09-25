@@ -45,6 +45,7 @@ SPATIAL_FIGS = [
     PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_population.png",
     PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_mdp_residual_map.png",
     PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_mdp_excess_prob_map.png",
+    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_scaling_null.png",
     PAT_FIG / "HDBSCAN" / "period_stratified_robustness" / "Period_HDBSCAN_comparison.png",
     PAT_FIG / "Signed_distance" / "period_stratified_robustness" / "Period_signed_distance_gam_curve.png",
     PAT_FIG / "Signed_distance" / "pop_adjusted" / "worldpop_2020" / "Pop_adjusted_gam_effects.png",
@@ -251,3 +252,13 @@ rule proximity_descriptives:
     shell:
         "python {SPATIAL_SRC}/Signed_distance/3_proximity_descriptives.py && "
         "Rscript {SPATIAL_SRC}/Signed_distance/3plot_waste_settlement_proximity.R"
+
+
+# 5c sensitivity — the proportional-growth null for the population effect.
+rule plot_pop_scaling_null:
+    input:
+        PAT_POP / "Nairobi_pop_adjusted_curve_population.csv",
+    output:
+        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_scaling_null.png",
+    shell:
+        "Rscript {REPO_ROOT}/5_spatial_pattern/Signed_distance/pop_adjusted/4plot_pop_scaling_null.R"
