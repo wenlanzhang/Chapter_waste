@@ -26,6 +26,7 @@ Chapter_waste/
 ├── 1prepare_chapter_data/      harmonised layers, local + OSMnx roads, road figures
 ├── 2coverage_analysis/         1cityroad / 2roadsvi / 3sviwaste / 4roadwaste / 5_gridsvi (+ plots)
 ├── 3_waste_identification/     held-out metrics, Qwen review, replicate notebook (+ plots)
+│                               (data dir also holds training/ — provenance, read by nothing)
 ├── 4_100m/                     indicator build, crowd validation (+ plots)
 ├── 5_spatial_pattern/
 │   ├── HDBSCAN/                clustering + settlement context
@@ -1029,7 +1030,15 @@ git checkout f0d3b5b -- archive/ Figure/archive/
 
 Excluded by decision rather than superseded: KDE, distance decay, the n = 107 self-collected held-out set, `Waste_HDBSCAN_gsvi`, `HDBSCAN_100m_cell_sensitivity`, the self-collected cluster-size distribution, and the optional admin-unit socio-economic analysis (`99_optional_SE_analysis`).
 
-Archived *data* is untouched, under `$PHD_DATA_ROOT/Chapter_waste/archive_2026-09-21/`.
+Archived *data* has also been removed (1.4 GB, 566 files). It was regenerable pipeline output, except for the training provenance, which was verified byte-for-byte and moved to `$PHD_DATA_ROOT/Chapter_waste/3_waste_identification/training/`:
+
+| Kept | What it is |
+| --- | --- |
+| `scenarios/sc_{0,25,50,75,100}pct_training.csv` | which images trained each of the five detectors — the only copy |
+| `Train0315_695_*` | the 695-image pool, its label manifest and inventory |
+| `heldout_runs/` | `sc_100pct` predictions with `predicted_bboxes` and `panoid`, the three Qwen replicates, the 30 false positives and Qwen's raw replies |
+
+Not kept: the n = 107 self-collected held-out set, ~40 MB of YOLO val-run diagnostics (held on Colab), three superseded `_with_qwen` drafts, and the regenerable coverage / 100 m / spatial-pattern outputs. See `3_waste_identification/training/README.md` for the full record.
 
 ---
 
