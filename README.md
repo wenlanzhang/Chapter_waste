@@ -216,6 +216,28 @@ All step-2 scripts read from `Chapter_waste/1prepare_chapter_data/` and write to
 
 **Road input:** `Nairobi_road_03_local_cleaned_32737.gpkg` (local OSM cleaned segments; from step 1a).
 
+### 2.0 `0_grid_coverage_funnel.py` — the whole cascade on one unit
+
+Blocks 2a–2e each measure one narrowing on whichever unit suits it. This puts the chain back on the 100 m cell so it reads end to end — the figure companion to `table_0_coverage_headline.csv`.
+
+| Context | Cells | Of city | Of previous |
+| --- | ---: | ---: | ---: |
+| City | 69,943 | 100.0% | — |
+| Road-accessible | 56,120 | 80.2% | 80.2% |
+| GSVI-observed | 22,725 | 32.5% | 40.5% |
+| Waste-positive | 2,065 | 3.0% | 9.1% |
+
+The nested matrix gives every conditional share. Its one off-nominal cell is the useful one: **three GSVI-observed cells are road-excluded**, so "road-accessible given GSVI-observed" is 99.99% rather than 100%. Street View occurs on mapped roads, and a perfectly nested chain would be the suspicious result.
+
+```bash
+python  2coverage_analysis/0_grid_coverage_funnel.py     # needs 2c and 2e
+Rscript 2coverage_analysis/0plot_grid_coverage_funnel.R
+```
+
+**Figure:** `0_Nairobi_grid_coverage_funnel.png` — (a) the funnel, (b) the nested matrix.
+
+---
+
 ### 2a. `1cityroad.py` — City → road (100 m grid)
 
 **Unit:** the active 100 m grid (`chapter_paths.active_grid_gpkg()`, 69,943 cells). Arm independent. For each cell, three road metrics from the cleaned local OSM segments:

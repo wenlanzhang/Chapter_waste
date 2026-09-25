@@ -248,3 +248,33 @@ rule plot_process_zoom:
         n="|".join(str(n) for n in ZOOM_BLOCK_SIZES),
     shell:
         "Rscript {REPO_ROOT}/2coverage_analysis/6plot_process_zoom_map.R --svi-buffer-m={params.svi_buffer_m} --block-cols={wildcards.n} --block-rows={wildcards.n}"
+
+
+# Block 0 — the whole cascade back on one unit, as a figure companion to
+# table_0_coverage_headline.csv. Depends on 2c and 2e.
+COVERAGE_DATA += [
+    COV / "0_Nairobi_grid_coverage_funnel.csv",
+    COV / "0_Nairobi_grid_coverage_matrix.csv",
+]
+COVERAGE_FIGS += [FIG / "2coverage_analysis" / "0_Nairobi_grid_coverage_funnel.png"]
+
+
+rule grid_coverage_funnel:
+    input:
+        sviwaste_gpkg("gsvi"),
+        COV / "5_Nairobi_gridsvi_grid100m_gsvi_32737.gpkg",
+    output:
+        COV / "0_Nairobi_grid_coverage_funnel.csv",
+        COV / "0_Nairobi_grid_coverage_matrix.csv",
+    shell:
+        "python {REPO_ROOT}/2coverage_analysis/0_grid_coverage_funnel.py"
+
+
+rule plot_grid_coverage_funnel:
+    input:
+        COV / "0_Nairobi_grid_coverage_funnel.csv",
+        COV / "0_Nairobi_grid_coverage_matrix.csv",
+    output:
+        FIG / "2coverage_analysis" / "0_Nairobi_grid_coverage_funnel.png",
+    shell:
+        "Rscript {REPO_ROOT}/2coverage_analysis/0plot_grid_coverage_funnel.R"
