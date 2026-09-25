@@ -39,8 +39,7 @@ Chapter_waste/
 │   └── 4_pattern/              HDBSCAN/ settlement/ Signed_distance/, both arms
 │
 ├── Figure/<step>/              outputs, numbered by the block that produces them
-├── drafts/                     scratch analyses kept out of the pipeline
-└── archive/2026-09-21/         superseded scripts; nothing live reads them
+└── drafts/                     scratch analyses kept out of the pipeline
 ```
 
 Data lives outside the repo under `$PHD_DATA_ROOT/Chapter_waste/<step>/`, mirroring these names. Each step writes its chapter tables to `<step>/thesis_table/` and its working outputs beside them.
@@ -277,7 +276,7 @@ python 2coverage_analysis/2roadsvi.py --table-only --svi-buffer-m 50
 Rscript 2coverage_analysis/2plot_roadsvi_maps.R --svi-buffer-m=50
 ```
 
-The buffer distance is a parameter (`--svi-buffer-m`), but only the 50 m result is part of the pipeline; the 75/100 m sensitivity outputs were dropped (archived under `archive_2026-09-21/2coverage_analysis_buffer_sensitivity/`).
+The buffer distance is a parameter (`--svi-buffer-m`), but only the 50 m result is part of the pipeline; the 75/100 m sensitivity outputs were dropped. Their data is still under `$PHD_DATA_ROOT/Chapter_waste/archive_2026-09-21/2coverage_analysis_buffer_sensitivity/`.
 
 **Outputs** (tagged by buffer + arm, `buf50m_gsvi`):
 
@@ -1017,6 +1016,20 @@ The model-free version is the more persuasive one — the observed rate by band,
 **Figure:** `1_SC_gam_comparison.png` — (a) observed rate by band, both arms, (b) both fitted curves.
 
 ---
+
+---
+
+## Superseded material
+
+`archive/2026-09-21/` (scripts) and `Figure/archive/2026-09-21/` (71 figures) were removed once every figure had been rebuilt in Steps 0–6 or excluded by decision. They remain in git history and on `origin/main` up to commit `f0d3b5b`; recover any of it with:
+
+```bash
+git checkout f0d3b5b -- archive/ Figure/archive/
+```
+
+Excluded by decision rather than superseded: KDE, distance decay, the n = 107 self-collected held-out set, `Waste_HDBSCAN_gsvi`, `HDBSCAN_100m_cell_sensitivity`, the self-collected cluster-size distribution, and the optional admin-unit socio-economic analysis (`99_optional_SE_analysis`).
+
+Archived *data* is untouched, under `$PHD_DATA_ROOT/Chapter_waste/archive_2026-09-21/`.
 
 ---
 
