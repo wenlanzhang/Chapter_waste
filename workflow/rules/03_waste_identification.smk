@@ -20,14 +20,15 @@ WASTE_ID_DATA = [
 ]
 
 WASTE_ID_FIGS = [
+    WASTE_ID_FIG / "0_Baseline_YOLO_training_curves.png",
     WASTE_ID_FIG / "1_Heldout_yolo_qwen_panel.png",
     WASTE_ID_FIG / "1_Heldout_qwen_only_panel.png",
     WASTE_ID_FIG / "2_Heldout_qwen_replicate_stability.png",
-    WASTE_ID_FIG / "3_Heldout_validation_binary_metrics.png",
-    WASTE_ID_FIG / "3_Heldout_validation_binary_bars.png",
-    WASTE_ID_FIG / "4_Heldout_validation_stage_metrics.png",
-    WASTE_ID_FIG / "4_Heldout_validation_stage_bars.png",
 ]
+
+# table_4_sc_sensitivity_detail.csv is written here but plotted in Step 6.2:
+# the scenario sweep is one pass over all training mixes, and the figures that
+# read it belong with the rest of the self-collected argument.
 
 
 rule heldout_metrics:
@@ -41,6 +42,18 @@ rule heldout_metrics:
         WASTE_ID_THESIS / "table_4_sc_sensitivity_detail.csv",
     shell:
         "python {REPO_ROOT}/3_waste_identification/1_heldout_metrics.py"
+
+
+# The raw Ultralytics log is not produced by this pipeline; it is the training
+# run's own output, kept under Waste/img/ with the rest of the model artefacts.
+rule plot_baseline_training_curves:
+    input:
+        PHD_DATA / "Waste" / "img" / "train_SVI_Yolo" / "results.csv",
+    output:
+        WASTE_ID_FIG / "0_Baseline_YOLO_training_curves.png",
+        WASTE_ID / "0_baseline_yolo_training_checkpoint.csv",
+    shell:
+        "Rscript {REPO_ROOT}/3_waste_identification/0plot_baseline_training_curves.R"
 
 
 rule plot_heldout_panel:
@@ -60,23 +73,3 @@ rule plot_qwen_stability:
         WASTE_ID_FIG / "2_Heldout_qwen_replicate_stability.png",
     shell:
         "Rscript {REPO_ROOT}/3_waste_identification/2plot_qwen_stability.R"
-
-
-rule plot_sc_sensitivity:
-    input:
-        WASTE_ID_THESIS / "table_4_sc_sensitivity_detail.csv",
-    output:
-        WASTE_ID_FIG / "3_Heldout_validation_binary_metrics.png",
-        WASTE_ID_FIG / "3_Heldout_validation_binary_bars.png",
-    shell:
-        "Rscript {REPO_ROOT}/3_waste_identification/3plot_sc_sensitivity.R"
-
-
-rule plot_stage_comparison:
-    input:
-        WASTE_ID_THESIS / "table_4_sc_sensitivity_detail.csv",
-    output:
-        WASTE_ID_FIG / "4_Heldout_validation_stage_metrics.png",
-        WASTE_ID_FIG / "4_Heldout_validation_stage_bars.png",
-    shell:
-        "Rscript {REPO_ROOT}/3_waste_identification/4plot_stage_comparison.R"

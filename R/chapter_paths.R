@@ -1,4 +1,4 @@
-# Shared data roots for Steps 0–7. Override with PHD_DATA_ROOT.
+# Shared data roots for Steps 0–6. Override with PHD_DATA_ROOT.
 phd_data_root <- Sys.getenv(
   "PHD_DATA_ROOT",
   unset = "/Users/wenlanzhang/Downloads/PhD_UCL/Data"

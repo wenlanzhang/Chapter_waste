@@ -40,7 +40,6 @@ ARMS = {
         "sizes_csv": OUTPUT_DIR / "Nairobi_hdbscan_cluster_sizes_gsvi.csv",
         "summary_csv": OUTPUT_DIR
         / "Nairobi_hdbscan_cluster_size_summary_gsvi.csv",
-        "thesis_sizes": TABLE_DIR / "table_hdbscan_cluster_sizes_gsvi.csv",
         "label": "GSVI waste-positive panoramas",
     },
 }
@@ -147,7 +146,6 @@ def process_arm(key: str) -> dict:
 
     sizes = cluster_size_table(gdf)
     sizes.to_csv(meta["sizes_csv"], index=False)
-    sizes.to_csv(meta["thesis_sizes"], index=False)
 
     summary = summarise(gdf, sizes, meta["label"], key)
     pd.DataFrame([summary]).to_csv(meta["summary_csv"], index=False)
@@ -176,9 +174,8 @@ def main() -> None:
     summaries = [
         process_arm("gsvi"),
     ]
-    comparison = OUTPUT_DIR / "Nairobi_hdbscan_cluster_size_summary_comparison.csv"
-    pd.DataFrame(summaries).to_csv(comparison, index=False)
-    print(f"Wrote {comparison}")
+    # Per-cluster sizes stay beside the geopackage; they back a figure rather
+    # than standing as a chapter table.
 
 
 if __name__ == "__main__":

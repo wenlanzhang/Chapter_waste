@@ -51,8 +51,6 @@ ARMS = {
         / "Nairobi_hdbscan_cluster_distance_counts_gsvi.csv",
         "summary_csv": OUTPUT_DIR
         / "Nairobi_hdbscan_settlement_context_summary_gsvi.csv",
-        "thesis_csv": TABLE_DIR
-        / "table_hdbscan_cluster_distance_composition_gsvi.csv",
         "label": "GSVI waste-positive panoids",
     },
 }
@@ -160,7 +158,6 @@ def process_arm(key: str, slums) -> dict:
     counts, props = composition_tables(gdf.drop(columns="geometry", errors="ignore"))
     counts.to_csv(meta["count_csv"], index=False)
     props.to_csv(meta["prop_csv"], index=False)
-    props.to_csv(meta["thesis_csv"], index=False)
 
     summary = summary_metrics(gdf, props, meta["label"])
     summary["arm"] = key
@@ -190,9 +187,7 @@ def main() -> None:
     slums = load_slums()
     summaries = [process_arm("gsvi", slums)]
 
-    comparison = OUTPUT_DIR / "Nairobi_hdbscan_settlement_context_summary_comparison.csv"
-    pd.DataFrame(summaries).to_csv(comparison, index=False)
-    print(f"Wrote {comparison}")
+    # Per-cluster composition stays beside the geopackage; it backs a figure.
 
 
 if __name__ == "__main__":

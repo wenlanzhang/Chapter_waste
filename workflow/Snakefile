@@ -21,7 +21,6 @@ os.environ["USE_EXTENDED_GRID"] = USE_EXTENDED_FLAG
 
 from chapter_paths import (
     active_grid_gpkg,
-    compare_dir,
     coverage_dir,
     extend_dir,
     figure_dir,
@@ -29,6 +28,7 @@ from chapter_paths import (
     pattern_dir,
     phd_data_root,
     prep_dir,
+    selfcollected_dir,
     waste_id_dir,
 )
 from lib.arms import ARMS, ARM_KEYS
@@ -39,7 +39,6 @@ PREP = prep_dir()
 EXT = extend_dir()
 COV = coverage_dir()
 GRID100 = grid100_dir()
-CMP = compare_dir()
 PAT = pattern_dir()
 
 ROAD_BUF = int(config.get("road_buffer_m", 50))
@@ -66,6 +65,7 @@ include: "rules/02_coverage.smk"
 include: "rules/03_waste_identification.smk"
 include: "rules/04_100m.smk"
 include: "rules/05_spatial.smk"
+include: "rules/06_selfcollected.smk"
 
 STEP_LISTS = [
     ("PREPARE_DATA", "PREPARE_FIGS", True),
@@ -75,9 +75,7 @@ STEP_LISTS = [
     ("WASTE_ID_DATA", "WASTE_ID_FIGS", True),
     ("GRID100M_DATA", "GRID100M_FIGS", True),
     ("SPATIAL_DATA", "SPATIAL_FIGS", True),
-    ("GRID_DATA", "GRID_FIGS", True),
-    ("COMPARE_DATA", "COMPARE_FIGS", True),
-    ("SPATIAL_DATA", "SPATIAL_FIGS", True),
+    ("SELFCOLLECTED_DATA", "SELFCOLLECTED_FIGS", True),
 ]
 
 

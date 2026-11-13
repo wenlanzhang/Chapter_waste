@@ -1,4 +1,4 @@
-# Shared styling for 4_compare and 5_spatial_pattern figures
+# Shared map styling for the spatial-pattern and self-collected figures.
 
 suppressPackageStartupMessages({
   library(ggplot2)

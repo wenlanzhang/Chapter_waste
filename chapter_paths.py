@@ -1,4 +1,4 @@
-"""Shared data roots for Steps 0–7 (+ optional SE). Override with PHD_DATA_ROOT / USE_EXTENDED_GRID.
+"""Shared data roots for Steps 0–6. Override with PHD_DATA_ROOT / USE_EXTENDED_GRID.
 
 CLI scripts should put the repo root on ``sys.path`` before importing this module:
 
@@ -58,24 +58,13 @@ def figure_dir() -> Path:
     return REPO_ROOT / "Figure"
 
 
-def compare_dir() -> Path:
-    return chapter_data_root() / "4_compare"
-
-
 def pattern_dir() -> Path:
     return chapter_data_root() / "5_spatial_pattern"
 
 
-def training_dir() -> Path:
-    return chapter_data_root() / "6_sensitivity_training"
-
-
-def heldout_dir() -> Path:
-    return chapter_data_root() / "7_heldout_validation"
-
-
-def optional_se_dir() -> Path:
-    return chapter_data_root() / "99_optional_SE_analysis"
+def selfcollected_dir() -> Path:
+    """Step 6: what self-collected imagery adds on top of the GSVI arm."""
+    return chapter_data_root() / "6_selfcollected"
 
 
 def extended_grid_gpkg() -> Path:
@@ -87,7 +76,7 @@ def angela_grid_gpkg() -> Path:
 
 
 def active_grid_gpkg() -> Path:
-    """Step 3 grid: Mollweide-extended when present, else Angela clip.
+    """Active 100 m grid: Mollweide-extended when present, else Angela clip.
 
     ``USE_EXTENDED_GRID`` unset preserves the exists() fallback used before
     Snakemake. ``0`` / ``false`` / ``no`` forces the Angela-only clip.
