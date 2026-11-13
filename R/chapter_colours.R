@@ -1,4 +1,4 @@
-# Shared brown-ish chapter palette (aligned with 4_compare / 5_spatial_pattern figures)
+# Shared brown-ish chapter palette for the chapter figures.
 
 CHAPTER_AXIS_COLOUR <- "#4D2D18"
 

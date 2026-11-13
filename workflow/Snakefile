@@ -21,7 +21,6 @@ os.environ["USE_EXTENDED_GRID"] = USE_EXTENDED_FLAG
 
 from chapter_paths import (
     active_grid_gpkg,
-    compare_dir,
     coverage_dir,
     extend_dir,
     figure_dir,
@@ -40,7 +39,6 @@ PREP = prep_dir()
 EXT = extend_dir()
 COV = coverage_dir()
 GRID100 = grid100_dir()
-CMP = compare_dir()
 PAT = pattern_dir()
 
 ROAD_BUF = int(config.get("road_buffer_m", 50))

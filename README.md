@@ -573,7 +573,7 @@ Figure 1 is the centrepiece: panel A is patchy and follows the road network, pan
 
 ## Step 5 — Spatial pattern of visible waste (`5_spatial_pattern/`)
 
-Takes the **2,696 waste-positive GSVI panoramas** (of 76,605 available) and asks where they fall: are they clustered, are they associated with urban-poor settlements, and does that association survive controls. **GSVI arm only** — the self-collected comparison is the mitigation story and stays in `drafts/observation_opportunity/`.
+Takes the **2,696 waste-positive GSVI panoramas** (of 76,605 available) and asks where they fall: are they clustered, are they associated with urban-poor settlements, and does that association survive controls. **GSVI arm only**; the self-collected comparison is Step 6 (`6_selfcollected/`).
 
 ```
 5_spatial_pattern/

@@ -10,7 +10,7 @@ Angela's IDEAmaps_grid-boundary-nairobi.gpkg is an exact 100 m square lattice
 in ESRI:54009 (global origin). This script keeps existing clipped Angela cells
 and cell_id values, and fills constituency gaps with new Mollweide 100 m cells.
 
-Standalone experiment — does not modify Step 1 / 3_100m outputs.
+Standalone experiment — does not modify Step 1 or Step 4 outputs.
 """
 
 from __future__ import annotations

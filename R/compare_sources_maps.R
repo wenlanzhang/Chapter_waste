@@ -1,4 +1,4 @@
-# Shared loaders and map builders for 4_compare source maps
+# Shared loaders and map builders for the Step 6 source maps.
 
 WGS84 <- 4326
 
