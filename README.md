@@ -392,7 +392,7 @@ Panoramas (not images) are the unit for observation intensity here: each panoram
 Image-level evaluation of the waste detector on the **independent GSVI held-out set** (manual QA labels, balanced waste / background). The detector was retrained at several shares of self-collected (SC) imagery in its training set — one `sc_<share>pct` scenario per share — and every model is validated on the same images. Two stages are scored:
 
 1. **YOLO only** — the detector's image-level prediction
-2. **YOLO → Qwen** — a YOLO positive is kept only if Qwen2-VL also answers *Yes*; where several replicates exist the reported run is the one with the highest F1
+2. **YOLO → Qwen** — a YOLO positive is kept only if Qwen2-VL also answers *Yes*; where several replicates exist each metric is computed per run and averaged (mean confusion counts are kept only for the confusion-matrix figure)
 
 The scenario set, the sample size and the headline scenario are all read from the data, not fixed in the scripts: `1_heldout_metrics.py --scenario` chooses the headline (default `sc_100pct`), and the plotting scripts derive their axes, labels, fills and captions from the table they are given.
 
@@ -424,7 +424,7 @@ Rscript 6_selfcollected/2_identification/2plot_stage_comparison.R
 └── thesis_table/                             # 1_heldout_metrics.py's output
 ```
 
-`sampling/` records what the held-out set is and how it was drawn: sampling happens at **panorama** level so the directional views of one location cannot straddle train and test, then each panorama expands to its retained views. Its `class`, `bg_kind`, `sample_seed` and `in_training_695` columns are the audit trail for the balance, the hard-negative share, reproducibility, and the guarantee that nothing was seen in training. `2_qwen_review.py` also reads its `img_dir` column to locate each JPG on disk (falling back to the Google panorama tree) — the same files YOLO was validated on. For the current draw: 100 panoramas → 180 images, 90 waste / 90 background, 63 easy + 27 hard-negative backgrounds, seed `20260807`.
+`sampling/` records what the held-out set is and how it was drawn: sampling happens at **panorama** level so the directional views of one location cannot straddle train and test, then each panorama expands to its retained views. Its `class`, `bg_kind`, `sample_seed` and `in_training_695` columns are the audit trail for the balance, the hard-negative share, reproducibility, and the guarantee that nothing was seen in training. `2_qwen_review.py` also reads its `img_dir` column to locate each JPG on disk (falling back to the Google panorama tree) — the same files YOLO was validated on. For the current draw: 105 panoramas → 180 images, 90 waste / 90 background, 63 easy + 27 hard-negative backgrounds, seed `20260807`.
 
 ### Running the Qwen pass (`2_qwen_review.py`)
 
@@ -455,10 +455,10 @@ Start with `--dry-run` (reports the call count, makes none), then `--limit 3` as
 
 | Independent GSVI test | Accuracy | Precision | Recall | F1 |
 | --- | --- | --- | --- | --- |
-| YOLO only | 80.6% (74.2–85.7) | 73.9% (65.2–81.1) | 94.4% (87.6–97.6) | 82.9% (77.2–87.5) |
-| YOLO → Qwen | 92.8% (88.0–95.7) | 94.3% (87.2–97.5) | 91.1% (83.4–95.4) | 92.7% (87.8–95.7) |
+| YOLO only | 80.6% (75.0–86.1) | 73.9% (68.5–79.8) | 94.4% (88.9–98.9) | 82.9% (78.6–87.3) |
+| YOLO → Qwen (mean of 3 Qwen runs) | 92.2% (88.3–95.7) | 93.9% (89.5–97.7) | 90.4% (84.1–95.9) | 92.1% (87.9–95.6) |
 
-Headline scenario `sc_100pct`, Wilson binomial 95% CIs, n = 180 (`table_2_yolo_qwen_heldout_ci.csv`). The VLM pass removes 25 of 30 YOLO false positives at the cost of 3 true positives — precision +20 pp for −3 pp recall.
+Headline scenario `sc_100pct`, n = 180 (90 waste, 90 background). 95% CIs are percentile intervals from one stratified, paired bootstrap over test images (B = 10,000, fixed seed; resampled within class; each image's ground truth, YOLO prediction and all three cascade runs kept together; cascade metrics re-averaged over runs in each replicate) — image-sampling uncertainty conditional on the observed runs (`table_2_yolo_qwen_heldout_ci.csv`). On average over the three Qwen runs, the VLM pass removes 24.7 of 30 YOLO false positives at the cost of 3.7 true positives. Paired differences, cascade − YOLO, from the same replicates (`table_2_yolo_qwen_heldout_diff.csv`): accuracy +11.7 pp (6.9 to 16.5), precision +19.9 pp (14.4 to 25.5), F1 +9.1 pp (5.1 to 12.9), recall −4.1 pp (−8.1 to −0.7) — a precision gain bought with a small recall loss. Run-to-run range, reported separately: F1 91.4–92.7%.
 
 **Sensitivity to the SC share of the YOLO training set** (`table_1_yolo_detection.csv` box level, `table_4_sc_sensitivity.csv` image level). Computed here because it is one pass over all scenarios; **read and plotted in [Step 6.2](#62--the-sc-training-mix-2_identification)**:
 
@@ -472,7 +472,7 @@ Headline scenario `sc_100pct`, Wilson binomial 95% CIs, n = 180 (`table_2_yolo_q
 
 Adding self-collected imagery mainly buys **precision**: false positives fall from 39 to 30 and mAP@0.50 gains ~6 pp, while recall stays in the 94–98% band throughout.
 
-**Stability** (`table_3_qwen_replicates.csv`, from the notebook): the three independent Qwen calls on all 115 `sc_100pct` YOLO-positive images agree unanimously on 108/115 (93.9–97.4% pairwise); per-run F1 91.4 / 92.7 / 92.1%, 3-run majority 92.7%. This is the one place a multi-replicate run exists, which is why `sc_100pct` is flattered by roughly a point of F1 relative to the single-pass scenarios — the figure captions state this automatically, read off the `qwen_status` column.
+**Stability** (`table_3_qwen_replicates.csv`, from the notebook): the three independent Qwen calls on all 115 `sc_100pct` YOLO-positive images agree unanimously on 108/115 (93.9–97.4% pairwise); per-run F1 91.4 / 92.7 / 92.1%, 3-run majority 92.7%. This is the one place a multi-replicate run exists. The reported `sc_100pct` cascade is the mean of the three runs, so it is not favoured over the single-pass scenarios by picking the best run; the figure captions state the replicate count automatically, read off the `qwen_status` column.
 
 **Figures** (`Figure/3_waste_identification/`):
 

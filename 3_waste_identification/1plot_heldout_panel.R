@@ -1,9 +1,10 @@
 #!/usr/bin/env Rscript
 # Step 3 figure 1 — independent GSVI held-out, headline scenario:
 #   1_Heldout_yolo_qwen_panel.png  both stages — metric bars + two confusion matrices
+#   1_Heldout_yolo_qwen_panel_manuscript.png  the same panel without title / subtitle / caption
 #   1_Heldout_qwen_only_panel.png  the YOLO + Qwen cascade alone, for presenting the
 #                                  final result without the baseline beside it
-# Left of each: image-level Accuracy / Precision / Recall / F1 with Wilson 95% CI.
+# Left of each: image-level Accuracy / Precision / Recall / F1 with stratified paired bootstrap 95% CI.
 # Input: thesis_table/table_2_yolo_qwen_heldout_detail.csv (1_heldout_metrics.py)
 
 suppressPackageStartupMessages({
@@ -32,7 +33,7 @@ if (!file.exists(DETAIL_CSV)) {
   stop("Missing ", DETAIL_CSV, " — run 3_waste_identification/1_heldout_metrics.py first")
 }
 
-# --- Combined panel: metric bars (+ Wilson CI) | YOLO CM | YOLO→Qwen CM ---
+# --- Combined panel: metric bars (+ bootstrap CI) | YOLO CM | YOLO→Qwen CM ---
 STAGE_COLOURS <- c(
   "YOLO Only" = "#C9A27F",
   "YOLO + Qwen" = "#5F6F5A"
@@ -154,20 +155,22 @@ p_bars <- ggplot(bar_df, aes(x = metric, y = score, fill = model)) +
   )
 
 build_cm_simple <- function(tp, fp, tn, fn, title, palette) {
-  fill_max <- max(as.integer(c(tp, fp, tn, fn)), na.rm = TRUE)
+  # Counts can be fractional: the YOLO + Qwen matrix is the mean over Qwen replicates.
+  fill_max <- max(c(tp, fp, tn, fn), na.rm = TRUE)
   cm <- data.frame(
     truth = factor(c("Waste", "Waste", "Background", "Background"), levels = CLASS_LEVELS),
     pred = factor(c("Waste", "Background", "Waste", "Background"), levels = CLASS_LEVELS),
-    n = c(as.integer(tp), as.integer(fn), as.integer(fp), as.integer(tn)),
+    n = as.numeric(c(tp, fn, fp, tn)),
     stringsAsFactors = FALSE
   ) |>
     mutate(
+      label = ifelse(abs(n - round(n)) < 1e-9, sprintf("%d", as.integer(round(n))), sprintf("%.1f", n)),
       text_colour = chocolate_label_colour(n, limits = c(0, fill_max), trans = "sqrt")
     )
 
   ggplot(cm, aes(x = pred, y = truth, fill = n)) +
     geom_tile(colour = "white", linewidth = 1.1) +
-    geom_text(aes(label = n, colour = text_colour), size = 5.2, fontface = "bold") +
+    geom_text(aes(label = label, colour = text_colour), size = 5.2, fontface = "bold") +
     scale_colour_identity() +
     scale_x_discrete(limits = CLASS_LEVELS) +
     scale_y_discrete(limits = rev(CLASS_LEVELS)) +
@@ -251,11 +254,11 @@ panel_fig <- (p_bars | cm_block) +
     title = "Independent GSVI held-out — YOLO vs YOLO + Qwen",
     subtitle = paste0(
       sprintf(
-        "Image-level binary metrics with Wilson binomial 95%% CI (n = %d). ",
-        as.integer(yolo_row$tp + yolo_row$fp + yolo_row$tn + yolo_row$fn)
+        "Image-level binary metrics with stratified paired bootstrap 95%% CI (B = 10,000; n = %d). ",
+        as.integer(round(yolo_row$tp + yolo_row$fp + yolo_row$tn + yolo_row$fn))
       ),
-      "YOLO + Qwen keeps a YOLO positive only when Qwen2-VL also answers Yes; ",
-      sub("^.*?: ", "", qwen_row$note)
+      "YOLO + Qwen keeps a YOLO positive only when Qwen2-VL also answers Yes;\n",
+      sub("\\. Source:.*$", "", sub("^.*?: ", "", qwen_row$note))
     ),
     caption = "Left: Accuracy / Precision / Recall / F1. Right: confusion matrices (True × Predicted).",
     theme = theme(
@@ -268,6 +271,13 @@ panel_fig <- (p_bars | cm_block) +
 out_panel <- file.path(FIG_DIR, "1_Heldout_yolo_qwen_panel.png")
 ggsave(out_panel, panel_fig, width = 12.8, height = 5.5, dpi = 600, bg = "white")
 message("Wrote ", out_panel)
+
+# Same panel without title, subtitle or caption, for the manuscript (the
+# description goes in the figure legend there).
+panel_bare <- (p_bars | cm_block) + plot_layout(widths = c(1.3, 2.15))
+out_bare <- file.path(FIG_DIR, "1_Heldout_yolo_qwen_panel_manuscript.png")
+ggsave(out_bare, panel_bare, width = 12.8, height = 4.8, dpi = 600, bg = "white")
+message("Wrote ", out_bare)
 
 # --- cascade only: the same headline result without the YOLO baseline -------
 qwen_bar_df <- bar_df |> filter(model == "YOLO + Qwen")
@@ -305,8 +315,8 @@ qwen_fig <- (p_bars_qwen | (p_true_label | p_cm_qwen_solo) + plot_layout(widths 
     title = "Independent GSVI held-out — YOLO + Qwen",
     subtitle = paste0(
       sprintf(
-        "Image-level binary metrics with Wilson binomial 95%% CI (n = %d)\n",
-        as.integer(qwen_row$tp + qwen_row$fp + qwen_row$tn + qwen_row$fn)
+        "Image-level binary metrics with stratified paired bootstrap 95%% CI (B = 10,000; n = %d)\n",
+        as.integer(round(qwen_row$tp + qwen_row$fp + qwen_row$tn + qwen_row$fn))
       ),
       "A YOLO positive is kept only when Qwen2-VL also answers Yes; ",
       # note reads "...: <run> (Yes=.., No=.. of N YOLO+). Source: <file>" —

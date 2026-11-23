@@ -15,6 +15,7 @@ WASTE_ID_DATA = [
     WASTE_ID_THESIS / "table_2_yolo_qwen_heldout.csv",
     WASTE_ID_THESIS / "table_2_yolo_qwen_heldout_ci.csv",
     WASTE_ID_THESIS / "table_2_yolo_qwen_heldout_detail.csv",
+    WASTE_ID_THESIS / "table_2_yolo_qwen_heldout_diff.csv",
     WASTE_ID_THESIS / "table_3_qwen_replicates.csv",
     WASTE_ID_THESIS / "table_4_sc_sensitivity.csv",
 ]
