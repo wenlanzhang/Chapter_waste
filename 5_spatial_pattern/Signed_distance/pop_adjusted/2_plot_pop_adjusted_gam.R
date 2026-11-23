@@ -44,15 +44,15 @@ get_opt <- function(name, default = NULL) {
   if (length(hit)) sub(paste0("^--", name, "="), "", hit[[1]]) else default
 }
 
-data_subdir <- get_opt("data-subdir", "")
+data_subdir <- get_opt("data-subdir", "worldpop_2020")
 fig_subdir <- get_opt("fig-subdir", data_subdir)
 pop_caption <- get_opt(
   "pop-caption",
-  "WorldPop Constrained Kenya 2024 (100 m), used as a static density covariate (not matched to panorama year)."
+  "WorldPop unconstrained Kenya 2020 (ken_ppp_2020), used as a static density covariate (not matched to panorama year)."
 )
 run_hint <- get_opt(
   "run-hint",
-  "python 5_spatial_pattern/pop_adjusted/1_pop_adjusted_gam.py"
+  "python 5_spatial_pattern/Signed_distance/pop_adjusted/1_pop_adjusted_gam.py"
 )
 
 DATA_ROOT <- chapter_data_root
@@ -67,7 +67,7 @@ fig_root <- normalizePath(
   mustWork = FALSE
 )
 # If this script lives in worldpop_2020/, climb one extra level to repo Figure/
-if (basename(normalizePath(script_dir)) == "worldpop_2020") {
+if (basename(normalizePath(script_dir)) %in% c("worldpop_2020", "worldpop_2024_constrained")) {
   fig_root <- normalizePath(
     file.path(script_dir, "..", "..", "..", "..", "Figure", "5_spatial_pattern", "Signed_distance", "pop_adjusted"),
     mustWork = FALSE
@@ -115,6 +115,34 @@ has_ci_d <- all(c("prob_ci_low", "prob_ci_high") %in% names(curve_d)) &&
 has_ci_p <- all(c("prob_ci_low", "prob_ci_high") %in% names(curve_p)) &&
   any(is.finite(curve_p$prob_ci_low) & is.finite(curve_p$prob_ci_high))
 
+# Describe the bands from what the curve file says was computed, so the caption
+# cannot drift from the data (older files carry a panorama-level bootstrap).
+ci_text <- function(curve) {
+  if (all(c("ci_block_m", "ci_n_draws") %in% names(curve)) && is.finite(curve$ci_block_m[1])) {
+    list(
+      short = sprintf("95%% bands: %s km spatial block bootstrap",
+                      format(curve$ci_block_m[1] / 1000, trim = TRUE)),
+      long = sprintf(
+        paste(
+          "Shaded bands: 2.5th–97.5th percentiles over %s spatial block bootstrap draws",
+          "(%s km blocks resampled with replacement, random grid offset, GAM refitted each draw),",
+          "which allow for residual spatial dependence between neighbouring panoramas."
+        ),
+        comma(curve$ci_n_draws[1]), format(curve$ci_block_m[1] / 1000, trim = TRUE)
+      )
+    )
+  } else {
+    list(
+      short = "95% bands: panorama-level bootstrap (assumes independence)",
+      long = paste(
+        "Shaded bands: panorama-level bootstrap 95% intervals, which treat panoramas",
+        "as independent and are too narrow under residual spatial autocorrelation."
+      )
+    )
+  }
+}
+ci_lab <- ci_text(curve_d)
+
 subtitle_extra <- NULL
 if (!is.null(summary) && "delta_aic_MP_minus_MDP" %in% names(summary)) {
   subtitle_extra <- sprintf(
@@ -149,10 +177,17 @@ if (!is.null(frame)) {
   }
 }
 
+# Panel (a) is drawn to 5 km, as in every other distance figure. Beyond that
+# the panoramas are sparse and the spline tail is not distinguishable from flat
+# (the block-bootstrap band there spans roughly 0.3-7%). The full curve stays
+# in the CSV.
+DIST_MAX_M <- 5000
+curve_d_shown <- curve_d[curve_d$signed_distance_m <= DIST_MAX_M, , drop = FALSE]
+
 y_hi <- max(
-  curve_d$prob_waste_positive,
+  curve_d_shown$prob_waste_positive,
   curve_p$prob_waste_positive,
-  if (has_ci_d) curve_d$prob_ci_high else NA_real_,
+  if (has_ci_d) curve_d_shown$prob_ci_high else NA_real_,
   if (has_ci_p) curve_p$prob_ci_high else NA_real_,
   na.rm = TRUE
 )
@@ -175,9 +210,9 @@ p_a <- p_a +
   geom_line(colour = WASTE_COLOUR, linewidth = 1.0) +
   scale_x_continuous(
     labels = comma,
-    breaks = c(0, 5000, 10000),
-    expand = expansion(mult = c(0.04, 0.05))
+    breaks = seq(0, DIST_MAX_M, 1000)
   ) +
+  coord_cartesian(xlim = c(min(curve_d$signed_distance_m), DIST_MAX_M)) +
   scale_y_continuous(
     breaks = y_breaks,
     labels = percent_format(accuracy = 0.1),
@@ -186,7 +221,7 @@ p_a <- p_a +
   ) +
   labs(
     title = "(a) Adjusted effect of signed distance",
-    subtitle = "Standardised over population density and capture year",
+    subtitle = "Standardised over population density and capture year; shown to 5 km",
     x = "Signed distance to settlement (m)\n(negative = inside, positive = outside)",
     y = "Predicted P(waste-positive)"
   ) +
@@ -256,14 +291,14 @@ combined <- (p_a + p_b) +
     title = "Population-adjusted signed-distance GAM (MDP)",
     subtitle = paste(
       c(
-        "Panorama-level logistic GAM; bootstrap 95% CI",
+        paste0("Panorama-level logistic GAM; ", ci_lab$short),
         subtitle_extra
       ),
       collapse = "  |  "
     ),
-    caption = paste0(
-      pop_caption,
-      " Shaded bands = bootstrap 95% CI."
+    caption = paste(
+      strwrap(paste(pop_caption, ci_lab$long), 190),
+      collapse = "\n"
     ),
     theme = theme(
       plot.title = element_text(colour = AXIS_COLOUR, face = "bold", size = 13),

@@ -598,7 +598,7 @@ The **observation-frame NNR** is the important control. Rather than comparing ag
 
 ### 5c. Signed-distance GAM (`Signed_distance/`)
 
-`logit P(waste) = α + s(signed distance to nearest settlement) + year FE`, on all 76,605 panoramas. Against a year-only null: **LRT χ² = 2,216.7 (df 7), p < 0.001**, pseudo-R² 0.114. The gradient is not an artefact of *when* imagery was captured.
+`logit P(waste) = α + s(signed distance to nearest settlement) + year FE`, on all 76,605 panoramas. Against a year-only null: **LRT χ² = 2,216.3 (df 7), p < 0.001**, pseudo-R² 0.114. The gradient is not an artefact of *when* imagery was captured.
 
 `3_proximity_descriptives.py` gives the same relationship without a model — the observed rate by distance band, which panel (a) of `Waste_settlement_proximity.png` plots beside the fitted curve:
 
@@ -614,41 +614,275 @@ The **observation-frame NNR** is the important control. Rather than comparing ag
 
 A 40-fold range, monotonic, straight from the counts. `thesis_table/proximity_descriptives.csv` states the same thing compositionally: waste-positive panoramas sit a median **265 m** from a settlement against **1,090 m** for the rest, and **67.4%** are within 500 m against 29.7%.
 
-**Sensitivity (`pop_adjusted/`)** — nested models on 74,882 panoramas with WorldPop density:
+**Sensitivity (`pop_adjusted/worldpop_2020/`)** — nested models on the manuscript sample: 76,578 panoramas with WorldPop unconstrained 2020 density:
 
 | Model | Terms | AIC | Pseudo-R² |
 | --- | --- | --- | --- |
-| M0 | year | 22,754 | 0.020 |
-| MP | + population | 20,964 | 0.098 |
-| MD | + distance | 20,681 | 0.110 |
-| MDP | distance + population | 20,117 | 0.135 |
-| MDPS | + thin-plate spatial field | 19,720 | 0.154 |
+| M0 | year | 22,912 | 0.019 |
+| MP | + population | 20,419 | 0.126 |
+| MD | + distance | 20,710 | 0.114 |
+| MDP | distance + population | 20,102 | 0.140 |
+| MDPS | + thin-plate spatial field | 19,619 | 0.163 |
 
-Adding distance to a population-only model improves AIC by ~850, so the settlement gradient is **not** just population density. The distance curve correlates 0.92 between MDP and MDPS, so it also survives a residual spatial field.
+Adding distance to a population-only model improves AIC by 317 (LRT χ² 331, df 7, p ≈ 2 × 10⁻⁶⁷), so the settlement gradient is **not** just population density. A residual spatial field (MDPS) attenuates the distance gradient but does not remove it: see the spatial-field check below. The population elasticity is 0.45 (2 km block bootstrap 95% interval 0.31–0.57; see the proportional-growth null below).
+
+**One sample throughout.** Every number in Step 5c's population-adjusted checks, and the density-band check in 5d, uses this sample. `1_pop_adjusted_gam.py` and every downstream script default to it (`pop_adjusted/worldpop_2020/`). The WorldPop constrained 2024 run is kept only as a sensitivity in `pop_adjusted/worldpop_2024_constrained/` (74,882 panoramas, ΔAIC 847): `python 5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2024_constrained/1_pop_adjusted_gam.py`. The WorldPop reference-year check below explains why the constrained product gives the larger distance effect.
+
+**Spatial thinning (`pop_adjusted/2_thinning_sensitivity.py`, R1.5 / R3.1).** Neighbouring panoramas, about 20 m apart, can show the same waste pile, so the GAM may count one site several times. The first version of this check (`dedup_sensitivity`, since removed from `1_pop_adjusted_gam.py`) thinned **waste-positive panoramas only**. It grouped positives with DBSCAN (eps = 50 / 100 m, `min_samples = 1`, which chains neighbours together), kept one positive per group, and **kept every negative**. That selection depends on the outcome. It lowered prevalence and removed positives fastest where they cluster, inside settlements, so it biased the gradient towards zero. It was conservative, but it was not a neutral test.
+
+The revised check thins the **complete panorama frame without looking at the label**, at *d* = 25, 50, 75 and 100 m. Panoramas are visited in random order, and a panorama is kept unless one already kept lies within *d* m. No two retained panoramas are closer than *d*, whatever their outcome. Each threshold is repeated over 100 random orders. The same MP / MD / MDP GAMs are refitted on each thinned frame, with year FE reassigned on the retained data. The settlement measures and the pop- and year-standardised distance curve are recomputed on the same retained panoramas. The curve is standardised over 500 evenly spaced quantiles of the frame's own population distribution. `1_pop_adjusted_gam.py` used to draw a random 400-value sample, which was noisy: on the manuscript sample the edge value ranged 5.3–6.2% across seeds, and the published curve's 6.18% was the top of that range. Quantiles give 5.79%, the same as averaging over every panorama. `1_pop_adjusted_gam.py` now uses quantiles too. The superseded scheme is reproduced at the same four thresholds for comparison only.
+
+**Denominators.** Every rate is retained positives ÷ retained panoramas (positives + negatives) in that scheme and draw.
+
+**Which sample.** The submitted manuscript's population-adjusted GAM uses the **unconstrained WorldPop 2020** raster: 76,578 panoramas and ΔAIC (MP − MDP) = 316.6. Its outputs are in `pop_adjusted/worldpop_2020/`, and that is the sample to report. The constrained 2024 sensitivity run (`pop_adjusted/worldpop_2024_constrained/`) has 74,882 panoramas and ΔAIC 847. The two differ for two reasons:
+
+- **Missing panoramas:** the constrained raster has no value outside mapped built-up areas. That drops 1,720 panoramas, all negative, none inside a settlement, a median 4.5 km from one, at about 61 people/km².
+- **Different population term:** the two rasters disagree (log-density correlation 0.56), and the 2020 population term explains more on its own (MP pseudo-R² 0.126 vs 0.098). That leaves less for distance to add.
+
+`python …/2_thinning_sensitivity.py` runs the manuscript sample by default; `--data-subdir worldpop_2024_constrained` runs the 2024 sensitivity.
+
+**Uncertainty shown.** Ranges in brackets, and the bands and error bars in the figure, are the 2.5th–97.5th percentiles over the 100 thinning draws. They describe variability due to *which panoramas are retained*. They are **not** statistical confidence intervals.
+
+**Manuscript sample (WorldPop 2020), label-blind**, medians over 100 draws (`worldpop_2020/thesis_table/thinning_sensitivity.csv`):
+
+| | None | 25 m | 50 m | 75 m | 100 m |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Panoramas retained | 76,578 | 50,234 | 32,041 | 17,912 | 13,473 |
+| Positives / negatives retained | 2,696 / 73,882 | 1,798 / 48,438 | 1,099 / 30,942 | 608 / 17,301 | 432 / 13,040 |
+| Inside settlements: panoramas / positives | 3,757 / 501 | 2,360 / 301 | 1,474 / 200 | 831 / 117 | 606 / 86 |
+| Prevalence | 3.52% | 3.58% (3.51–3.64) | 3.43% (3.33–3.57) | 3.39% (3.19–3.60) | 3.20% (2.98–3.46) |
+| Rate inside / outside settlements | 13.3% / 3.01% | 12.8% / 3.12% | 13.6% / 2.94% | 14.2% / 2.87% | 14.4% / 2.69% |
+| Prevalence ratio (inside / outside) | 4.42 | 4.07 (3.89–4.24) | 4.60 (4.19–5.07) | 4.93 (4.28–5.62) | 5.38 (4.60–6.47) |
+| Adjusted P(waste), settlement edge → 2 km | 5.8% → 1.72% | 5.6% → 2.08% | 5.5% → 2.23% | 5.6% → 2.07% | 5.5% → 1.89% |
+| ΔAIC (MP − MDP) | 317 | 168 (143–194) | 108 (80–136) | 66 (47–99) | 49 (26–83) |
+| Draws with LRT MP vs MDP p < 0.001 | — | 100 / 100 | 100 / 100 | 100 / 100 | 100 / 100 |
+| McFadden pseudo-R² (MDP) | 0.140 | 0.143 | 0.154 | 0.159 | 0.173 |
+
+**Superseded positive-only scheme, same sample** (positives thinned, all 73,882 negatives kept; one deterministic run):
+
+| | None | 25 m | 50 m | 75 m | 100 m |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Positives retained | 2,696 | 2,371 | 2,080 | 1,702 | 1,431 |
+| Prevalence | 3.52% | 3.11% | 2.74% | 2.25% | 1.90% |
+| Prevalence ratio (inside / outside) | 4.42 | 4.06 | 3.94 | 3.66 | 3.66 |
+| ΔAIC (MP − MDP) | 317 | 257 | 208 | 157 | 124 |
+| McFadden pseudo-R² (MDP) | 0.140 | 0.129 | 0.119 | 0.103 | 0.092 |
+
+The 2024 constrained sample gives the same picture (`worldpop_2024_constrained/thesis_table/thinning_sensitivity.csv`). Label-blind prevalence there is 3.69 / 3.56 / 3.51 / 3.33%, and the prevalence ratio is 3.98 / 4.42 / 4.77 / 5.00, against 4.32 unthinned. MDP beats MP in all 400 draws.
+
+![Thinning sensitivity, manuscript sample](Figure/5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2020/Thinning_sensitivity.png)
+
+Figures (`2plot_thinning_sensitivity.R`, written under `pop_adjusted/worldpop_2020/`; the 2024 versions are under `pop_adjusted/worldpop_2024_constrained/`):
+
+- **`Thinning_sensitivity.png`** (supplementary): (a) the adjusted distance curve at each threshold; (b–d) prevalence, prevalence ratio and pseudo-R² against threshold.
+- **`Thinning_sensitivity_main.png`** (main text, if space allows): the curve and the prevalence ratio only. Both figures draw the label-blind scheme alone. The superseded positive-only scheme is not plotted; its numbers stay in the table above for the response letter.
+
+**Reading it.**
+
+- **Prevalence and the curve:** label-blind thinning leaves both close to their unthinned values at every threshold. The observed rate still falls monotonically from about 13–14% inside settlements to about 0.3% beyond 5 km (`thinning/Nairobi_thinning_band_rates.csv`).
+- **Prevalence ratio:** it stays between 4.07 and 5.38 around the unthinned 4.42, and does not have to be monotonic in *d*. Changing *d* changes the geographic composition of what is retained.
+- **The 25 m dip is systematic, not noise:** all 100 draws fall below 4.42. Inside settlements 60% of positives survive against 63% of negatives. Outside, 68% of positives survive against 66% of negatives. Short-range thinning removes runs of adjacent positive views inside settlements, which are the near-duplicates it targets. From 50 m up the balance reverses, and a minority of draws fall below 4.42 (18%, 8% and 2% at 50, 75 and 100 m).
+- **ΔAIC and χ²:** both shrink because they grow with *n*, and the 100 m frame keeps 18% of the panoramas. On the manuscript sample ΔAIC at 100 m is 49 (26–83). That is still positive in every draw, with the LRT p < 0.001 in all of them, but much smaller than unthinned. The settlement ratio and the curve are the more stable evidence.
+- **Pseudo-R²:** it rises under stronger thinning. That does **not** show thinning improves the model: *n* and the sample composition both change. Read it only as evidence that model fit does not deteriorate under the tested specifications.
+- **The superseded scheme:** it is the one that weakens the gradient, steadily, as its design predicts.
+- **Outer distance bands:** at 75–100 m they rest on few positives (at 100 m, a median of 20 at 2–5 km and 5 beyond 5 km), so read their rates loosely.
+
+**Residual spatial autocorrelation: spatial block bootstrap (`pop_adjusted/3_spatial_block_bootstrap.py`, R1.3 / R3.2).** MDP leaves small but significant residual spatial autocorrelation (Moran's I = 0.060, k = 8, p = 0.001 on the manuscript sample). Nearby panoramas are not independent, so intervals that assume they are can be too narrow. The GAM is kept exactly as specified. Only the way its uncertainty is estimated changes.
+
+- **Method.** Lay a square grid of side *B* over the panoramas, with a fresh random offset in each draw so that no single grid placement drives the result. Resample the occupied blocks with replacement, keeping every panorama in a drawn block together. Refit MDP and recompute the settlement ratios and the population- and year-standardised distance curve. *B* = 250 m, 500 m, 1 km, 2 km and 4 km (about 6,400 down to 64 occupied blocks), with 500 draws each. Intervals are 2.5th–97.5th bootstrap percentiles. The same procedure with single panoramas as the unit (the "panorama bootstrap") reproduces what the original intervals assume. Three of the 500 draws at 4 km failed: the resampled distances fell outside the spline knots.
+- **Choosing *B*.** The residual correlogram (`block_bootstrap/Nairobi_mdp_residual_correlogram.csv`) is 0.31 between panoramas under 25 m apart, 0.01–0.05 out to about 1 km, and about 0 from 2–3 km. Blocks of 2–4 km therefore contain essentially all of the residual dependence. The smaller blocks show how the intervals widen as more of it is captured.
+
+Manuscript sample (WorldPop 2020, 76,578 panoramas), `worldpop_2020/thesis_table/block_bootstrap_intervals.csv`:
+
+| Interval method | Prevalence ratio 4.42 | Odds ratio 4.95 | Adjusted P(waste) at settlement edge, 5.80% | Edge ÷ 2 km ratio, 3.38 |
+| --- | --- | --- | --- | --- |
+| Analytic (Katz / Woolf), assumes independence | 4.04–4.85 | 4.47–5.49 | — | — |
+| Panorama bootstrap, assumes independence | 4.03–4.80 | 4.47–5.43 | 5.37–6.25 | 2.82–4.05 |
+| 250 m blocks | 3.90–4.94 (1.35×) | 4.29–5.61 | 5.18–6.44 | 2.63–4.59 |
+| 500 m blocks | 3.80–5.11 (1.70×) | 4.18–5.84 | 5.08–6.67 | 2.40–4.98 |
+| 1 km blocks | 3.64–5.37 (2.24×) | 3.99–6.16 | 4.93–6.91 | 2.11–6.07 |
+| 2 km blocks | 3.49–5.77 (2.96×) | 3.81–6.64 | 4.43–7.31 | 1.72–7.55 |
+| 4 km blocks | 3.16–6.41 (4.23×) | 3.42–7.46 | 4.01–7.88 | 1.50–9.56 |
+
+The multiplier is the interval width relative to the panorama bootstrap.
+
+![Spatial block bootstrap, manuscript sample](Figure/5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2020/Spatial_block_bootstrap.png)
+
+`Spatial_block_bootstrap.png` (`3plot_spatial_block_bootstrap.R`): (a) the residual correlogram with the block sizes marked; (b) the prevalence-ratio interval by method; (c) the curve with the panorama-bootstrap band against the 2 km and 4 km block bands, all three around the same full-sample curve.
+
+**Reading it.**
+
+- **The reviewers' concern is borne out.** Allowing for spatial dependence widens every interval steadily with block size. At 2–4 km, the scale where the residual correlation dies out, the intervals are about 3–4× wider for the settlement ratio and 3–6× wider for the curve. The original intervals were too narrow.
+- **The substantive conclusions do not change.** The prevalence ratio's lower bound stays above 3 (3.16 at 4 km), and the odds ratio's above 3.4. The adjusted edge-to-2 km contrast stays above 1 at every block size: 1.50 at 4 km, with 1 of 497 draws at or below 1. The point estimates do not move. Every bootstrap distribution is centred on the full-sample estimate.
+- **What to report.** Use the 2 km (or, conservatively, 4 km) block intervals in place of the analytic and panorama-level ones. The main figure does this (see below). State the conclusion as "inside-settlement prevalence is at least about three times the outside rate", not as a precise 4.4.
+
+**The main figure uses the block-bootstrap bands.** `Pop_adjusted_gam_effects.png` (and its two single-panel versions) used to shade a panorama-level bootstrap of 40 draws, which assumes independence. `1_pop_adjusted_gam.py` now computes both of its bands, for the distance curve and the population curve, from the 2 km spatial block bootstrap with 500 draws, and the figure's subtitle and caption say so. Panel (a) is drawn to 5 km, like every other distance figure: beyond that the panoramas are sparse, the band spans roughly 0.3–7%, and the spline's upturn is not distinguishable from flat. The script uses the same sampler and seed as `3_spatial_block_bootstrap.py`, so the band on the distance curve is the same set of replicates as the 2 km row of the table above (5.80% at the edge, 4.43–7.31). The population curve reads 0.99% (0.64–1.52) at 1,000 people/km², 3.67% (2.88–4.54) at 10,000 and 7.06% (5.31–9.11) at 50,000. 2 km is the block size the capture-year, boundary and WorldPop-year checks also use.
+
+**One curve everywhere.** The adjusted curve is defined once, in `mdp_distance_curve` (`1_pop_adjusted_gam.py`), and every script in `pop_adjusted/` calls it. It averages over 500 evenly spaced quantiles of each sample's own population distribution, weighted by year share. The central curve in the main figure, the block-bootstrap figure and the unthinned line of the thinning figure is therefore the same curve: 5.80% at the edge, 3.22% at 500 m and 1.72% at 2 km on the manuscript sample.
+
+**Why it differs from the submitted curve.** The submitted version standardised over a random 400-value sample of the population distribution. On the manuscript sample that alone moves the edge value between 5.3% and 6.2% across seeds, and the submitted curve (6.18% at the edge, 1.84% at 2 km) sits at the top of that range. Averaging over every panorama gives 5.79% and 1.72%. The shape is unchanged. The population curve moved by at most 0.26 percentage points, and the elasticity is unchanged.
+
+**Out-of-area prediction (`spatial_blocked_cv` in `1_pop_adjusted_gam.py`).** Each model is refitted five times, each time leaving out one of five geographic clusters of panoramas (KMeans on location), and scored on the cluster it did not see. Held-out covariates are clipped to the training range. Pooled over all 76,578 held-out panoramas (`worldpop_2020/Nairobi_pop_adjusted_spatial_cv.csv`):
+
+| Model | Brier score | Log-loss |
+| --- | ---: | ---: |
+| M0: year | 0.03420 | 0.1542 |
+| MP: + population | 0.03262 | 0.1348 |
+| MD: + distance | 0.03284 | 0.1386 |
+| MDP: distance + population | 0.03259 | 0.1349 |
+
+- **Population and distance each predict out of area.** Both improve clearly on year alone.
+- **Adding distance to population does not improve out-of-area prediction.** MDP and MP are level (log-loss 0.1349 vs 0.1348; MDP is better in two of the five areas and worse in three). The in-sample gain from distance (ΔAIC 317) is real, but it does not transfer to a part of the city the model has not seen.
+- **How to state the result.** The settlement gradient is an association that holds within the sampled city after adjusting for population. It is not evidence that distance to a settlement predicts waste in unsampled areas better than population does. With pseudo-R² at 0.14, none of these is a predictive model.
+- **The 2024 constrained sample is worse.** There MDP's pooled log-loss is 0.182 against MP's 0.143, because one held-out area fails badly (0.31 against 0.07).
+- **An earlier version of this table was wrong.** The cross-validation used to drop most held-out panoramas through an indexing error and averaged each model over a different set of folds. Any number taken from the old `spatial_cv.csv` should be discarded.
+
+**A spatial field in the model (`pop_adjusted/7_spatial_field_sensitivity.py`, R1.3 / R3.2).** The block bootstrap keeps MDP and widens its intervals. This check changes the model instead. MDPS adds a thin-plate spatial field on panorama location (25 knots) to MDP, so smooth residual spatial variation is absorbed by the model. Two questions:
+
+- **Does distance still add?** MPS is MDPS without the distance term (population + field + year). The test MPS vs MDPS is the spatial-field analogue of the central MP vs MDP test.
+- **How much of the gradient remains?** The MDPS distance curve is standardised by setting every panorama's distance to each grid value while it keeps its own population, capture year and location (2,000 panoramas evenly spaced in population rank). Intervals are 2 km spatial block bootstrap percentiles (500 draws, both models refitted on each draw, the same replicate stream as above).
+
+Manuscript sample, `worldpop_2020/thesis_table/spatial_field_sensitivity.csv`:
+
+| Model | Test of the distance term | ΔAIC (distance adds) | LRT p | Edge ÷ 2 km (2 km block 95%) | Draws with edge ÷ 2 km ≤ 1 |
+| --- | --- | ---: | --- | --- | ---: |
+| MDP: distance + population + year | MP vs MDP | 317 | 2 × 10⁻⁶⁷ | 3.38 (1.72–7.55) | 0 / 500 |
+| MDPS: MDP + spatial field | MPS vs MDPS | 241 | 2 × 10⁻⁵¹ | 1.90 (1.49–5.55) | 0 / 500 |
+
+![Spatial-field sensitivity, manuscript sample](Figure/5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2020/Spatial_field_sensitivity.png)
+
+`Spatial_field_sensitivity.png` (`7plot_spatial_field_sensitivity.R`): (a) each model's distance curve relative to its own value at 2 km, to 5 km; (b) the edge ÷ 2 km contrast with ΔAIC for the distance term.
+
+**Reading it.**
+
+- **Distance still adds.** With population, year and the spatial field all in the model, the distance term improves AIC by 241 (317 without the field). The gradient is not a stand-in for smooth spatial variation.
+- **The gradient is attenuated, not removed.** The edge ÷ 2 km contrast falls from 3.38 to 1.90, about 56% of the MDP value (replicate-by-replicate interval 0.33–1.53, so the size of the attenuation is itself uncertain). It stays above 1 in every one of the 500 draws. To 5 km the two relative curves have the same shape (correlation 0.97 on the log scale).
+- **Why relative curves, not levels.** Distance to a settlement is itself a smooth function of location, so the field and the distance term share part of the same signal. The field takes up the overall level, which leaves the level of the MDPS curve poorly identified (10.5% at the edge, 5.5% at 2 km, against a sample prevalence of 3.5%). The contrast and the shape are the quantities the two models can be compared on. For the same reason MDPS is a deliberately harsh test: some of what the field absorbs is the settlement gradient.
+- **The earlier 0.71.** `1_pop_adjusted_gam.py` still reports a curve correlation of 0.71 between MDP and MDPS. That number is taken over the full grid to 11 km at median population with the field held at zero, and it is driven by the sparse tail beyond 5 km, where the MDP spline turns up and the MDPS curve keeps falling. It should not be quoted as a measure of agreement; the table above replaces it.
+
+**Capture year and the population layer (`pop_adjusted/4_capture_year_sensitivity.py`, R1 minor / R3.3).** Capture year enters every GAM as a fixed effect. A year cannot carry its own effect if it has fewer than 200 panoramas or no waste-positive panorama: the level would rest on almost nothing, or separate completely. 2015 (5 panoramas) and 2019 (73) are both, with no positives between them. `lib.gam.assign_year_fe` joins each such year, on its own, to the nearest year that has neither problem: **2015 to 2017, and 2019 to 2018**.
+
+The submitted version used a different rule. It first pooled all sparse years into one level and then moved that level as a block, which put 2015 into 2018 only because it had been pooled with 2019. The new rule moves 5 panoramas from the 2018 level to the 2017 level and changes nothing else. On the manuscript sample ΔAIC (MP − MDP) is 316.578 against 316.580, and the adjusted P(waste) at the settlement edge is 5.8028% against 5.8031%. The same rule applies to the primary signed-distance GAM and to the GSVI arm in Step 6.
+
+The script refits the same nested GAMs on the manuscript sample under four specifications:
+
+- **Main:** 2015 joined to 2017, 2019 to 2018.
+- **Excluded:** the 78 panoramas from 2015 and 2019 dropped.
+- **Early imagery:** 2017–2018 only, with year FE within the period.
+- **Late imagery:** 2021–2022 only, with year FE within the period.
+
+Intervals are 2 km spatial block bootstrap percentiles, 500 draws, from the same replicate stream as the block bootstrap above. The "main" column therefore carries exactly that table's 2 km intervals. Output: `worldpop_2020/thesis_table/capture_year_sensitivity.csv`.
+
+| | Main | 2015 and 2019 excluded | Early, 2017–2018 | Late, 2021–2022 |
+| --- | ---: | ---: | ---: | ---: |
+| Panoramas / waste-positive | 76,578 / 2,696 | 76,500 / 2,696 | 36,352 / 1,716 | 40,148 / 980 |
+| Prevalence | 3.52% | 3.52% | 4.72% | 2.44% |
+| ΔAIC M0 − MP (population adds to year) | 2,493 | 2,493 | 1,773 | 748 |
+| ΔAIC MP − MDP (distance adds to population) | 317 | 313 | 163 | 143 |
+| LRT MP vs MDP | p < 10⁻⁶⁶ | p < 10⁻⁶⁶ | p < 10⁻³⁴ | p < 10⁻³⁰ |
+| Pseudo-R² (MDP) | 0.140 | 0.140 | 0.152 | 0.100 |
+| Prevalence ratio, inside / outside | 4.42 (3.49–5.77) | 4.42 (3.48–5.77) | 3.85 (2.93–5.44) | 4.52 (3.40–6.17) |
+| Adjusted P(waste), edge → 2 km | 5.80% → 1.72% | 5.80% → 1.74% | 7.33% → 2.71% | 4.44% → 1.12% |
+| Edge ÷ 2 km | 3.38 (1.72–7.55) | 3.34 (1.71–7.36) | 2.71 (1.51–6.31) | 3.97 (1.67–10.32) |
+| Curve correlation with main | — | 1.000 | 0.971 | 0.815 |
+
+![Capture-year sensitivity, manuscript sample](Figure/5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2020/Capture_year_sensitivity.png)
+
+`Capture_year_sensitivity.png` (`4plot_capture_year_sensitivity.R`): (a) the main curve against the curve with 2015 and 2019 excluded; (b) early against late imagery, each with its block-bootstrap band; (c) the edge-to-2 km contrast and the prevalence ratio for each specification.
+
+**Reading it.**
+
+- **The grouping does not matter.** Excluding 2015 and 2019 instead of joining them to their neighbouring years changes ΔAIC from 317 to 313 and leaves the curve unchanged (largest difference 0.02 percentage points). The 78 panoramas are all negative, so they carry almost no information about the distance relationship. Nothing depends on the choice.
+- **Both imagery periods show the relationship on their own.** In each period, population adds strongly to year, and distance adds clearly to population (ΔAIC 163 and 143). The settlement ratio is about 4 in each, with every block-bootstrap interval well above 1, and so is the edge-to-2 km contrast.
+- **The level differs by period, not the gradient.** Overall prevalence is lower in later imagery (2.4% vs 4.7%). The early curve also has a shoulder at 1–2 km that the late curve does not, which is why the late curve correlates only 0.82 with the published one. But the bands overlap there, and both curves fall steeply from the settlement edge.
+
+**Why one population layer.** WorldPop 2020 is used as a **common spatial reference for where people live**, not as a population estimate matched to each image's capture year. 2020 falls between the two imagery periods (2017–2018 and 2021–2022), and the term only needs to rank locations by residential density, which changes far more slowly than the counts themselves. The period split is the direct check: the population term remains strongly informative and distance still adds to it within imagery captured on either side of 2020. The WorldPop reference-year check below tests this directly with 2018 and 2022 layers.
+
+**Positional uncertainty near settlement boundaries (`pop_adjusted/5_boundary_exclusion.py`, R1.4).** A panorama is located by its camera, but the waste it shows can be tens of metres away, so a camera just outside a mapped settlement may photograph waste inside it, or the reverse. The check drops every panorama within *d* m of a mapped boundary (|signed distance| ≤ *d*), positives and negatives alike, for *d* = 25, 50 and 100 m. It then recomputes the inside/outside comparison and refits the population-adjusted GAMs on what remains. Intervals are 2 km spatial block bootstrap percentiles (500 draws, the same replicate stream as the block bootstrap above, so the "None" column carries that table's intervals). Manuscript sample: `worldpop_2020/thesis_table/boundary_exclusion_sensitivity.csv`.
+
+| Excluded band | None | ±25 m | ±50 m | ±100 m |
+| --- | ---: | ---: | ---: | ---: |
+| Inside: panoramas / waste-positive | 3,757 / 501 | 2,768 / 374 | 1,931 / 254 | 915 / 98 |
+| Outside: panoramas / waste-positive | 72,821 / 2,195 | 71,775 / 2,068 | 70,648 / 1,960 | 68,714 / 1,809 |
+| Median depth of retained inside panoramas | 53 m | 76 m | 96 m | 136 m |
+| Rate inside / outside | 13.3% / 3.01% | 13.5% / 2.88% | 13.2% / 2.77% | 10.7% / 2.63% |
+| Prevalence ratio | 4.42 (3.49–5.77) | 4.69 (3.56–6.27) | 4.74 (3.57–6.63) | 4.07 (2.78–6.17) |
+| Odds ratio | 4.95 (3.81–6.64) | 5.27 (3.89–7.29) | 5.31 (3.85–7.72) | 4.44 (2.92–7.03) |
+| ΔAIC MP − MDP (distance adds to population) | 317 | 240 | 177 | 116 |
+| LRT MP vs MDP | p < 10⁻⁶⁶ | p < 10⁻⁴⁹ | p < 10⁻³⁵ | p < 10⁻²¹ |
+| Adjusted P(waste), 250 m → 2 km outside | 4.10% → 1.72% | 4.01% → 1.76% | 3.85% → 1.82% | 3.54% → 1.91% |
+| 250 m ÷ 2 km | 2.39 (1.26–4.86) | 2.28 (1.20–4.75) | 2.11 (1.16–4.62) | 1.85 (1.04–4.22) |
+
+![Boundary exclusion, manuscript sample](Figure/5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2020/Boundary_exclusion_sensitivity.png)
+
+`Boundary_exclusion_sensitivity.png` (`5plot_boundary_exclusion.R`): (a) the prevalence ratio by excluded band, with the counts kept; (b) the adjusted distance curve refitted on each reduced sample.
+
+**Reading it.**
+
+- **The inside/outside contrast does not depend on near-boundary panoramas.** Removing everything within 25 or 50 m slightly raises the prevalence ratio (4.69, 4.74). Removing everything within 100 m leaves 4.07. Every block-bootstrap interval stays far above 1, and the inside rate is unchanged at about 13% until the 100 m band.
+- **The 100 m band changes which settlements are compared.** Half of all inside panoramas lie within 53 m of a boundary, so at ±100 m only 915 remain: the deepest interiors, in larger settlements. The small drop there (inside rate 10.7%) is as consistent with that change of composition as with boundary misclassification.
+- **The distance gradient weakens but survives.** ΔAIC for adding distance falls from 317 to 116, and the 250 m-to-2 km contrast from 2.39 to 1.85 (interval 1.04–4.22). Part of the gradient is carried by panoramas close to the boundary, where prevalence outside is highest. Distance still adds to population in every case (p < 10⁻²¹ at 100 m).
+- **What it does not show.** This tests sensitivity to boundary and camera-position uncertainty only. It does not identify where any photographed waste pile actually is.
+
+**WorldPop reference year (`pop_adjusted/6_worldpop_year_sensitivity.py`, R3.3).** This tests whether one 2020 population layer can stand for imagery captured 2015–2022, by refitting the GAMs with other WorldPop years, both static and year-matched to each panorama's capture period. No single WorldPop product covers both 2018 and 2022, so there are two sets:
+
+- **Set A, the manuscript's product:** unconstrained 100 m (Global 2000–2020 series, which ends in 2020). Static 2020 (published), static 2018, and year-matched: 2015–2019 imagery takes 2018, and 2021–2022 imagery takes 2020.
+- **Set B, WorldPop R2025A constrained 100 m:** the only 100 m layer available for 2022. Static 2018, static 2022, and year-matched (2018 / 2022), on the 74,789 panoramas with a value in every constrained layer. A **bridge** fits the published 2020 unconstrained layer on that same sample, to separate the change of product from the change of sample.
+
+Layers sit in `$PHD_DATA_ROOT/RS/Pop_density/`. `ken_ppp_2018.tif` and the 2018 and 2022 R2025A constrained layers were downloaded from data.worldpop.org for this check. Edge ÷ 2 km intervals are 2 km block bootstrap percentiles (500 draws, the same replicate stream as the block bootstrap above, so the published row carries that table's interval). Output: `worldpop_2020/thesis_table/worldpop_year_sensitivity.csv`.
+
+| Population layer | Panoramas | ΔAIC M0 − MP (population) | ΔAIC MP − MDP (distance) | Adjusted P(waste), edge → 2 km | Edge ÷ 2 km | Curve corr. with published |
+| --- | ---: | ---: | ---: | --- | --- | ---: |
+| Unconstrained 2020 (published) | 76,578 | 2,493 | 317 | 5.80% → 1.72% | 3.38 (1.72–7.55) | — |
+| Unconstrained 2018 | 76,578 | 2,492 | 318 | 5.81% → 1.71% | 3.39 (1.71–7.59) | 1.000 |
+| Unconstrained, year-matched (2018 / 2020) | 76,578 | 2,489 | 318 | 5.83% → 1.72% | 3.39 (1.72–7.61) | 0.999 |
+| Bridge: unconstrained 2020, constrained sample | 74,789 | 2,338 | 317 | 5.95% → 1.72% | 3.46 (1.84–7.98) | 0.998 |
+| Constrained 2018 | 74,789 | 1,759 | 861 | 7.37% → 1.52% | 4.84 (2.57–9.68) | 0.857 |
+| Constrained 2022 | 74,789 | 1,776 | 851 | 7.34% → 1.53% | 4.80 (2.54–9.62) | 0.855 |
+| Constrained, year-matched (2018 / 2022) | 74,789 | 1,764 | 857 | 7.38% → 1.53% | 4.83 (2.56–9.68) | 0.857 |
+
+![WorldPop reference-year sensitivity](Figure/5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2020/Worldpop_year_sensitivity.png)
+
+`Worldpop_year_sensitivity.png` (`6plot_worldpop_year_sensitivity.R`): (a) the curves for set A; (b) the curves for set B with the bridge; (c) the edge-to-2 km contrast and ΔAIC for every layer.
+
+**Reading it.**
+
+- **The reference year does not matter.** Within a product, log density at the panoramas correlates 0.998–0.999 between 2018, 2020 and 2022. Static and year-matched fits are indistinguishable: ΔAIC for distance is 317–318 in set A and 851–861 in set B, and the curves are identical. Over 2018–2022, WorldPop changes the level of population far more than its spatial pattern, which is all the covariate has to capture.
+- **The product matters, and the published choice is the conservative one.** Unconstrained and constrained layers correlate only about 0.57 at the panoramas. With the constrained layers, population explains less and distance adds more (ΔAIC about 855 vs 317), with a steeper curve (edge ÷ 2 km about 4.8 vs 3.4). The bridge shows this is the product, not the 1,789 panoramas the constrained layers drop: the unconstrained 2020 layer on the constrained sample still gives 317.
+- **For the response.** WorldPop 2020 serves as a common spatial reference for residential density. Replacing it with 2018 or 2022 layers, or matching the layer to capture period, leaves every result unchanged. The unconstrained product used in the manuscript gives the smaller of the two distance effects.
 
 ### 5d. Sensitivity and robustness
 
 | Check | Question it answers | Result |
 | --- | --- | --- |
 | `HDBSCAN/3b_hdbscan_param_sweep.py` | Are the 24 clusters a tuning artefact? | Silhouette 0.496–0.517 across min_cluster_size 15–40 × min_samples 4–10. The chosen (25, 6) sits on a flat ridge, not a lucky peak. |
+| `HDBSCAN/3c_hdbscan_param_overlap.py` | The count ranges 15–49 across the grid: do the hotspots themselves change? | Mostly they split or merge. Compared panorama by panorama with the primary run, a median 96% (90–100%) of primary-hotspot panoramas stay clustered, the clustered sets overlap with Jaccard 0.87 (0.78–0.95), and at most 2 of the 24 primary clusters dissolve into noise. A median 92% of clustered panoramas sit in an alternative cluster lying mainly within one primary cluster, and 100% in a primary cluster lying mainly within one alternative cluster (`Hdbscan_param_overlap.png`). |
 | `HDBSCAN/period_stratified_robustness/` | Do the hotspots depend on one capture campaign? | Same parameters per period: 2015–2019 → 19 clusters, 77.6% clustered; 2021–2022 → 9 clusters, 79.9% clustered. Same areas, near-identical clustered share. Fewer clusters later follows from fewer positives (980 vs 1,716). |
 | `Signed_distance/period_stratified_robustness/` | Does the distance gradient hold in both periods? | Yes, in each period separately. Pseudo-R² 0.118 (2015–2019) vs 0.071 (2021–2022). |
 | `settlement/5_temporal_robustness.py` | Do settlement rates drift by year? | Year-by-year positive rates and prevalence ratios (`Temporal_*_by_year.png`). |
-| `Signed_distance/pop_adjusted/` | Is the gradient just population density? | No — adding distance to a population-only model gains ~850 AIC; distance curve correlates 0.92 between MDP and MDPS. |
+| `Signed_distance/pop_adjusted/` | Is the gradient just population density? | No. On the manuscript sample (WorldPop 2020), adding distance to a population-only model gains 317 AIC (LRT p ≈ 2 × 10⁻⁶⁷). With a residual spatial field in the model the gradient is weaker but still there (see the spatial-field row). |
+| `Signed_distance/pop_adjusted/7_spatial_field_sensitivity.py` | Does the gradient survive a spatial field in the model itself? | Yes, attenuated. With a thin-plate field on location added, distance still adds to population + field (ΔAIC 241, LRT p ≈ 2 × 10⁻⁵¹). The edge ÷ 2 km contrast falls from 3.38 to 1.90 (2 km block interval 1.49–5.55; 0 of 500 draws at or below 1), and the curve's shape to 5 km is unchanged (r = 0.97). |
+| `Signed_distance/pop_adjusted/6_worldpop_year_sensitivity.py` | Does one 2020 WorldPop layer misrepresent imagery from other years? | No. Static 2018 or 2022 layers, or layers matched to capture period, leave every result unchanged within a product (ΔAIC for distance 317–318 unconstrained, 851–861 constrained). The unconstrained product used in the manuscript gives the more conservative distance effect. |
+| `Signed_distance/pop_adjusted/5_boundary_exclusion.py` | Does the result rest on panoramas whose inside/outside label is uncertain? | No. Dropping all panoramas within 25 / 50 / 100 m of a boundary gives prevalence ratios of 4.69 / 4.74 / 4.07 (vs 4.42), all with 2 km block intervals above 2.7. The distance term weakens (ΔAIC 317 → 116 at 100 m) but stays clearly significant. |
+| `Signed_distance/pop_adjusted/4_capture_year_sensitivity.py` | Does joining 2015 to 2017 and 2019 to 2018, or using one 2020 population layer, drive the result? | No. Excluding the 78 panoramas from 2015 and 2019 leaves ΔAIC (MP − MDP) at 313 vs 317 and the curve unchanged. Fitted separately, 2017–2018 and 2021–2022 imagery each show population and distance effects (distance ΔAIC 163 / 143; prevalence ratio 3.85 / 4.52, 2 km block intervals above 2.9). |
+| `Signed_distance/pop_adjusted/3_spatial_block_bootstrap.py` | Are the intervals too narrow given residual spatial autocorrelation? | Yes, but the conclusions hold. With 2–4 km spatial blocks (the residual correlation is about 0 beyond 2–3 km), intervals are 3–6× wider than independence-based ones. The prevalence ratio is 4.42 (2 km: 3.49–5.77; 4 km: 3.16–6.41), and the adjusted edge ÷ 2 km contrast stays above 1 at every block size. |
+| `Signed_distance/pop_adjusted/2_thinning_sensitivity.py` | Do near-duplicate views of one waste pile drive the gradient? | No. On the manuscript sample (WorldPop 2020), label-blind thinning of all panoramas at 25 / 50 / 75 / 100 m (100 draws each) keeps prevalence (3.20–3.58% vs 3.52%), the prevalence ratio (4.07–5.38 vs 4.42) and the adjusted curve. MDP beats MP in 400 / 400 draws, though ΔAIC falls to 49 at 100 m. Replaces the earlier positive-only thinning, which biased the gradient towards zero. |
 | `HDBSCAN/5_hdbscan_cluster_views.py` | Do repeat views of one site inflate clusters? | Per-cluster `n_positive_views` descriptives; clustering itself stays one point per panorama. |
-| `settlement/4_settlement_by_density_band.py` | Is the settlement association just density, without assuming a model? | No. Within equal-count density bands the inside-settlement rate exceeds outside in **7 of 7** reportable bands, from **11.1× down to 1.6×**. The gap narrows as density rises, so density carries real weight at the top end but never accounts for the association. |
-| `pop_adjusted/worldpop_2020/` | Does the population control depend on which raster? | Repeats the nested GAMs with unconstrained WorldPop 2020 (n = 76,578) instead of constrained 2024 (n = 74,882). Model ordering is unchanged and MDP still beats MP, so the distance effect is not raster-specific. |
+| `settlement/4_settlement_by_density_band.py` | Is the settlement association just density, without assuming a model? | No. On the manuscript sample, within eight equal-count density bands the inside-settlement rate exceeds outside in **5 of 5** reportable bands, from **6.6× down to 1.4×** (all 95% CIs above 1). The three lowest-density bands have only 25 inside-settlement panoramas between them, too few to report. The gap narrows as density rises, so density carries real weight at the top end but never accounts for the association. |
+| `pop_adjusted/worldpop_2024_constrained/` | Does the population control depend on which raster? | Repeats the nested GAMs with constrained WorldPop 2024 (n = 74,882) instead of the manuscript's unconstrained 2020 (n = 76,578). Model ordering is unchanged and MDP still beats MP (ΔAIC 847 vs 317), so the distance effect is not raster-specific. |
 
 ```bash
 python  5_spatial_pattern/HDBSCAN/3b_hdbscan_param_sweep.py
+python  5_spatial_pattern/HDBSCAN/3c_hdbscan_param_overlap.py   # needs the hdbscan package
+python  5_spatial_pattern/HDBSCAN/3c_plot_hdbscan_param_overlap.py   # needs seaborn
 python  5_spatial_pattern/HDBSCAN/period_stratified_robustness/1_period_hdbscan.py
 Rscript 5_spatial_pattern/HDBSCAN/period_stratified_robustness/2_plot_period_hdbscan.R
 python  5_spatial_pattern/Signed_distance/period_stratified_robustness/1_period_signed_distance_gam.py
 Rscript 5_spatial_pattern/Signed_distance/period_stratified_robustness/2_plot_period_signed_distance_gam.R
 python  5_spatial_pattern/settlement/4_settlement_by_density_band.py    # needs the pop-adjusted frame
 Rscript 5_spatial_pattern/settlement/4plot_settlement_by_density_band.R
-python  5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2020/1_pop_adjusted_gam.py   # slow
-Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2020/2_plot_pop_adjusted_gam.R
+python  5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2024_constrained/1_pop_adjusted_gam.py   # slow; 2024 constrained sensitivity
+Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2024_constrained/2_plot_pop_adjusted_gam.R
 ```
 
 ### Run order
@@ -677,21 +911,39 @@ Rscript 5_spatial_pattern/Signed_distance/2_plot_signed_distance_gam.R
 python  5_spatial_pattern/Signed_distance/3_proximity_descriptives.py
 Rscript 5_spatial_pattern/Signed_distance/3plot_waste_settlement_proximity.R
 
-# 5c sensitivity: population-adjusted GAM (slow)
+# 5c sensitivity: population-adjusted GAM (slow). Every script defaults to the
+# manuscript sample, pop_adjusted/worldpop_2020/ (WorldPop unconstrained 2020).
 python  5_spatial_pattern/Signed_distance/pop_adjusted/1_pop_adjusted_gam.py
 Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/2_plot_pop_adjusted_gam.R
 Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/3_plot_mdp_residual_map.R
 Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/4plot_pop_scaling_null.R
+python  5_spatial_pattern/Signed_distance/pop_adjusted/2_thinning_sensitivity.py   # ~10 min, reads the GAM frame
+Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/2plot_thinning_sensitivity.R
+python  5_spatial_pattern/Signed_distance/pop_adjusted/3_spatial_block_bootstrap.py   # ~45 min
+Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/3plot_spatial_block_bootstrap.R
+python  5_spatial_pattern/Signed_distance/pop_adjusted/4_capture_year_sensitivity.py   # ~30 min
+Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/4plot_capture_year_sensitivity.R
+python  5_spatial_pattern/Signed_distance/pop_adjusted/5_boundary_exclusion.py   # ~30 min
+Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/5plot_boundary_exclusion.R
+python  5_spatial_pattern/Signed_distance/pop_adjusted/6_worldpop_year_sensitivity.py   # ~75 min; needs the 2018 and 2022 layers in RS/Pop_density
+Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/6plot_worldpop_year_sensitivity.R
+python  5_spatial_pattern/Signed_distance/pop_adjusted/7_spatial_field_sensitivity.py   # ~45 min
+Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/7plot_spatial_field_sensitivity.R
+# WorldPop constrained 2024 sensitivity (not the manuscript sample)
+python  5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2024_constrained/1_pop_adjusted_gam.py
+Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/worldpop_2024_constrained/2_plot_pop_adjusted_gam.R
+python  5_spatial_pattern/Signed_distance/pop_adjusted/2_thinning_sensitivity.py --data-subdir worldpop_2024_constrained
+Rscript 5_spatial_pattern/Signed_distance/pop_adjusted/2plot_thinning_sensitivity.R --data-subdir=worldpop_2024_constrained
 ```
 
-**The proportional-growth null** (`4plot_pop_scaling_null.R` → `Pop_scaling_null.png`) answers the obvious question about the population curve: what would it look like if waste simply scaled with people? That is an elasticity of exactly 1 — a straight line of slope 1 on log-log axes. The fitted elasticity is **0.52**, so prevalence rises roughly as the square root of density: a tenfold denser cell carries about 3.3× the prevalence, not 10×.
+**The proportional-growth null** (`4plot_pop_scaling_null.R` → `worldpop_2020/Pop_scaling_null.png`) answers the obvious question about the population curve: what would it look like if waste simply scaled with people? That is an elasticity of exactly 1 — a straight line of slope 1 on log-log axes. On the manuscript sample the fitted elasticity (slope of log P on log density, 1,000–70,000 people/km²) is **0.45** (2 km spatial block bootstrap 95% interval **0.31–0.57**, 500 draws; no draw reaches 1): a tenfold denser cell carries about 2.8× the prevalence, not 10×.
 
 | Density | Fitted | If proportional | Ratio |
 | ---: | ---: | ---: | ---: |
-| 5,000 /km² | 1.62% | 4.80% | 3.0× |
-| 10,000 /km² | 2.70% | 9.34% | 3.5× |
-| 30,000 /km² | 4.82% | 28.31% | 5.9× |
-| 50,000 /km² | 6.46% | 46.99% | 7.3× |
+| 5,000 /km² | 2.88% | 4.91% | 1.7× |
+| 10,000 /km² | 3.67% | 9.90% | 2.7× |
+| 30,000 /km² | 5.48% | 30.22% | 5.5× |
+| 50,000 /km² | 7.07% | 49.60% | 7.0× |
 
 Panel (b) is where the comparison can be read, since a constant elasticity is straight only on log-log axes; panel (a) shows the same curves on the axes `Pop_adjusted_gam_effects.png` uses, where the null accelerates off the panel. Read it with care: the outcome is a binary per-panorama indicator and therefore saturates, so part of the shortfall from 1 may be that ceiling rather than less waste per person.
 
@@ -699,7 +951,7 @@ Or `snakemake all`, which resolves the same order.
 
 ### Figures (`Figure/5_spatial_pattern/`)
 
-25 figures across `HDBSCAN/`, `settlement/` and `Signed_distance/` (the pop-adjusted sensitivity figures sit under `Signed_distance/pop_adjusted/`, mirroring the scripts). Three archived figures are **not** rebuilt here — `Waste_HDBSCAN_comparison.png`, `Hotspot_area_difference_gsvi_selfcollected.png` and `Mitigation_new_obs_stacked_bar.png` — because each exists only to set GSVI beside GSVI+self-collected. That comparison is [Step 6.4a](#64a-hotspots-hdbscan), which supersedes all three with `1_SC_hotspot_comparison.png` and `2_SC_cluster_composition.png`.
+37 figures across `HDBSCAN/`, `settlement/` and `Signed_distance/`. The pop-adjusted figures sit under `Signed_distance/pop_adjusted/worldpop_2020/` (the manuscript sample, 13 figures); `Signed_distance/pop_adjusted/worldpop_2024_constrained/` holds 7 from the constrained 2024 sensitivity, which are not for the manuscript. Three archived figures are **not** rebuilt here — `Waste_HDBSCAN_comparison.png`, `Hotspot_area_difference_gsvi_selfcollected.png` and `Mitigation_new_obs_stacked_bar.png` — because each exists only to set GSVI beside GSVI+self-collected. That comparison is [Step 6.4a](#64a-hotspots-hdbscan), which supersedes all three with `1_SC_hotspot_comparison.png` and `2_SC_cluster_composition.png`.
 
 `Waste_HDBSCAN_gsvi.png` is also dropped: `Waste_HDBSCAN_context_gsvi.png` shows the same 24 clusters with the same numbering and parameters, plus settlement boundaries, named settlements and the Dandora landfill — the plain version added nothing. Its script `3_plot_hdbscan_map.R` is removed.
 
@@ -730,7 +982,7 @@ One table across the whole representation pipeline, assembled from the sub-steps
 | | Cells >500 m from an observation | 13,149 (18.8%) | 12,855 (18.4%) | −294 (−0.4 pp) |
 | | Cells reached by SC that were previously unobserved (P_new) | — | 9.9% | 90.1% already observed |
 | | Self-collected images per newly observed cell | — | **23** | E_cov = 0.043 |
-| Measurement | CV–VLM F1 | 91.1% | 92.7% | +1.6 pp |
+| Measurement | CV–VLM F1 | 91.1% | 92.1% | +1.0 pp |
 | Indicator | Direct share of represented cells ‡ | 33.2% | 33.4% | +0.2 pp |
 | | Cells changing final indicator class | — | 670 (1.0%) | — |
 | | Changed cells affected through interpolation | — | 604 (90.1%) | — |
@@ -1012,7 +1264,7 @@ The NNR is the control that matters, because its null is redrawn from the frame 
 | Measure | GSVI | GSVI + SC |
 | --- | --- | --- |
 | Observation locations | 76,605 | 79,584 |
-| LRT vs year-only, χ² (df 7) | 2,216.7 | 2,475.5 |
+| LRT vs year-only, χ² (df 7) | 2,216.3 | 2,475.5 |
 | Pseudo-R², year only | 0.019 | 0.019 |
 | Pseudo-R², year + s(distance) | 0.114 | 0.120 |
 | AIC, year + s(distance) | 20,712 | 21,630 |

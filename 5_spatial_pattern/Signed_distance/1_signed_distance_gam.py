@@ -8,10 +8,10 @@ Full GSVI sample (analysis unit = panoid):
 Controls for capture year while estimating the settlement-distance gradient.
 Period-stratified curves / HDBSCAN are supporting robustness only.
 
-Sparse years (n < MIN_YEAR_N) are pooled as "other". Year FE levels with zero
-waste-positives cannot stand alone in a logit (complete separation); those
-panoramas are reassigned to the nearest calendar year that has positives so the
-full panorama set is retained.
+A year with fewer than MIN_YEAR_N panoramas, or with no waste-positive panorama,
+cannot stand alone in a logit (too few observations, or complete separation).
+Each such year joins its own nearest calendar year that has neither problem
+(2015 → 2017, 2019 → 2018), so the full panorama set is retained.
 """
 
 from __future__ import annotations
