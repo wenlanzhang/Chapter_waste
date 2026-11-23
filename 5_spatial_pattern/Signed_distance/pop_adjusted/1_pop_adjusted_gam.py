@@ -14,9 +14,10 @@ Nested models (same year FE treatment as Signed_distance/1_signed_distance_gam.p
   MDPS: MDP + thin-plate spatial field on (x, y)          # residual-spatial sensitivity
 
 Central test: MP vs MDP. Also report MD vs MDP.
-Default population covariate: static WorldPop Constrained 2024 100 m
-(ken_pop_2024_CN_100m_R2025A_v1.tif). Override with --pop-raster / --output-dir
-(e.g. worldpop_2020/ uses unconstrained ken_ppp_2020.tif).
+Default population covariate (the manuscript sample): static WorldPop
+unconstrained Kenya 2020 (ken_ppp_2020.tif), outputs in pop_adjusted/worldpop_2020/.
+Override with --pop-raster / --output-dir; worldpop_2024_constrained/ does this
+for the WorldPop constrained 2024 layer (a sensitivity, not the manuscript).
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ from esda.moran import Moran
 from libpysal.weights import KNN
 from scipy import stats
 from scipy.spatial.distance import cdist
-from sklearn.cluster import DBSCAN, KMeans
+from sklearn.cluster import KMeans
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import brier_score_loss, log_loss
 from statsmodels.gam.api import BSplines, GLMGam
@@ -44,6 +45,7 @@ _REPO_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "chapter_p
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from chapter_paths import phd_data_root  # noqa: E402
 from lib.gam import (  # noqa: E402
     BOOT_SEED,
     CI_ALPHA,
@@ -60,21 +62,41 @@ from lib.panoids import (  # noqa: E402
     signed_distance_to_slums,
 )
 
-# Defaults = 2024 constrained primary run; CLI can redirect to a variant folder.
-OUTPUT_DIR = PATTERN_DIR / "Signed_distance" / "pop_adjusted"
+# Every population-raster run lives in its own folder under POP_ADJ_ROOT.
+# The default is the manuscript sample: WorldPop unconstrained Kenya 2020.
+# worldpop_2024_constrained/ wraps this script for the 2024 constrained layer.
+POP_ADJ_ROOT = PATTERN_DIR / "Signed_distance" / "pop_adjusted"
+MANUSCRIPT_SUBDIR = "worldpop_2020"
+OUTPUT_DIR = POP_ADJ_ROOT / MANUSCRIPT_SUBDIR
 TABLE_DIR = OUTPUT_DIR / "thesis_table"
-POP_RASTER = OUTPUT_DIR / "ken_pop_2024_CN_100m_R2025A_v1.tif"
-POP_LABEL = "static WorldPop Constrained Kenya 2024 (100 m CN)"
-POP_SHORT = "WorldPop Constrained KE 2024, 100 m (static)"
-THESIS_NAME = "pop_adjusted_gam.csv"
+POP_RASTER = phd_data_root() / "RS" / "Pop_density" / "UnconstraintIndividualCountries" / "ken_ppp_2020.tif"
+POP_LABEL = "static WorldPop unconstrained Kenya 2020 (ken_ppp_2020, people/pixel)"
+POP_SHORT = "WorldPop unconstrained KE 2020 (static)"
+THESIS_NAME = "pop_adjusted_gam_worldpop_2020.csv"
 
 SPLINE_DF_SPATIAL = 6
-BOOT_B = 40
+BLOCK_BOOT_M = 2000.0  # block side for the curve bands: residual correlation is ~0 by 2 km
+BLOCK_BOOT_B = 500
 N_SPATIAL_KNOTS = 25
 N_CV_FOLDS = 5
-DEDUP_THRESHOLDS_M = (50.0, 100.0)
 MORAN_K = 8
-STD_SAMPLE_N = 400  # subsample size when standardising over the other covariate
+STD_SAMPLE_N = 500  # quantiles used when standardising over the other covariate
+
+
+def standardisation_points(values: pd.Series) -> np.ndarray:
+    """STD_SAMPLE_N evenly spaced quantiles of a covariate's distribution.
+
+    The curves average predictions over the other covariate's distribution.
+    This used to be a random sample of 400 values, which made the curve itself
+    noisy: on the WorldPop 2020 sample the adjusted P(waste) at the settlement
+    edge ranged 5.3–6.2% across seeds, and the published draw (6.18%) was the
+    top of that range. Quantiles are deterministic and match averaging over
+    every panorama (5.79%).
+    """
+    v = values.to_numpy(dtype=float)
+    if len(v) <= STD_SAMPLE_N:
+        return v
+    return np.quantile(v, (np.arange(STD_SAMPLE_N) + 0.5) / STD_SAMPLE_N)
 
 
 def prepare_analysis_frame() -> pd.DataFrame:
@@ -405,186 +427,214 @@ def _predict_mdp(
     return np.asarray(result.predict(exog=exog, exog_smooth=xs), dtype=float)
 
 
-def standardised_curve_distance(
+def _mdp_year_average(
     df: pd.DataFrame,
     result,
     year_cols: list[str],
-    knots: np.ndarray | None = None,
-) -> pd.DataFrame:
-    """Adjusted P(waste+) vs signed distance, standardised over pop + year."""
+    dist_rep: np.ndarray,
+    pop_rep: np.ndarray,
+    n_points: int,
+    grid_n: int,
+) -> np.ndarray:
+    """Mean MDP prediction over n_points standardisation values, weighted by year share."""
     weights = year_standardisation_weights(df)
-    d_min = float(df["signed_distance_m"].quantile(0.01))
-    d_max = float(df["signed_distance_m"].quantile(0.99))
-    grid = np.linspace(d_min, d_max, PRED_GRID_N)
+    weights.index = weights.index.astype(str)
+    out = np.zeros(grid_n, dtype=float)
+    for level, wt in weights.items():
+        pred = _predict_mdp(result, year_cols, dist_rep, pop_rep, str(level))
+        out += float(wt) * pred.reshape(n_points, grid_n).mean(axis=0)
+    return out
 
-    rng = np.random.default_rng(BOOT_SEED)
-    pop_vals = df["log1p_pop_density"].to_numpy(dtype=float)
-    if len(pop_vals) > STD_SAMPLE_N:
-        pop_sample = pop_vals[rng.choice(len(pop_vals), size=STD_SAMPLE_N, replace=False)]
-    else:
-        pop_sample = pop_vals
 
-    def mean_curve(fit, cols, levels: set[str], spatial_zero: np.ndarray | None):
-        w = weights.astype(float).copy()
-        w.index = w.index.astype(str)
-        keep = [lv for lv in w.index if lv in levels]
-        w = w.reindex(keep).dropna()
-        w = w[w > 0]
-        w = w / w.sum()
-        pred = np.zeros(len(grid), dtype=float)
-        for level, wt in w.items():
-            acc = np.zeros(len(grid), dtype=float)
-            for pop_v in pop_sample:
-                acc += _predict_mdp(
-                    fit,
-                    cols,
-                    grid,
-                    np.full(len(grid), pop_v),
-                    str(level),
-                    spatial_extra=spatial_zero,
-                )
-            pred += float(wt) * (acc / len(pop_sample))
-        return pred
+def mdp_distance_curve(
+    df: pd.DataFrame, result, year_cols: list[str], grid: np.ndarray
+) -> np.ndarray:
+    """Adjusted P(waste+) over a signed-distance grid, standardised over pop + year.
 
-    full_levels = set(df["year_fe"].astype(str).unique())
-    spatial_zero = None
-    if knots is not None:
-        # hold spatial field at mean basis (=0 after centering) → zeros
-        spatial_zero = np.zeros(N_SPATIAL_KNOTS, dtype=float)
+    The one definition of the curve: every script and figure in pop_adjusted/
+    calls this, so the central MDP curve is the same wherever it is drawn.
+    Population and year shares are those of `df` itself.
+    """
+    pop = standardisation_points(df["log1p_pop_density"])
+    g = len(grid)
+    return _mdp_year_average(
+        df, result, year_cols, np.tile(grid, len(pop)), np.repeat(pop, g), len(pop), g
+    )
 
-    mean = mean_curve(result, year_cols, full_levels, spatial_zero)
 
-    n = len(df)
-    draws: list[np.ndarray] = []
-    print(f"  Bootstrap CI for distance curve (B={BOOT_B})...")
-    for _ in range(BOOT_B):
-        idx = rng.integers(0, n, size=n)
-        boot = df.iloc[idx]
-        if boot["waste_positive"].nunique() < 2 or boot["year_fe"].nunique() < 2:
+def mdp_population_curve(
+    df: pd.DataFrame, result, year_cols: list[str], grid: np.ndarray
+) -> np.ndarray:
+    """Adjusted P(waste+) over a log1p(pop density) grid, standardised over distance + year."""
+    dist = standardisation_points(df["signed_distance_m"])
+    g = len(grid)
+    return _mdp_year_average(
+        df, result, year_cols, np.repeat(dist, g), np.tile(grid, len(dist)), len(dist), g
+    )
+
+
+def refit_mdp(df: pd.DataFrame):
+    """MDP on a (re)sample: year FE reassigned on the rows present, ridge fallback."""
+    d = assign_year_fe(df.drop(columns=["year_fe"], errors="ignore"), verbose=False)
+    res, cols, _, _ = fit_mdp(d)
+    if not np.isfinite(float(res.llf)):
+        res, cols, _, _ = fit_mdp(d, alpha=1.0)
+    return d, res, cols
+
+
+def block_sample(xy: np.ndarray, block_m: float, rng: np.random.Generator) -> np.ndarray:
+    """Row indices of one spatial block bootstrap sample (random grid offset)."""
+    off = rng.uniform(0, block_m, size=2)
+    cell = np.floor((xy + off) / block_m).astype(np.int64)
+    key = cell[:, 0] * 1_000_003 + cell[:, 1]
+    uniq, inv = np.unique(key, return_inverse=True)
+    order = np.argsort(inv, kind="stable")
+    starts = np.searchsorted(inv[order], np.arange(len(uniq)))
+    ends = np.append(starts[1:], len(order))
+    drawn = rng.integers(0, len(uniq), size=len(uniq))
+    return np.concatenate([order[starts[b] : ends[b]] for b in drawn])
+
+
+def block_bootstrap_seed(block_m: float) -> int:
+    """Seed of the replicate stream for one block size (0 = panorama-level).
+
+    Shared with 3_spatial_block_bootstrap.py, so the 2 km band drawn here is
+    the same set of replicates as the 2 km row of its interval table.
+    """
+    return BOOT_SEED + int(block_m) + 7
+
+
+def distance_grid(df: pd.DataFrame) -> np.ndarray:
+    return np.linspace(
+        float(df["signed_distance_m"].quantile(0.01)),
+        float(df["signed_distance_m"].quantile(0.99)),
+        PRED_GRID_N,
+    )
+
+
+def population_grid(df: pd.DataFrame) -> np.ndarray:
+    return np.linspace(
+        float(df["log1p_pop_density"].quantile(0.01)),
+        float(df["log1p_pop_density"].quantile(0.99)),
+        PRED_GRID_N,
+    )
+
+
+def block_bootstrap_curves(
+    df: pd.DataFrame,
+    d_grid: np.ndarray,
+    p_grid: np.ndarray,
+    block_m: float = BLOCK_BOOT_M,
+    n_boot: int = BLOCK_BOOT_B,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Spatial block bootstrap replicates of both adjusted curves.
+
+    Each replicate resamples occupied blocks with replacement, refits MDP and
+    re-standardises over that replicate's own population (or distance) and
+    year distribution. Returns (distance draws, population draws), one row per
+    replicate that fitted.
+    """
+    xy = df[["x", "y"]].to_numpy(dtype=float)
+    rng = np.random.default_rng(block_bootstrap_seed(block_m))
+    d_draws: list[np.ndarray] = []
+    p_draws: list[np.ndarray] = []
+    for r in range(n_boot):
+        boot = df.iloc[block_sample(xy, block_m, rng)].reset_index(drop=True)
+        if boot["waste_positive"].nunique() < 2:
             continue
         try:
-            boot_fit, boot_cols, _, _ = fit_mdp(boot)
-            draws.append(
-                mean_curve(
-                    boot_fit,
-                    boot_cols,
-                    set(boot["year_fe"].astype(str).unique()),
-                    None,
-                )
-            )
-        except Exception:
+            d, res, cols = refit_mdp(boot)
+        except Exception as exc:
+            print(f"    rep {r}: fit failed ({exc})")
             continue
+        for draws, curve_fn, grid in (
+            (d_draws, mdp_distance_curve, d_grid),
+            (p_draws, mdp_population_curve, p_grid),
+        ):
+            try:
+                draws.append(curve_fn(d, res, cols, grid))
+            except Exception as exc:
+                print(f"    rep {r}: {curve_fn.__name__} failed ({exc})")
+        if (r + 1) % 100 == 0:
+            print(f"    {r + 1}/{n_boot} replicates")
+    return np.vstack(d_draws), np.vstack(p_draws)
 
-    lo = np.full(PRED_GRID_N, np.nan)
-    hi = np.full(PRED_GRID_N, np.nan)
-    ci_method = "none"
-    if draws:
-        arr = np.vstack(draws)
-        lo = np.nanpercentile(arr, 100.0 * (CI_ALPHA / 2.0), axis=0)
-        hi = np.nanpercentile(arr, 100.0 * (1.0 - CI_ALPHA / 2.0), axis=0)
-        ci_method = f"bootstrap_B{len(draws)}_pop_year_standardised"
-        print(f"  Bootstrap CI from {len(draws)}/{BOOT_B} draws")
 
+ELASTICITY_RANGE_KM2 = (1000.0, 70000.0)
+
+
+def population_elasticity(p_grid: np.ndarray, curve: np.ndarray) -> float:
+    """Slope of log P(waste+) on log density over ELASTICITY_RANGE_KM2.
+
+    1 would mean prevalence proportional to population. Same definition as
+    4plot_pop_scaling_null.R.
+    """
+    dens = np.expm1(p_grid)
+    ok = (dens >= ELASTICITY_RANGE_KM2[0]) & (dens <= ELASTICITY_RANGE_KM2[1]) & (curve > 0)
+    return float(np.polyfit(np.log(dens[ok]), np.log(curve[ok]), 1)[0])
+
+
+def _curve_frame(
+    x: dict, mean: np.ndarray, draws: np.ndarray, block_m: float, prediction_type: str, panel: str
+) -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "signed_distance_m": grid,
+            **x,
             "prob_waste_positive": mean,
-            "prob_ci_low": lo,
-            "prob_ci_high": hi,
-            "prediction_type": "pop_year_standardised",
-            "ci_method": ci_method,
+            "prob_ci_low": np.nanpercentile(draws, 100.0 * (CI_ALPHA / 2.0), axis=0),
+            "prob_ci_high": np.nanpercentile(draws, 100.0 * (1.0 - CI_ALPHA / 2.0), axis=0),
+            "prediction_type": prediction_type,
+            "ci_method": f"spatial_block_bootstrap_{block_m:.0f}m_B{len(draws)}",
+            "ci_block_m": block_m,
+            "ci_n_draws": len(draws),
             "ci_alpha": CI_ALPHA,
-            "panel": "distance",
+            "panel": panel,
         }
     )
 
 
-def standardised_curve_population(
-    df: pd.DataFrame,
-    result,
-    year_cols: list[str],
-) -> pd.DataFrame:
-    """Adjusted P(waste+) vs pop density, standardised over distance + year."""
-    weights = year_standardisation_weights(df)
-    p_min = float(df["log1p_pop_density"].quantile(0.01))
-    p_max = float(df["log1p_pop_density"].quantile(0.99))
-    grid = np.linspace(p_min, p_max, PRED_GRID_N)
-    dens_grid = np.expm1(grid)
+def standardised_curves(
+    df: pd.DataFrame, result, year_cols: list[str]
+) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    """Both adjusted MDP curves with spatial block bootstrap bands.
 
-    rng = np.random.default_rng(BOOT_SEED + 1)
-    dist_vals = df["signed_distance_m"].to_numpy(dtype=float)
-    if len(dist_vals) > STD_SAMPLE_N:
-        dist_sample = dist_vals[
-            rng.choice(len(dist_vals), size=STD_SAMPLE_N, replace=False)
-        ]
-    else:
-        dist_sample = dist_vals
+    Also returns the population elasticity with its interval from the same
+    replicates.
 
-    def mean_curve(fit, cols, levels: set[str]):
-        w = weights.astype(float).copy()
-        w.index = w.index.astype(str)
-        keep = [lv for lv in w.index if lv in levels]
-        w = w.reindex(keep).dropna()
-        w = w[w > 0]
-        w = w / w.sum()
-        pred = np.zeros(len(grid), dtype=float)
-        for level, wt in w.items():
-            acc = np.zeros(len(grid), dtype=float)
-            for d_v in dist_sample:
-                acc += _predict_mdp(
-                    fit,
-                    cols,
-                    np.full(len(grid), d_v),
-                    grid,
-                    str(level),
-                )
-            pred += float(wt) * (acc / len(dist_sample))
-        return pred
-
-    full_levels = set(df["year_fe"].astype(str).unique())
-    mean = mean_curve(result, year_cols, full_levels)
-
-    n = len(df)
-    draws: list[np.ndarray] = []
-    print(f"  Bootstrap CI for population curve (B={BOOT_B})...")
-    for _ in range(BOOT_B):
-        idx = rng.integers(0, n, size=n)
-        boot = df.iloc[idx]
-        if boot["waste_positive"].nunique() < 2 or boot["year_fe"].nunique() < 2:
-            continue
-        try:
-            boot_fit, boot_cols, _, _ = fit_mdp(boot)
-            draws.append(
-                mean_curve(
-                    boot_fit, boot_cols, set(boot["year_fe"].astype(str).unique())
-                )
-            )
-        except Exception:
-            continue
-
-    lo = np.full(PRED_GRID_N, np.nan)
-    hi = np.full(PRED_GRID_N, np.nan)
-    ci_method = "none"
-    if draws:
-        arr = np.vstack(draws)
-        lo = np.nanpercentile(arr, 100.0 * (CI_ALPHA / 2.0), axis=0)
-        hi = np.nanpercentile(arr, 100.0 * (1.0 - CI_ALPHA / 2.0), axis=0)
-        ci_method = f"bootstrap_B{len(draws)}_distance_year_standardised"
-        print(f"  Bootstrap CI from {len(draws)}/{BOOT_B} draws")
-
-    return pd.DataFrame(
-        {
-            "log1p_pop_density": grid,
-            "pop_density_km2": dens_grid,
-            "prob_waste_positive": mean,
-            "prob_ci_low": lo,
-            "prob_ci_high": hi,
-            "prediction_type": "distance_year_standardised",
-            "ci_method": ci_method,
-            "ci_alpha": CI_ALPHA,
-            "panel": "population",
-        }
+    The bands are 2.5th–97.5th percentiles over BLOCK_BOOT_B replicates with
+    BLOCK_BOOT_M blocks. They replace the panorama-level bootstrap (B = 40),
+    which treated neighbouring panoramas as independent and was 3–6× too
+    narrow given the residual spatial autocorrelation in MDP.
+    """
+    d_grid, p_grid = distance_grid(df), population_grid(df)
+    mean_d = mdp_distance_curve(df, result, year_cols, d_grid)
+    mean_p = mdp_population_curve(df, result, year_cols, p_grid)
+    print(
+        f"  Spatial block bootstrap bands ({BLOCK_BOOT_M:,.0f} m blocks, B={BLOCK_BOOT_B})..."
     )
+    d_draws, p_draws = block_bootstrap_curves(df, d_grid, p_grid)
+    print(f"  Bands from {len(d_draws)} distance / {len(p_draws)} population replicates")
+    curve_d = _curve_frame(
+        {"signed_distance_m": d_grid},
+        mean_d, d_draws, BLOCK_BOOT_M, "pop_year_standardised", "distance",
+    )
+    curve_p = _curve_frame(
+        {"log1p_pop_density": p_grid, "pop_density_km2": np.expm1(p_grid)},
+        mean_p, p_draws, BLOCK_BOOT_M, "distance_year_standardised", "population",
+    )
+    el_draws = np.array([population_elasticity(p_grid, c) for c in p_draws])
+    elasticity = {
+        "pop_elasticity": population_elasticity(p_grid, mean_p),
+        "pop_elasticity_ci_low": float(np.percentile(el_draws, 100.0 * (CI_ALPHA / 2.0))),
+        "pop_elasticity_ci_high": float(np.percentile(el_draws, 100.0 * (1.0 - CI_ALPHA / 2.0))),
+        "pop_elasticity_share_draws_ge_1": float(np.mean(el_draws >= 1.0)),
+        "pop_elasticity_ci_method": curve_p["ci_method"].iloc[0],
+    }
+    print(
+        f"  Population elasticity {elasticity['pop_elasticity']:.2f} "
+        f"({elasticity['pop_elasticity_ci_low']:.2f}–{elasticity['pop_elasticity_ci_high']:.2f})"
+    )
+    return curve_d, curve_p, elasticity
 
 
 def concurvity_diagnostics(df: pd.DataFrame) -> pd.DataFrame:
@@ -705,166 +755,82 @@ def mdp_residual_frame(df: pd.DataFrame, result) -> pd.DataFrame:
     return out.reset_index(drop=True)
 
 
+CV_SMOOTH_COLS = {
+    "M0": [],
+    "MP": ["log1p_pop_density"],
+    "MD": ["signed_distance_m"],
+    "MDP": ["signed_distance_m", "log1p_pop_density"],
+}
+
+
 def spatial_blocked_cv(df: pd.DataFrame) -> pd.DataFrame:
-    """5 geographic folds (KMeans); report Brier + log-loss for nested models."""
+    """Out-of-sample Brier score and log-loss under spatially blocked 5-fold CV.
+
+    Folds are five geographic clusters of panoramas (KMeans on x, y), so each
+    model is scored on an area it was not fitted to. Held-out covariates are
+    clipped to the training fold's range, because a B-spline basis is not
+    defined outside its knots; year levels absent from the training fold fall
+    on the reference year.
+
+    A model's row with fold = -1 pools every held-out panorama, and is only
+    written when all five folds predicted, so the pooled rows are comparable
+    across models.
+    """
     xy = df[["x", "y"]].to_numpy(dtype=float)
     labels = KMeans(
         n_clusters=N_CV_FOLDS, random_state=BOOT_SEED, n_init=10
     ).fit_predict(xy)
     rows = []
     for model_name, fitter in FITTERS.items():
-        briers = []
-        loglosses = []
+        smooth_cols = CV_SMOOTH_COLS[model_name]
+        y_all: list[np.ndarray] = []
+        p_all: list[np.ndarray] = []
         for fold in range(N_CV_FOLDS):
             test_mask = labels == fold
-            train = df.loc[~test_mask].copy()
-            test = df.loc[test_mask].copy()
-            if (
-                train["waste_positive"].nunique() < 2
-                or test["waste_positive"].nunique() < 1
-                or train["year_fe"].nunique() < 2
-            ):
-                continue
+            train, test = df.loc[~test_mask], df.loc[test_mask]
             try:
                 fit, year_cols, _, _ = fitter(train)
-            except Exception:
+                test_year = test["year_fe"].astype(str).to_numpy()
+                exog = np.column_stack(
+                    [np.ones(len(test))]
+                    + [(test_year == c.replace("year_", "", 1)).astype(float) for c in year_cols]
+                )
+                if smooth_cols:
+                    lo = train[smooth_cols].min().to_numpy(dtype=float)
+                    hi = train[smooth_cols].max().to_numpy(dtype=float)
+                    xs = np.clip(test[smooth_cols].to_numpy(dtype=float), lo, hi)
+                    pred = fit.predict(exog=exog, exog_smooth=xs)
+                else:
+                    pred = fit.predict(exog)
+            except Exception as exc:
+                print(f"    {model_name} fold {fold}: failed ({exc})")
                 continue
-            # Build test design matching training year columns
+            pred = np.clip(np.asarray(pred, dtype=float), 1e-6, 1 - 1e-6)
             y_true = test["waste_positive"].to_numpy(dtype=float)
-            year_dummies = pd.get_dummies(test["year_fe"], drop_first=False, prefix="year")
-            # reconstruct exog with training columns
-            exog_train, train_year_cols = _year_exog(train)
-            col_order = list(exog_train.columns)
-            exog_test = pd.DataFrame({"const": np.ones(len(test), dtype=float)})
-            for col in train_year_cols:
-                level = col.replace("year_", "", 1)
-                exog_test[col] = (test["year_fe"].astype(str) == level).astype(float)
-            exog_mat = _align_exog(exog_test, col_order)
-            try:
-                if model_name == "M0":
-                    pred = np.asarray(fit.predict(exog_mat), dtype=float)
-                elif model_name == "MP":
-                    xs = test[["log1p_pop_density"]].to_numpy(dtype=float)
-                    pred = np.asarray(
-                        fit.predict(exog=exog_mat, exog_smooth=xs), dtype=float
-                    )
-                elif model_name == "MD":
-                    xs = test[["signed_distance_m"]].to_numpy(dtype=float)
-                    pred = np.asarray(
-                        fit.predict(exog=exog_mat, exog_smooth=xs), dtype=float
-                    )
-                else:  # MDP
-                    xs = test[
-                        ["signed_distance_m", "log1p_pop_density"]
-                    ].to_numpy(dtype=float)
-                    pred = np.asarray(
-                        fit.predict(exog=exog_mat, exog_smooth=xs), dtype=float
-                    )
-            except Exception:
-                continue
-            pred = np.asarray(pred, dtype=float)
-            ok = np.isfinite(pred) & np.isfinite(y_true)
-            if int(ok.sum()) < 10:
-                continue
-            pred = np.clip(pred[ok], 1e-6, 1 - 1e-6)
-            y_ok = y_true[ok]
-            briers.append(float(brier_score_loss(y_ok, pred)))
-            try:
-                loglosses.append(float(log_loss(y_ok, pred, labels=[0.0, 1.0])))
-            except Exception:
-                loglosses.append(float("nan"))
+            y_all.append(y_true)
+            p_all.append(pred)
             rows.append(
                 {
                     "model": model_name,
                     "fold": int(fold),
                     "n_train": int(len(train)),
-                    "n_test": int(ok.sum()),
-                    "brier": briers[-1],
-                    "log_loss": loglosses[-1],
+                    "n_test": int(len(test)),
+                    "n_test_positive": int(y_true.sum()),
+                    "brier": float(brier_score_loss(y_true, pred)),
+                    "log_loss": float(log_loss(y_true, pred, labels=[0.0, 1.0])),
                 }
             )
-        if briers:
+        if len(y_all) == N_CV_FOLDS:
+            y_cat, p_cat = np.concatenate(y_all), np.concatenate(p_all)
             rows.append(
                 {
                     "model": model_name,
                     "fold": -1,
                     "n_train": -1,
-                    "n_test": -1,
-                    "brier": float(np.nanmean(briers)),
-                    "log_loss": float(np.nanmean(loglosses)),
-                }
-            )
-    return pd.DataFrame(rows)
-
-
-def thin_positive_panoramas(df: pd.DataFrame, dist_m: float, seed: int) -> pd.DataFrame:
-    """Keep one waste+ panorama per spatial group; drop other positives (not→neg)."""
-    pos = df.loc[df["waste_positive"] == 1].copy()
-    neg = df.loc[df["waste_positive"] == 0].copy()
-    if len(pos) == 0:
-        return df.copy()
-    coords = pos[["x", "y"]].to_numpy(dtype=float)
-    labels = DBSCAN(eps=float(dist_m), min_samples=1, metric="euclidean").fit(coords).labels_
-    rng = np.random.default_rng(seed)
-    keep_idx = []
-    for lab in np.unique(labels):
-        members = np.where(labels == lab)[0]
-        keep_idx.append(int(rng.choice(members)))
-    kept_pos = pos.iloc[keep_idx]
-    out = pd.concat([kept_pos, neg], ignore_index=True)
-    return out
-
-
-def dedup_sensitivity(df: pd.DataFrame, result_mdp) -> pd.DataFrame:
-    """Refit MDP after thinning waste+ at 50 m / 100 m; compare distance signal."""
-    rows = []
-    base_lrt = None
-    # baseline LRT proxy: MP vs MDP on full data already elsewhere
-    for thr in DEDUP_THRESHOLDS_M:
-        thinned = thin_positive_panoramas(df, thr, seed=BOOT_SEED + int(thr))
-        n_pos = int(thinned["waste_positive"].sum())
-        n_drop = int(df["waste_positive"].sum()) - n_pos
-        print(
-            f"  Dedup {thr:.0f} m: kept waste+={n_pos:,} "
-            f"(removed {n_drop:,} secondary positives); n={len(thinned):,}"
-        )
-        try:
-            m_p, _, _, _ = fit_mp(thinned)
-            if not np.isfinite(float(m_p.llf)):
-                print(f"    MP unstable at {thr:.0f} m; retrying with light penalty")
-                m_p, _, _, _ = fit_mp(thinned, alpha=1.0)
-            m_dp, _, _, _ = fit_mdp(thinned)
-            if not np.isfinite(float(m_dp.llf)):
-                print(f"    MDP unstable at {thr:.0f} m; retrying with light penalty")
-                m_dp, _, _, _ = fit_mdp(thinned, alpha=1.0)
-            if not np.isfinite(float(m_p.llf)) or not np.isfinite(float(m_dp.llf)):
-                raise RuntimeError("non-finite log-likelihood after penalty retry")
-            lrt = likelihood_ratio_test(m_dp, m_p, f"MP_vs_MDP_dedup_{int(thr)}m")
-            rows.append(
-                {
-                    "dedup_threshold_m": thr,
-                    "n_panoids": int(len(thinned)),
-                    "n_waste_positive": n_pos,
-                    "n_positives_removed": n_drop,
-                    "aic_MP": _safe_aic(m_p),
-                    "aic_MDP": _safe_aic(m_dp),
-                    "delta_aic_MP_minus_MDP": float(_safe_aic(m_p) - _safe_aic(m_dp)),
-                    "lrt_stat": lrt["lr_stat"],
-                    "lrt_df": lrt["df_diff"],
-                    "lrt_p_value": lrt["p_value"],
-                    "pseudo_r2_MDP": _model_metrics(m_dp, "MDP", len(thinned))[
-                        "pseudo_r2_mcfadden"
-                    ],
-                }
-            )
-        except Exception as exc:
-            rows.append(
-                {
-                    "dedup_threshold_m": thr,
-                    "n_panoids": int(len(thinned)),
-                    "n_waste_positive": n_pos,
-                    "n_positives_removed": n_drop,
-                    "error": str(exc),
+                    "n_test": int(len(y_cat)),
+                    "n_test_positive": int(y_cat.sum()),
+                    "brier": float(brier_score_loss(y_cat, p_cat)),
+                    "log_loss": float(log_loss(y_cat, p_cat, labels=[0.0, 1.0])),
                 }
             )
     return pd.DataFrame(rows)
@@ -942,13 +908,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--pop-raster",
         type=Path,
         default=None,
-        help="WorldPop GeoTIFF (default: 2024 CN under pop_adjusted/)",
+        help="WorldPop GeoTIFF (default: unconstrained ken_ppp_2020)",
     )
     p.add_argument(
         "--output-dir",
         type=Path,
         default=None,
-        help="Output directory for CSVs / thesis_table (default: pop_adjusted/)",
+        help="Output directory for CSVs / thesis_table (default: pop_adjusted/worldpop_2020/)",
     )
     p.add_argument(
         "--pop-label",
@@ -966,7 +932,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--thesis-name",
         type=str,
         default=None,
-        help="Thesis CSV filename (default: pop_adjusted_gam.csv)",
+        help="Thesis CSV filename (default: pop_adjusted_gam_worldpop_2020.csv)",
     )
     p.add_argument(
         "--residuals-only",
@@ -1138,14 +1104,10 @@ def main(argv: list[str] | None = None) -> None:
         knots = None
 
     print("\n  Adjusted prediction curves from MDP...")
-    curve_d = standardised_curve_distance(df, res_mdp, year_cols_mdp)
-    curve_p = standardised_curve_population(df, res_mdp, year_cols_mdp)
+    curve_d, curve_p, elasticity = standardised_curves(df, res_mdp, year_cols_mdp)
 
     print("\n  Spatially blocked 5-fold CV (Brier / log-loss)...")
     cv = spatial_blocked_cv(df)
-
-    print("\n  Adjacent-panorama deduplication sensitivity (50 m, 100 m)...")
-    dedup = dedup_sensitivity(df, res_mdp)
 
     # Summary + thesis table
     mdp_met = metrics.loc[metrics["model"] == "MDP"].iloc[0]
@@ -1183,6 +1145,7 @@ def main(argv: list[str] | None = None) -> None:
         "concurvity_max_dist_given_pop": float(
             conc.iloc[0]["concurvity_max_distance_given_pop"]
         ),
+        **elasticity,
         "moran_i_mdp_resid": moran["moran_i"],
         "moran_p_mdp_resid": moran["moran_p_sim"],
         "mdps_fit": int(bool(sim_info)),
@@ -1206,7 +1169,6 @@ def main(argv: list[str] | None = None) -> None:
     curve_d_path = OUTPUT_DIR / "Nairobi_pop_adjusted_curve_distance.csv"
     curve_p_path = OUTPUT_DIR / "Nairobi_pop_adjusted_curve_population.csv"
     cv_path = OUTPUT_DIR / "Nairobi_pop_adjusted_spatial_cv.csv"
-    dedup_path = OUTPUT_DIR / "Nairobi_pop_adjusted_dedup_sensitivity.csv"
     summary_path = OUTPUT_DIR / "Nairobi_pop_adjusted_summary.csv"
     sim_path = OUTPUT_DIR / "Nairobi_pop_adjusted_mdps_similarity.csv"
 
@@ -1217,7 +1179,6 @@ def main(argv: list[str] | None = None) -> None:
     curve_d.to_csv(curve_d_path, index=False)
     curve_p.to_csv(curve_p_path, index=False)
     cv.to_csv(cv_path, index=False)
-    dedup.to_csv(dedup_path, index=False)
     pd.DataFrame([summary]).to_csv(summary_path, index=False)
     if sim_info:
         pd.DataFrame([sim_info]).to_csv(sim_path, index=False)
@@ -1269,6 +1230,12 @@ def main(argv: list[str] | None = None) -> None:
                 f"p={moran['moran_p_sim']:.4f}",
             ),
             (
+                "Population elasticity (1,000–70,000 /km²)",
+                f"{elasticity['pop_elasticity']:.2f}",
+                f"{BLOCK_BOOT_M / 1000:g} km block 95% CI "
+                f"{elasticity['pop_elasticity_ci_low']:.2f}–{elasticity['pop_elasticity_ci_high']:.2f}",
+            ),
+            (
                 "Distance remains after pop+year?",
                 "Yes" if distance_remains else "Weaker / check",
                 "",
@@ -1289,7 +1256,6 @@ def main(argv: list[str] | None = None) -> None:
     print(f"Wrote {curve_d_path}")
     print(f"Wrote {curve_p_path}")
     print(f"Wrote {cv_path}")
-    print(f"Wrote {dedup_path}")
     print(f"Wrote {summary_path}")
     print(f"Wrote {thesis_path}")
 

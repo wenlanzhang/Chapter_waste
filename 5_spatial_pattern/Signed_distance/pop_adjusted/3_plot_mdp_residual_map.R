@@ -34,15 +34,15 @@ get_opt <- function(name, default = NULL) {
   if (length(hit)) sub(paste0("^--", name, "="), "", hit[[1]]) else default
 }
 
-data_subdir <- get_opt("data-subdir", "")
+data_subdir <- get_opt("data-subdir", "worldpop_2020")
 fig_subdir <- get_opt("fig-subdir", data_subdir)
 pop_caption <- get_opt(
   "pop-caption",
-  "WorldPop Constrained Kenya 2024 (100 m), static density covariate (not matched to panorama year)."
+  "WorldPop unconstrained Kenya 2020 (ken_ppp_2020), static density covariate (not matched to panorama year)."
 )
 run_hint <- get_opt(
   "run-hint",
-  "python 5_spatial_pattern/pop_adjusted/1_pop_adjusted_gam.py --residuals-only"
+  "python 5_spatial_pattern/Signed_distance/pop_adjusted/1_pop_adjusted_gam.py --residuals-only"
 )
 
 DATA_ROOT <- chapter_data_root
@@ -57,7 +57,7 @@ fig_root <- normalizePath(
   file.path(script_dir, "..", "..", "..", "Figure", "5_spatial_pattern", "Signed_distance", "pop_adjusted"),
   mustWork = FALSE
 )
-if (basename(normalizePath(script_dir)) == "worldpop_2020") {
+if (basename(normalizePath(script_dir)) %in% c("worldpop_2020", "worldpop_2024_constrained")) {
   fig_root <- normalizePath(
     file.path(script_dir, "..", "..", "..", "..", "Figure", "5_spatial_pattern", "Signed_distance", "pop_adjusted"),
     mustWork = FALSE

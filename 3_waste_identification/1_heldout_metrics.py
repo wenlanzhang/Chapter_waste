@@ -9,8 +9,18 @@ sc_100pct — and every model is validated on the same 180 images.
 Headline results (sc_100pct, the full detector):
 
   1. YOLO only        image-level prediction from the held-out val run
-  2. YOLO -> Qwen     a YOLO positive is kept only if Qwen2-VL also says Yes,
-                      using the best of the independent Qwen replicates (highest F1)
+  2. YOLO -> Qwen     a YOLO positive is kept only if Qwen2-VL also says Yes;
+                      each metric is computed per Qwen replicate and averaged
+                      (a single-pass scenario is its one run)
+
+95% intervals: one paired percentile bootstrap over panoramas, the units the
+held-out set was drawn by (B = 10,000, fixed seed; waste and background
+panoramas resampled within class, each bringing all its views). Each resample
+keeps an image's ground truth, YOLO prediction and every cascade run together,
+and cascade metrics are re-averaged over runs within it. The intervals describe
+sampling uncertainty conditional on the observed runs; the run range is
+reported separately. Paired cascade-minus-YOLO differences
+come from the same replicates.
 
 Plus the repeated-inference stability of those replicates, and a sensitivity
 table across the five SC shares.
@@ -24,8 +34,9 @@ Inputs (Data/Chapter_waste/3_waste_identification/):
 Outputs (thesis_table/):
   table_1_yolo_detection.csv / _detail.csv    box-level mAP, all scenarios
   table_2_yolo_qwen_heldout.csv               display metrics, headline scenario
-  table_2_yolo_qwen_heldout_ci.csv            + Wilson 95% CIs
-  table_2_yolo_qwen_heldout_detail.csv        counts + numeric CIs (feeds the panel figure)
+  table_2_yolo_qwen_heldout_ci.csv            + bootstrap 95% CIs
+  table_2_yolo_qwen_heldout_detail.csv        counts + numeric CIs + run range (feeds the panel figure)
+  table_2_yolo_qwen_heldout_diff.csv          paired cascade - YOLO differences with 95% CIs
   table_3_qwen_replicates.csv                 replicates + majority (stability figure)
   table_4_sc_sensitivity.csv / _detail.csv    image-level metrics across SC shares
 """
@@ -33,7 +44,6 @@ Outputs (thesis_table/):
 from __future__ import annotations
 
 import argparse
-import math
 import re
 import sys
 from pathlib import Path
@@ -57,6 +67,11 @@ PREDICTIONS_NAME = "heldout_GSVI_p100_image_level_predictions.csv"
 QWEN_LABELS_GLOB = "qwen_labels_sc_*.csv"
 FP_CSV_TEMPLATE = "heldout_GSVI_p100_{scenario}_fp_conf001.csv"
 HEADLINE_SCENARIO = "sc_100pct"
+
+METRICS = ("accuracy", "precision", "recall", "f1")
+BOOT_B = 10_000
+BOOT_SEED = 20261123
+CI_METHOD = f"class_stratified_panorama_paired_percentile_bootstrap_B{BOOT_B}"
 
 UUID_PREFIX = re.compile(r"^[0-9a-f]{8}-", re.I)
 SCENARIO_SHARE = re.compile(r"sc_(\d+)pct", re.I)
@@ -126,49 +141,105 @@ def metrics_binary(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
     }
 
 
-def wilson_ci(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n <= 0:
-        return float("nan"), float("nan")
-    p = successes / n
-    z2 = z * z
-    den = 1.0 + z2 / n
-    center = (p + z2 / (2.0 * n)) / den
-    margin = z * math.sqrt((p * (1.0 - p) / n) + z2 / (4.0 * n * n)) / den
-    return max(0.0, center - margin), min(1.0, center + margin)
+def metrics_from_counts(tp, fp, tn, fn) -> dict[str, np.ndarray]:
+    """Accuracy / precision / recall / F1 from confusion counts (scalars or arrays).
 
+    An undefined ratio (empty denominator) is 0, as in metrics_binary. F1 is
+    written as 2TP / (2TP + FP + FN), which equals 2PR / (P + R) whenever that
+    is defined.
+    """
+    tp, fp, tn, fn = (np.asarray(x, dtype=float) for x in (tp, fp, tn, fn))
 
-def wilson_from_counts(tp: int, fp: int, tn: int, fn: int) -> dict[str, float]:
-    n = tp + fp + tn + fn
-    accuracy = (tp + tn) / n if n else 0.0
-    precision = tp / (tp + fp) if (tp + fp) else 0.0
-    recall = tp / (tp + fn) if (tp + fn) else 0.0
-    f1 = (
-        2 * precision * recall / (precision + recall)
-        if (precision + recall) > 0
-        else 0.0
-    )
-    acc_lo, acc_hi = wilson_ci(tp + tn, n)
-    prec_lo, prec_hi = wilson_ci(tp, tp + fp)
-    rec_lo, rec_hi = wilson_ci(tp, tp + fn)
-    f1_lo, f1_hi = wilson_ci(2 * tp, 2 * tp + fp + fn)
+    def ratio(num: np.ndarray, den: np.ndarray) -> np.ndarray:
+        return np.divide(num, den, out=np.zeros_like(num), where=den > 0)
+
     return {
-        "accuracy": accuracy,
-        "precision": precision,
-        "recall": recall,
-        "f1": f1,
-        "tp": tp,
-        "fp": fp,
-        "tn": tn,
-        "fn": fn,
-        "accuracy_ci95_low": float(acc_lo),
-        "accuracy_ci95_high": float(acc_hi),
-        "precision_ci95_low": float(prec_lo),
-        "precision_ci95_high": float(prec_hi),
-        "recall_ci95_low": float(rec_lo),
-        "recall_ci95_high": float(rec_hi),
-        "f1_ci95_low": float(f1_lo),
-        "f1_ci95_high": float(f1_hi),
+        "accuracy": ratio(tp + tn, tp + fp + tn + fn),
+        "precision": ratio(tp, tp + fp),
+        "recall": ratio(tp, tp + fn),
+        "f1": ratio(2 * tp, 2 * tp + fp + fn),
     }
+
+
+def stage_metrics(
+    y_true: np.ndarray, preds: np.ndarray, weights: np.ndarray | None = None
+) -> tuple[dict[str, np.ndarray], list[dict[str, np.ndarray]]]:
+    """Metrics of one stage, computed per run and then averaged over runs.
+
+    preds is (n_images, n_runs): one column per run (a single column for YOLO).
+    weights, an (n_boot, n_images) array of how many times each image appears
+    in each bootstrap replicate, gives one value per replicate; the same weights
+    apply to y_true and to every run, so the runs stay paired.
+    Returns (run-mean metrics, per-run metrics).
+    """
+    w = np.ones(len(y_true)) if weights is None else weights
+    runs = []
+    for j in range(preds.shape[1]):
+        p = preds[:, j]
+        runs.append(
+            metrics_from_counts(
+                (w * ((y_true == 1) & (p == 1))).sum(axis=-1),
+                (w * ((y_true == 0) & (p == 1))).sum(axis=-1),
+                (w * ((y_true == 0) & (p == 0))).sum(axis=-1),
+                (w * ((y_true == 1) & (p == 0))).sum(axis=-1),
+            )
+        )
+    mean = {m: np.mean([r[m] for r in runs], axis=0) for m in METRICS}
+    return mean, runs
+
+
+def panorama_ids(frame: pd.DataFrame) -> np.ndarray:
+    """Panorama of each image: the img_key without its trailing _<heading>."""
+    return frame["img_key"].str.rsplit("_", n=1).str[0].to_numpy()
+
+
+def bootstrap_weights(
+    y_true: np.ndarray, panoramas: np.ndarray, n_boot: int = BOOT_B, seed: int = BOOT_SEED
+) -> np.ndarray:
+    """(n_boot, n_images) resampling weights from a panorama-level bootstrap.
+
+    The held-out set was drawn by panorama, and most panoramas contribute two
+    views, so panoramas, not images, are the independent units. Each replicate
+    draws panoramas with replacement within class (every panorama is all-waste
+    or all-background), keeping the number of waste and background panoramas
+    fixed; every view of a drawn panorama comes with it.
+    """
+    codes, _ = pd.factorize(panoramas)
+    n_pan = codes.max() + 1
+    pan_class = np.full(n_pan, -1)
+    for c, y in zip(codes, y_true):
+        if pan_class[c] not in (-1, y):
+            raise ValueError("A held-out panorama mixes waste and background images")
+        pan_class[c] = y
+    rng = np.random.default_rng(seed)
+    pan_counts = np.zeros((n_boot, n_pan))
+    for cls in (1, 0):
+        members = np.flatnonzero(pan_class == cls)
+        draws = rng.choice(members, size=(n_boot, len(members)), replace=True)
+        for b in range(n_boot):
+            pan_counts[b] += np.bincount(draws[b], minlength=n_pan)
+    return pan_counts[:, codes]
+
+
+def percentile_ci(draws: np.ndarray) -> tuple[float, float]:
+    lo, hi = np.percentile(draws, [2.5, 97.5])
+    return float(lo), float(hi)
+
+
+def evaluate_stage(
+    y_true: np.ndarray, preds: np.ndarray, weights: np.ndarray
+) -> tuple[dict[str, float], dict[str, np.ndarray]]:
+    """Point metrics (mean of per-run values), their bootstrap 95% intervals and
+    the run range, plus the bootstrap draws (for paired differences)."""
+    point, runs = stage_metrics(y_true, preds)
+    draws, _ = stage_metrics(y_true, preds, weights)
+    out: dict[str, float] = {}
+    for m in METRICS:
+        out[m] = float(point[m])
+        out[f"{m}_ci95_low"], out[f"{m}_ci95_high"] = percentile_ci(draws[m])
+        out[f"{m}_run_min"] = float(min(r[m] for r in runs))
+        out[f"{m}_run_max"] = float(max(r[m] for r in runs))
+    return out, draws
 
 
 def fmt_pct(x: float) -> str:
@@ -302,19 +373,32 @@ def check_vote_coverage(frame: pd.DataFrame, replicates: list[str], scenario: st
             )
 
 
-def best_replicate(frame: pd.DataFrame, replicates: list[str]) -> tuple[str, dict[str, float]]:
-    """Replicate with the highest F1 (ties: accuracy, precision, recall, column order)."""
+def cascade_runs(
+    frame: pd.DataFrame, replicates: list[str]
+) -> tuple[np.ndarray, list[dict[str, float]]]:
+    """Cascade predictions for every Qwen replicate, (n_images, n_runs), and
+    each run's metrics and confusion counts.
+
+    The reported cascade result is the arithmetic mean of the per-run metrics
+    (stage_metrics); the mean confusion counts are kept only to draw the
+    confusion matrix. With one replicate this is that run.
+    """
     y_true = frame["gt_waste"].to_numpy()
     yolo = frame["pred_waste"].to_numpy()
-    best_col = replicates[0]
-    best_m = metrics_binary(y_true, cascade_pred(yolo, frame[best_col].tolist()))
-    best_key = (best_m["f1"], best_m["accuracy"], best_m["precision"], best_m["recall"])
-    for col in replicates[1:]:
-        m = metrics_binary(y_true, cascade_pred(yolo, frame[col].tolist()))
-        key = (m["f1"], m["accuracy"], m["precision"], m["recall"])
-        if key > best_key:
-            best_col, best_m, best_key = col, m, key
-    return best_col, best_m
+    preds = np.column_stack([cascade_pred(yolo, frame[c].tolist()) for c in replicates])
+    runs = [metrics_binary(y_true, preds[:, j]) for j in range(preds.shape[1])]
+    return preds, runs
+
+
+def mean_counts(runs: list[dict[str, float]]) -> dict[str, float]:
+    return {k: float(np.mean([r[k] for r in runs])) for k in ("tp", "fp", "tn", "fn")}
+
+
+def replicate_note(replicates: list[str], runs: list[dict[str, float]]) -> str:
+    if len(runs) == 1:
+        return f"single Qwen pass ({replicates[0]})"
+    f1s = " / ".join(f"{100 * r['f1']:.1f}" for r in runs)
+    return f"mean of {len(runs)} Qwen replicates (per-run F1 {f1s}%)"
 
 
 # ---------------------------------------------------------------------------
@@ -371,7 +455,8 @@ def headline_stages(
     qwen: dict[str, tuple[pd.DataFrame, list[str]]],
     headline: str,
 ) -> list[dict]:
-    """YOLO and YOLO -> Qwen confusion counts for the headline scenario."""
+    """YOLO and YOLO -> Qwen predictions for the headline scenario, on the same
+    images in the same order (the bootstrap resamples them together)."""
     frame = preds[preds["scenario"] == headline].copy()
     if frame.empty:
         raise ValueError(f"No predictions for headline scenario {headline!r}")
@@ -382,6 +467,9 @@ def headline_stages(
     stages = [
         {
             "stage": "YOLO candidate stage",
+            "y_true": y_true,
+            "panoramas": panorama_ids(frame),
+            "preds": yolo.reshape(-1, 1),
             **{k: yolo_m[k] for k in ("tp", "fp", "tn", "fn")},
             "note": f"Image-level prediction, {headline} ({PREDICTIONS_NAME})",
         }
@@ -397,19 +485,18 @@ def headline_stages(
     labels, replicates = qwen[headline]
     voted = qwen_vote_frame(frame, labels, replicates)
     check_vote_coverage(voted, replicates, headline)
-    best_col, pipe_m = best_replicate(voted, replicates)
-    votes = voted[best_col].tolist()
-    n_yes = sum(1 for yp, v in zip(yolo, votes) if yp == 1 and v == "yes")
-    n_no = sum(1 for yp, v in zip(yolo, votes) if yp == 1 and v == "no")
+    pipe_preds, runs = cascade_runs(voted, replicates)
 
     stages.append(
         {
             "stage": "YOLO → Qwen",
-            **{k: pipe_m[k] for k in ("tp", "fp", "tn", "fn")},
+            "y_true": y_true,
+            "panoramas": panorama_ids(frame),
+            "preds": pipe_preds,
+            **mean_counts(runs),
             "note": (
-                f"Best of {len(replicates)} Qwen replicates by F1: {best_col} "
-                f"(Yes={n_yes}, No={n_no} of {int(yolo.sum())} YOLO+). "
-                f"Source: qwen_labels_{headline}.csv"
+                f"{headline}: {replicate_note(replicates, runs)} "
+                f"on {int(yolo.sum())} YOLO+. Source: qwen_labels_{headline}.csv"
             ),
         }
     )
@@ -417,34 +504,53 @@ def headline_stages(
 
 
 def write_main_heldout_tables(stages: list[dict]) -> None:
-    """table_2 — display, Wilson-CI and detail views of the headline comparison."""
+    """table_2 — display, CI, detail and paired-difference views of the headline
+    comparison.
+
+    95% intervals are percentile intervals from one class-stratified, paired
+    panorama bootstrap (bootstrap_weights): every stage and every Qwen run is
+    scored on the same resampled panoramas, and cascade metrics are averaged
+    over runs within each replicate. They describe sampling uncertainty
+    conditional on the observed runs, not run-to-run variation, which is
+    reported separately as the run range.
+    """
     detail_rows = []
     display_rows = []
     ci_rows = []
+    draws_by_stage: dict[str, dict[str, np.ndarray]] = {}
+    point_by_stage: dict[str, dict[str, float]] = {}
+
+    weights = bootstrap_weights(stages[0]["y_true"], stages[0]["panoramas"])
+    n_images = len(stages[0]["y_true"])
+    n_pos = int(stages[0]["y_true"].sum())
 
     for st in stages:
-        ci = wilson_from_counts(st["tp"], st["fp"], st["tn"], st["fn"])
+        if not np.array_equal(st["y_true"], stages[0]["y_true"]):
+            raise ValueError("Stages must be scored on the same images in the same order")
+        ci, draws = evaluate_stage(st["y_true"], st["preds"], weights)
+        draws_by_stage[st["stage"]] = draws
+        point_by_stage[st["stage"]] = ci
         detail_rows.append(
             {
                 "test_set": "Independent GSVI held-out",
                 "stage": st["stage"],
-                "accuracy_pct": round(100 * ci["accuracy"], 1),
-                "precision_pct": round(100 * ci["precision"], 1),
-                "recall_pct": round(100 * ci["recall"], 1),
-                "f1_pct": round(100 * ci["f1"], 1),
-                "tp": ci["tp"],
-                "fp": ci["fp"],
-                "tn": ci["tn"],
-                "fn": ci["fn"],
-                "accuracy_ci95_low": ci["accuracy_ci95_low"],
-                "accuracy_ci95_high": ci["accuracy_ci95_high"],
-                "precision_ci95_low": ci["precision_ci95_low"],
-                "precision_ci95_high": ci["precision_ci95_high"],
-                "recall_ci95_low": ci["recall_ci95_low"],
-                "recall_ci95_high": ci["recall_ci95_high"],
-                "f1_ci95_low": ci["f1_ci95_low"],
-                "f1_ci95_high": ci["f1_ci95_high"],
-                "ci_method": "wilson_binomial",
+                "n_images": n_images,
+                "n_waste": n_pos,
+                "n_panoramas": int(pd.unique(stages[0]["panoramas"]).size),
+                "n_runs": int(st["preds"].shape[1]),
+                **{f"{m}_pct": round(100 * ci[m], 1) for m in METRICS},
+                **{m: ci[m] for m in METRICS},
+                "tp": round(st["tp"], 2),
+                "fp": round(st["fp"], 2),
+                "tn": round(st["tn"], 2),
+                "fn": round(st["fn"], 2),
+                **{
+                    f"{m}_{s}": ci[f"{m}_{s}"]
+                    for m in METRICS
+                    for s in ("ci95_low", "ci95_high", "run_min", "run_max")
+                },
+                "ci_method": CI_METHOD,
+                "boot_seed": BOOT_SEED,
                 "note": st["note"],
             }
         )
@@ -484,11 +590,46 @@ def write_main_heldout_tables(stages: list[dict]) -> None:
     ]
     ci_text = ",".join(header) + "\n" + "\n".join(",".join(row) for row in ci_rows) + "\n"
 
-    print("\nMain held-out comparison (best Qwen replicate; Wilson 95% CI):")
+    print(
+        "\nMain held-out comparison (Qwen = mean of per-run metrics; class-stratified "
+        f"paired panorama bootstrap 95% CI, B = {BOOT_B}):"
+    )
     print(pd.DataFrame(ci_rows, columns=header).to_string(index=False))
     write_csv(pd.DataFrame(display_rows), "table_2_yolo_qwen_heldout.csv")
     write_text(ci_text, "table_2_yolo_qwen_heldout_ci.csv")
     write_csv(pd.DataFrame(detail_rows), "table_2_yolo_qwen_heldout_detail.csv")
+
+    # Paired differences, cascade minus YOLO, on the same bootstrap replicates
+    if len(stages) < 2:
+        return
+    base, comp = stages[0]["stage"], stages[1]["stage"]
+    diff_rows = []
+    for m in METRICS:
+        d = draws_by_stage[comp][m] - draws_by_stage[base][m]
+        lo, hi = percentile_ci(d)
+        diff_rows.append(
+            {
+                "metric": m,
+                "comparison": f"{comp} minus {base}",
+                "baseline_pct": round(100 * point_by_stage[base][m], 1),
+                "comparison_pct": round(100 * point_by_stage[comp][m], 1),
+                "difference_pp": round(100 * (point_by_stage[comp][m] - point_by_stage[base][m]), 1),
+                "difference_ci95_low_pp": round(100 * lo, 1),
+                "difference_ci95_high_pp": round(100 * hi, 1),
+                "share_boot_above_0": float(np.mean(d > 0)),
+                "ci_method": CI_METHOD,
+                "boot_seed": BOOT_SEED,
+            }
+        )
+    diff = pd.DataFrame(diff_rows)
+    print("\nPaired differences (percentage points, same bootstrap replicates):")
+    print(
+        diff[
+            ["metric", "baseline_pct", "comparison_pct", "difference_pp",
+             "difference_ci95_low_pp", "difference_ci95_high_pp"]
+        ].to_string(index=False)
+    )
+    write_csv(diff, "table_2_yolo_qwen_heldout_diff.csv")
 
 
 def write_stability_table(
@@ -669,9 +810,11 @@ def write_sc_sensitivity_table(
         n_fp_images = int(sum((y_true == 0) & (yolo == 1)))
         fp_csv = fp_csv_path(scenario)
 
-        variants: list[tuple[str, dict[str, float], str]] = [
+        weights = bootstrap_weights(y_true, panorama_ids(frame))
+        variants: list[tuple[str, np.ndarray, dict[str, float], str]] = [
             (
                 "YOLO only",
+                yolo.reshape(-1, 1),
                 metrics_binary(y_true, yolo),
                 f"Image-level prediction ({PREDICTIONS_NAME})",
             )
@@ -680,12 +823,13 @@ def write_sc_sensitivity_table(
             labels, replicates = qwen[scenario]
             voted = qwen_vote_frame(frame, labels, replicates)
             check_vote_coverage(voted, replicates, scenario)
-            best_col, pipe_m = best_replicate(voted, replicates)
+            pipe_preds, runs = cascade_runs(voted, replicates)
             variants.append(
                 (
                     "YOLO → Qwen",
-                    pipe_m,
-                    f"Best of {len(replicates)} replicates by F1: {best_col} "
+                    pipe_preds,
+                    mean_counts(runs),
+                    f"{scenario}: {replicate_note(replicates, runs)} "
                     f"(qwen_labels_{scenario}.csv)",
                 )
             )
@@ -697,8 +841,8 @@ def write_sc_sensitivity_table(
                 else "pending"
             )
 
-        for stage, m, note in variants:
-            ci = wilson_from_counts(m["tp"], m["fp"], m["tn"], m["fn"])
+        for stage, stage_preds, m, note in variants:
+            ci, _ = evaluate_stage(y_true, stage_preds, weights)
             display_rows.append(
                 {
                     "YOLO training set": scenario_label(scenario),
@@ -723,23 +867,21 @@ def write_sc_sensitivity_table(
                     "precision_pct": round(100 * ci["precision"], 1),
                     "recall_pct": round(100 * ci["recall"], 1),
                     "f1_pct": round(100 * ci["f1"], 1),
-                    "tp": ci["tp"],
-                    "fp": ci["fp"],
-                    "tn": ci["tn"],
-                    "fn": ci["fn"],
-                    "accuracy_ci95_low": ci["accuracy_ci95_low"],
-                    "accuracy_ci95_high": ci["accuracy_ci95_high"],
-                    "precision_ci95_low": ci["precision_ci95_low"],
-                    "precision_ci95_high": ci["precision_ci95_high"],
-                    "recall_ci95_low": ci["recall_ci95_low"],
-                    "recall_ci95_high": ci["recall_ci95_high"],
-                    "f1_ci95_low": ci["f1_ci95_low"],
-                    "f1_ci95_high": ci["f1_ci95_high"],
+                    "tp": round(m["tp"], 2),
+                    "fp": round(m["fp"], 2),
+                    "tn": round(m["tn"], 2),
+                    "fn": round(m["fn"], 2),
+                    **{
+                        f"{k}_{s}": ci[f"{k}_{s}"]
+                        for k in METRICS
+                        for s in ("ci95_low", "ci95_high", "run_min", "run_max")
+                    },
                     "map50": float(map_by_scenario.loc[scenario, "mAP50"]),
                     "map50_95": float(map_by_scenario.loc[scenario, "mAP50-95"]),
                     "n_yolo_fp_images": n_fp_images,
                     "qwen_status": qwen_status,
-                    "ci_method": "wilson_binomial",
+                    "ci_method": CI_METHOD,
+                    "boot_seed": BOOT_SEED,
                     "note": note,
                 }
             )

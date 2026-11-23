@@ -21,30 +21,31 @@ def assign_year_fe(
     min_year_n: int = MIN_YEAR_N,
     verbose: bool = True,
 ) -> pd.DataFrame:
-    """Pool rare years, then reassign zero-positive FE levels to the nearest year with positives."""
-    out = df.copy()
-    year_counts = out[year_col].value_counts()
-    rare = set(year_counts[year_counts < min_year_n].index.tolist())
-    out["year_fe"] = out[year_col].astype(str)
-    if rare:
-        out.loc[out[year_col].isin(rare), "year_fe"] = "other"
-        if verbose:
-            print(f"  Pooling rare years (n<{min_year_n}) as 'other': {sorted(rare)}")
+    """Year fixed-effect levels: each sparse year joins its own nearest usable year.
 
-    pos_by_fe = out.groupby("year_fe")[outcome_col].sum()
-    zero_pos = [lv for lv, n in pos_by_fe.items() if int(n) == 0]
-    if zero_pos:
-        rep_year = out.groupby("year_fe")[year_col].median().astype(float).to_dict()
-        positive_levels = [lv for lv, n in pos_by_fe.items() if int(n) > 0]
-        pos_reps = {lv: rep_year[lv] for lv in positive_levels}
-        for lv in zero_pos:
-            y0 = rep_year[lv]
-            nearest = min(pos_reps.items(), key=lambda kv: abs(kv[1] - y0))[0]
-            n_move = int((out["year_fe"] == lv).sum())
+    A year cannot carry its own fixed effect if it has fewer than `min_year_n`
+    panoramas or no waste-positive panorama (the level would be estimated from
+    almost nothing, or separate completely). Each such year is merged, on its
+    own, into the nearest year that has neither problem; a tie goes to the
+    earlier year. In the GSVI frame that sends 2015 (5 panoramas) to 2017 and
+    2019 (73) to 2018.
+
+    This replaces an earlier rule that first pooled all sparse years into one
+    "other" level and then moved that level as a block, which placed 2015 in
+    2018 only because it had been pooled with 2019.
+    """
+    out = df.copy()
+    by_year = out.groupby(year_col)[outcome_col].agg(["size", "sum"])
+    usable = by_year.index[(by_year["size"] >= min_year_n) & (by_year["sum"] > 0)]
+    target = {y: y for y in by_year.index}
+    if len(usable):
+        for y in by_year.index.difference(usable):
+            target[y] = min(usable, key=lambda u: (abs(u - y), u))
             if verbose:
                 print(
-                    f"  Reassigning year_fe='{lv}' ({n_move:,} panoids, 0 waste+) "
-                    f"→ '{nearest}' (nearest year FE with positives)"
+                    f"  Year {y} ({int(by_year.loc[y, 'size']):,} panoids, "
+                    f"{int(by_year.loc[y, 'sum'])} waste+) → year FE '{target[y]}' "
+                    "(nearest year with enough panoramas and positives)"
                 )
-            out.loc[out["year_fe"] == lv, "year_fe"] = nearest
+    out["year_fe"] = out[year_col].map(target).astype(str)
     return out

@@ -47,7 +47,7 @@ share_labels <- function(df, levels_in) {
     filter(as.character(scenario) %in% levels_in)
   setNames(sprintf("%g%%", shares$sc_share_pct[order(shares$sc_share_pct)]), levels_in)
 }
-# "sc_100pct uses the best of 3 replicates, the rest 1" — read off qwen_status
+# "sc_100pct averages 3 replicates, the rest use 1" — read off qwen_status
 # rather than restated by hand, so it cannot drift from what was actually run.
 replicate_note <- function(df) {
   reps <- df |>
@@ -58,7 +58,7 @@ replicate_note <- function(df) {
     return("Every scenario uses a single Qwen pass.")
   }
   sprintf(
-    "%s use%s the best of %s Qwen replicates; the remaining %d use a single Qwen pass.",
+    "%s use%s the mean of %s Qwen replicates; the remaining %d use a single Qwen pass.",
     paste(multi$scenario, collapse = ", "),
     if (nrow(multi) == 1) "s" else "",
     paste(unique(multi$n_rep), collapse = "/"),
@@ -103,9 +103,10 @@ if (nrow(incomplete)) {
   )
 }
 
-n_images <- unique(both$tp + both$fp + both$tn + both$fn)
-n_waste <- unique(both$tp + both$fn)
-n_background <- unique(both$fp + both$tn)
+# Counts can be fractional (YOLO + Qwen averaged over replicates), so round the totals.
+n_images <- unique(round(both$tp + both$fp + both$tn + both$fn))
+n_waste <- unique(round(both$tp + both$fn))
+n_background <- unique(round(both$fp + both$tn))
 stopifnot(length(n_images) == 1)
 
 plot_df <- both |>

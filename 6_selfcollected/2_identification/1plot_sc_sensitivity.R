@@ -60,7 +60,7 @@ share_labels <- function(df, levels_in) {
 share_colours <- function(levels_in) {
   setNames(colorRampPalette(c("#D4CCC2", "#6B4226"))(length(levels_in)), levels_in)
 }
-# "sc_100pct uses the best of 3 replicates, the rest 1" — read off qwen_status
+# "sc_100pct averages 3 replicates, the rest use 1" — read off qwen_status
 # rather than restated by hand, so it cannot drift from what was actually run.
 replicate_note <- function(df) {
   reps <- df |>
@@ -71,7 +71,7 @@ replicate_note <- function(df) {
     return("Every scenario uses a single Qwen pass.")
   }
   sprintf(
-    "%s use%s the best of %s Qwen replicates; the remaining %d use a single Qwen pass.",
+    "%s use%s the mean of %s Qwen replicates; the remaining %d use a single Qwen pass.",
     paste(multi$scenario, collapse = ", "),
     if (nrow(multi) == 1) "s" else "",
     paste(unique(multi$n_rep), collapse = "/"),
@@ -112,9 +112,10 @@ if (length(missing)) {
   )
 }
 
-n_images <- unique(cascade$tp + cascade$fp + cascade$tn + cascade$fn)
-n_waste <- unique(cascade$tp + cascade$fn)
-n_background <- unique(cascade$fp + cascade$tn)
+# Counts can be fractional (YOLO + Qwen averaged over replicates), so round the totals.
+n_images <- unique(round(cascade$tp + cascade$fp + cascade$tn + cascade$fn))
+n_waste <- unique(round(cascade$tp + cascade$fn))
+n_background <- unique(round(cascade$fp + cascade$tn))
 stopifnot(length(n_images) == 1)
 
 plot_df <- cascade |>

@@ -1,9 +1,11 @@
 #!/usr/bin/env Rscript
 # Step 3 figure 1 — independent GSVI held-out, headline scenario:
 #   1_Heldout_yolo_qwen_panel.png  both stages — metric bars + two confusion matrices
+#   1_Heldout_yolo_qwen_panel_manuscript.png  the same panel without title / subtitle / caption
 #   1_Heldout_qwen_only_panel.png  the YOLO + Qwen cascade alone, for presenting the
 #                                  final result without the baseline beside it
-# Left of each: image-level Accuracy / Precision / Recall / F1 with Wilson 95% CI.
+# Left of each: image-level Accuracy / Precision / Recall / F1 with 95% percentile CIs
+# from the class-stratified, paired panorama bootstrap in 1_heldout_metrics.py.
 # Input: thesis_table/table_2_yolo_qwen_heldout_detail.csv (1_heldout_metrics.py)
 
 suppressPackageStartupMessages({
@@ -32,93 +34,42 @@ if (!file.exists(DETAIL_CSV)) {
   stop("Missing ", DETAIL_CSV, " — run 3_waste_identification/1_heldout_metrics.py first")
 }
 
-# --- Combined panel: metric bars (+ Wilson CI) | YOLO CM | YOLO→Qwen CM ---
-STAGE_COLOURS <- c(
-  "YOLO Only" = "#C9A27F",
-  "YOLO + Qwen" = "#5F6F5A"
-)
+# --- Combined panel: metric bars (+ bootstrap CI) | YOLO CM | YOLO→Qwen CM ---
+d <- read.csv(DETAIL_CSV, stringsAsFactors = FALSE)
+is_pipe <- grepl("Qwen", d$stage, ignore.case = TRUE)
+n_runs <- d$n_runs[is_pipe][1]
+n_images <- d$n_images[1]
+n_panoramas <- d$n_panoramas[1]
+NUMBER_WORDS <- c("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+runs_word <- if (n_runs <= length(NUMBER_WORDS)) NUMBER_WORDS[n_runs] else as.character(n_runs)
+
+YOLO_LABEL <- "YOLO11x"
+PIPE_LABEL <- sprintf("YOLO11x\u2013Qwen2-VL (mean of %s runs)", runs_word)
+PIPE_CM_TITLE <- sprintf("YOLO11x\u2013Qwen2-VL: mean of %s runs", runs_word)
+STAGE_COLOURS <- setNames(c("#C9A27F", "#5F6F5A"), c(YOLO_LABEL, PIPE_LABEL))
 QWEN_CM_PALETTE <- c("#fafafa", "#D5D8CF", "#A8B0A0", "#7A8774", "#5F6F5A")
 
-stage_display <- function(stage) {
-  if (grepl("Qwen", stage, ignore.case = TRUE)) "YOLO + Qwen" else "YOLO Only"
-}
+METRIC_KEYS <- c("accuracy", "precision", "recall", "f1")
+METRIC_LABELS <- c("Accuracy", "Precision", "Recall", "F1")
 
-parse_pct <- function(x) {
-  as.numeric(gsub("%", "", x, fixed = TRUE)) / 100
-}
-
-parse_ci_pair <- function(x) {
-  # "74.2–85.7%" or "74.2-85.7%"
-  s <- gsub("%", "", x, fixed = TRUE)
-  s <- gsub("\u2013", "-", s, fixed = TRUE)
-  parts <- strsplit(s, "-", fixed = TRUE)
-  vapply(parts, function(p) {
-    if (length(p) < 2) return(c(NA_real_, NA_real_))
-    c(as.numeric(p[[1]]) / 100, as.numeric(p[[2]]) / 100)
-  }, numeric(2))
-}
-
-# Prefer numeric detail CIs; fall back to parsing the display CI table.
-if (file.exists(DETAIL_CSV)) {
-  d <- read.csv(DETAIL_CSV, stringsAsFactors = FALSE)
-  bar_df <- tidyr::pivot_longer(
-    d,
-    cols = c(accuracy_pct, precision_pct, recall_pct, f1_pct),
-    names_to = "metric_key",
-    values_to = "score_pct"
-  ) |>
-    mutate(
-      metric = factor(
-        metric_key,
-        levels = c("accuracy_pct", "precision_pct", "recall_pct", "f1_pct"),
-        labels = c("Accuracy", "Precision", "Recall", "F1 Score")
-      ),
-      model = factor(vapply(stage, stage_display, character(1)), levels = names(STAGE_COLOURS)),
-      score = score_pct / 100,
-      ci_low = case_when(
-        metric_key == "accuracy_pct" ~ accuracy_ci95_low,
-        metric_key == "precision_pct" ~ precision_ci95_low,
-        metric_key == "recall_pct" ~ recall_ci95_low,
-        TRUE ~ f1_ci95_low
-      ),
-      ci_high = case_when(
-        metric_key == "accuracy_pct" ~ accuracy_ci95_high,
-        metric_key == "precision_pct" ~ precision_ci95_high,
-        metric_key == "recall_pct" ~ recall_ci95_high,
-        TRUE ~ f1_ci95_high
-      )
-    )
-} else if (file.exists(CI_CSV)) {
-  ci_raw <- read.csv(CI_CSV, check.names = FALSE, stringsAsFactors = FALSE)
-  # Columns: stage, Accuracy, 95% CI, Precision, 95% CI, ...
-  stage_col <- names(ci_raw)[1]
-  metrics <- c("Accuracy", "Precision", "Recall", "F1")
-  rows <- list()
-  for (i in seq_len(nrow(ci_raw))) {
-    model <- stage_display(ci_raw[[stage_col]][i])
-    # After first col: Acc, CI, Prec, CI, Rec, CI, F1, CI
-    for (j in seq_along(metrics)) {
-      val_col <- 1 + (j - 1) * 2 + 1
-      ci_col <- val_col + 1
-      bounds <- parse_ci_pair(ci_raw[[ci_col]][i])
-      rows[[length(rows) + 1]] <- data.frame(
-        model = model,
-        metric = if (metrics[j] == "F1") "F1 Score" else metrics[j],
-        score = parse_pct(ci_raw[[val_col]][i]),
-        ci_low = bounds[1],
-        ci_high = bounds[2],
-        stringsAsFactors = FALSE
-      )
-    }
-  }
-  bar_df <- dplyr::bind_rows(rows) |>
-    mutate(
-      model = factor(model, levels = names(STAGE_COLOURS)),
-      metric = factor(metric, levels = c("Accuracy", "Precision", "Recall", "F1 Score"))
-    )
-} else {
-  stop("Need ", DETAIL_CSV, " or ", CI_CSV)
-}
+# Bar height = the unrounded estimate (for the cascade, the mean of the per-run
+# metrics); error bar = the bootstrap percentile limits as written, not a
+# symmetric +/- width.
+bar_df <- dplyr::bind_rows(lapply(METRIC_KEYS, function(k) {
+  data.frame(
+    model = ifelse(grepl("Qwen", d$stage, ignore.case = TRUE), PIPE_LABEL, YOLO_LABEL),
+    metric = METRIC_LABELS[match(k, METRIC_KEYS)],
+    score = d[[k]],
+    ci_low = d[[paste0(k, "_ci95_low")]],
+    ci_high = d[[paste0(k, "_ci95_high")]],
+    stringsAsFactors = FALSE
+  )
+})) |>
+  mutate(
+    model = factor(model, levels = names(STAGE_COLOURS)),
+    metric = factor(metric, levels = METRIC_LABELS)
+  )
+stopifnot(all(bar_df$ci_low <= bar_df$score & bar_df$score <= bar_df$ci_high))
 
 p_bars <- ggplot(bar_df, aes(x = metric, y = score, fill = model)) +
   geom_col(position = position_dodge(width = 0.72), width = 0.68, colour = NA) +
@@ -130,7 +81,7 @@ p_bars <- ggplot(bar_df, aes(x = metric, y = score, fill = model)) +
     colour = "#3a3a3a"
   ) +
   geom_text(
-    aes(label = sprintf("%.2f", score), y = pmin(ci_high, 1) + 0.035),
+    aes(label = sprintf("%.1f", 100 * score), y = pmin(ci_high, 1) + 0.035),
     position = position_dodge(width = 0.72),
     size = 3.0,
     fontface = "bold",
@@ -140,9 +91,10 @@ p_bars <- ggplot(bar_df, aes(x = metric, y = score, fill = model)) +
   scale_y_continuous(
     limits = c(0, 1.12),
     breaks = seq(0, 1, 0.2),
+    labels = function(x) 100 * x,
     expand = c(0, 0)
   ) +
-  labs(x = NULL, y = "Score", title = NULL) +
+  labs(x = NULL, y = "Score (%)", title = NULL, tag = "(a)") +
   map_theme() +
   theme(
     panel.grid.major.x = element_blank(),
@@ -150,24 +102,27 @@ p_bars <- ggplot(bar_df, aes(x = metric, y = score, fill = model)) +
     legend.position = "none",
     axis.text.x = element_text(size = 10, face = "bold", colour = "#2f2f2f"),
     axis.text.y = element_text(size = 9),
-    axis.title.y = element_text(size = 11, face = "bold")
+    axis.title.y = element_text(size = 11, face = "bold"),
+    plot.tag = element_text(size = 13, face = "bold", colour = "#2f2f2f")
   )
 
 build_cm_simple <- function(tp, fp, tn, fn, title, palette) {
-  fill_max <- max(as.integer(c(tp, fp, tn, fn)), na.rm = TRUE)
+  # Counts can be fractional: the YOLO + Qwen matrix is the mean over Qwen replicates.
+  fill_max <- max(c(tp, fp, tn, fn), na.rm = TRUE)
   cm <- data.frame(
     truth = factor(c("Waste", "Waste", "Background", "Background"), levels = CLASS_LEVELS),
     pred = factor(c("Waste", "Background", "Waste", "Background"), levels = CLASS_LEVELS),
-    n = c(as.integer(tp), as.integer(fn), as.integer(fp), as.integer(tn)),
+    n = as.numeric(c(tp, fn, fp, tn)),
     stringsAsFactors = FALSE
   ) |>
     mutate(
+      label = ifelse(abs(n - round(n)) < 1e-9, sprintf("%d", as.integer(round(n))), sprintf("%.1f", n)),
       text_colour = chocolate_label_colour(n, limits = c(0, fill_max), trans = "sqrt")
     )
 
   ggplot(cm, aes(x = pred, y = truth, fill = n)) +
     geom_tile(colour = "white", linewidth = 1.1) +
-    geom_text(aes(label = n, colour = text_colour), size = 5.2, fontface = "bold") +
+    geom_text(aes(label = label, colour = text_colour), size = 5.2, fontface = "bold") +
     scale_colour_identity() +
     scale_x_discrete(limits = CLASS_LEVELS) +
     scale_y_discrete(limits = rev(CLASS_LEVELS)) +
@@ -181,7 +136,7 @@ build_cm_simple <- function(tp, fp, tn, fn, title, palette) {
     map_theme() +
     theme(
       panel.grid = element_blank(),
-      plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+      plot.title = element_text(size = 11, face = "bold", hjust = 0.5),
       axis.text.x = element_text(size = 10),
       # Category labels rotated 90° anti-clockwise (bottom → top)
       axis.text.y = element_text(size = 10, angle = 90, hjust = 0.5, vjust = 0.5),
@@ -199,27 +154,31 @@ qwen_row <- d_cm[grepl("Qwen", d_cm$stage, ignore.case = TRUE), ][1, ]
 
 p_cm_yolo <- build_cm_simple(
   yolo_row$tp, yolo_row$fp, yolo_row$tn, yolo_row$fn,
-  "YOLO", CHOCOLATE_PALETTE
+  YOLO_LABEL, CHOCOLATE_PALETTE
 )
 p_cm_qwen <- build_cm_simple(
   qwen_row$tp, qwen_row$fp, qwen_row$tn, qwen_row$fn,
-  "YOLO + Qwen", QWEN_CM_PALETTE
+  PIPE_CM_TITLE, QWEN_CM_PALETTE
 )
 
 # Legend centred above the two confusion matrices (not under the bars)
 p_legend_row <- ggplot() +
   # Centred pair above the two CM panels (xlim 0–10 → mid ≈ 5)
-  annotate("rect", xmin = 2.85, xmax = 3.15, ymin = 0.30, ymax = 0.70,
-           fill = STAGE_COLOURS[["YOLO Only"]], colour = NA) +
-  annotate("text", x = 3.28, y = 0.5, label = "YOLO Only",
+  annotate("rect", xmin = 1.55, xmax = 1.80, ymin = 0.30, ymax = 0.70,
+           fill = STAGE_COLOURS[[YOLO_LABEL]], colour = NA) +
+  annotate("text", x = 1.92, y = 0.5, label = YOLO_LABEL,
            hjust = 0, vjust = 0.5, size = 3.8, colour = "#2f2f2f") +
-  annotate("rect", xmin = 5.15, xmax = 5.45, ymin = 0.30, ymax = 0.70,
-           fill = STAGE_COLOURS[["YOLO + Qwen"]], colour = NA) +
-  annotate("text", x = 5.58, y = 0.5, label = "YOLO + Qwen",
+  annotate("rect", xmin = 3.65, xmax = 3.90, ymin = 0.30, ymax = 0.70,
+           fill = STAGE_COLOURS[[PIPE_LABEL]], colour = NA) +
+  annotate("text", x = 4.02, y = 0.5, label = PIPE_LABEL,
            hjust = 0, vjust = 0.5, size = 3.8, colour = "#2f2f2f") +
   coord_cartesian(xlim = c(0, 10), ylim = c(0, 1), expand = FALSE, clip = "off") +
+  labs(tag = "(b)") +
   theme_void() +
-  theme(plot.margin = margin(0, 2, 0, 2))
+  theme(
+    plot.margin = margin(0, 2, 0, 2),
+    plot.tag = element_text(size = 13, face = "bold", colour = "#2f2f2f")
+  )
 
 # Shared "True" y-label rotated 90° anti-clockwise (reads bottom → top)
 p_true_label <- ggplot() +
@@ -248,14 +207,14 @@ cm_block <- p_legend_row / cm_pair +
 panel_fig <- (p_bars | cm_block) +
   plot_layout(widths = c(1.3, 2.15)) +
   plot_annotation(
-    title = "Independent GSVI held-out — YOLO vs YOLO + Qwen",
+    title = "Independent GSVI held-out — YOLO11x vs YOLO11x\u2013Qwen2-VL",
     subtitle = paste0(
       sprintf(
-        "Image-level binary metrics with Wilson binomial 95%% CI (n = %d). ",
-        as.integer(yolo_row$tp + yolo_row$fp + yolo_row$tn + yolo_row$fn)
+        "Image-level metrics; error bars are 95%% percentile CIs from a class-stratified, paired panorama bootstrap (B = 10,000; %d images from %d panoramas). ",
+        n_images, n_panoramas
       ),
-      "YOLO + Qwen keeps a YOLO positive only when Qwen2-VL also answers Yes; ",
-      sub("^.*?: ", "", qwen_row$note)
+      "\nThe pipeline keeps a YOLO positive only when Qwen2-VL also answers Yes; ",
+      sub("\\. Source:.*$", "", sub("^.*?: ", "", qwen_row$note))
     ),
     caption = "Left: Accuracy / Precision / Recall / F1. Right: confusion matrices (True × Predicted).",
     theme = theme(
@@ -269,21 +228,28 @@ out_panel <- file.path(FIG_DIR, "1_Heldout_yolo_qwen_panel.png")
 ggsave(out_panel, panel_fig, width = 12.8, height = 5.5, dpi = 600, bg = "white")
 message("Wrote ", out_panel)
 
+# Same panel without title, subtitle or caption, for the manuscript (the
+# description goes in the figure legend there).
+panel_bare <- (p_bars | cm_block) + plot_layout(widths = c(1.3, 2.15))
+out_bare <- file.path(FIG_DIR, "1_Heldout_yolo_qwen_panel_manuscript.png")
+ggsave(out_bare, panel_bare, width = 12.8, height = 4.8, dpi = 600, bg = "white")
+message("Wrote ", out_bare)
+
 # --- cascade only: the same headline result without the YOLO baseline -------
-qwen_bar_df <- bar_df |> filter(model == "YOLO + Qwen")
+qwen_bar_df <- bar_df |> filter(model == PIPE_LABEL)
 
 p_bars_qwen <- ggplot(qwen_bar_df, aes(x = metric, y = score)) +
-  geom_col(width = 0.58, fill = STAGE_COLOURS[["YOLO + Qwen"]], colour = NA) +
+  geom_col(width = 0.58, fill = STAGE_COLOURS[[PIPE_LABEL]], colour = NA) +
   geom_errorbar(
     aes(ymin = ci_low, ymax = ci_high),
     width = 0.15, linewidth = 0.45, colour = "#3a3a3a"
   ) +
   geom_text(
-    aes(label = sprintf("%.2f", score), y = pmin(ci_high, 1) + 0.035),
+    aes(label = sprintf("%.1f", 100 * score), y = pmin(ci_high, 1) + 0.035),
     size = 3.2, fontface = "bold", colour = "#2f2f2f"
   ) +
-  scale_y_continuous(limits = c(0, 1.12), breaks = seq(0, 1, 0.2), expand = c(0, 0)) +
-  labs(x = NULL, y = "Score", title = NULL) +
+  scale_y_continuous(limits = c(0, 1.12), breaks = seq(0, 1, 0.2), labels = function(x) 100 * x, expand = c(0, 0)) +
+  labs(x = NULL, y = "Score (%)", title = NULL) +
   map_theme() +
   theme(
     panel.grid.major.x = element_blank(),
@@ -296,18 +262,19 @@ p_bars_qwen <- ggplot(qwen_bar_df, aes(x = metric, y = score)) +
 
 p_cm_qwen_solo <- build_cm_simple(
   qwen_row$tp, qwen_row$fp, qwen_row$tn, qwen_row$fn,
-  "Confusion matrix", QWEN_CM_PALETTE
+  sprintf("Confusion matrix: mean of %s runs", runs_word), QWEN_CM_PALETTE
 )
 
 qwen_fig <- (p_bars_qwen | (p_true_label | p_cm_qwen_solo) + plot_layout(widths = c(0.08, 1))) +
   plot_layout(widths = c(1.25, 1)) +
   plot_annotation(
-    title = "Independent GSVI held-out — YOLO + Qwen",
+    title = "Independent GSVI held-out — YOLO11x\u2013Qwen2-VL",
     subtitle = paste0(
       sprintf(
-        "Image-level binary metrics with Wilson binomial 95%% CI (n = %d)\n",
-        as.integer(qwen_row$tp + qwen_row$fp + qwen_row$tn + qwen_row$fn)
+        "Image-level metrics; error bars are 95%% percentile CIs from a class-stratified, paired panorama bootstrap (B = 10,000; %d images from %d panoramas). ",
+        n_images, n_panoramas
       ),
+      "\n",
       "A YOLO positive is kept only when Qwen2-VL also answers Yes; ",
       # note reads "...: <run> (Yes=.., No=.. of N YOLO+). Source: <file>" —
       # keep the run and its vote counts, drop the trailing source path

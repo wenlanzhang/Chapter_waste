@@ -7,7 +7,12 @@ PAT_SD = PAT / "Signed_distance"
 PAT_POP = PAT_SD / "pop_adjusted"
 PAT_HDB_PER = PAT_HDB / "period_stratified_robustness"
 PAT_SD_PER = PAT_SD / "period_stratified_robustness"
+# Manuscript sample (WorldPop unconstrained 2020); every pop-adjusted script defaults to it.
 PAT_POP_2020 = PAT_POP / "worldpop_2020"
+# WorldPop constrained 2024: a sensitivity only.
+PAT_POP_2024 = PAT_POP / "worldpop_2024_constrained"
+FIG_POP_2020 = FIG / "5_spatial_pattern" / "Signed_distance" / "pop_adjusted" / "worldpop_2020"
+FIG_POP_2024 = FIG / "5_spatial_pattern" / "Signed_distance" / "pop_adjusted" / "worldpop_2024_constrained"
 PAT_FIG = FIG / "5_spatial_pattern"
 
 SPATIAL_DATA = [
@@ -17,16 +22,25 @@ SPATIAL_DATA = [
     PAT_SET / "Nairobi_nnr_observation_frame_summary.csv",
     PAT_SET / "thesis_table" / "settlement_association.csv",
     PAT_SD / "Nairobi_signed_distance_gam_summary.csv",
-    PAT_POP / "Nairobi_pop_adjusted_model_metrics.csv",
+    PAT_POP_2020 / "Nairobi_pop_adjusted_model_metrics.csv",
     # sensitivity / robustness
     PAT_HDB / "Nairobi_hdbscan_param_sweep.csv",
+    PAT_HDB / "thesis_table" / "hdbscan_param_overlap.csv",
     PAT_HDB_PER / "Nairobi_period_hdbscan_summary.csv",
     PAT_SD_PER / "Nairobi_period_signed_distance_gam_summary.csv",
-    PAT_POP_2020 / "Nairobi_pop_adjusted_model_metrics.csv",
+    PAT_POP_2024 / "Nairobi_pop_adjusted_model_metrics.csv",
     PAT_SET / "thesis_table" / "settlement_by_density_band.csv",
+    PAT_POP_2024 / "thesis_table" / "thinning_sensitivity.csv",
+    PAT_POP_2020 / "thesis_table" / "thinning_sensitivity.csv",
+    PAT_POP_2020 / "thesis_table" / "block_bootstrap_intervals.csv",
+    PAT_POP_2020 / "thesis_table" / "capture_year_sensitivity.csv",
+    PAT_POP_2020 / "thesis_table" / "boundary_exclusion_sensitivity.csv",
+    PAT_POP_2020 / "thesis_table" / "worldpop_year_sensitivity.csv",
+    PAT_POP_2020 / "thesis_table" / "spatial_field_sensitivity.csv",
 ]
 
 SPATIAL_FIGS = [
+    PAT_FIG / "HDBSCAN" / "Hdbscan_param_overlap.png",
     PAT_FIG / "HDBSCAN" / "Waste_HDBSCAN_context_gsvi.png",
     PAT_FIG / "HDBSCAN" / "Cluster_Size_Distribution_gsvi.png",
     PAT_FIG / "HDBSCAN" / "Cluster_Composition_By_Distance_gsvi.png",
@@ -40,15 +54,24 @@ SPATIAL_FIGS = [
     PAT_FIG / "Signed_distance" / "Signed_distance_gam_curve.png",
     PAT_FIG / "Signed_distance" / "Signed_distance_gam_curve_inset.png",
     PAT_FIG / "Signed_distance" / "Waste_settlement_proximity.png",
-    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_effects.png",
-    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_distance.png",
-    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_population.png",
-    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_mdp_residual_map.png",
-    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_mdp_excess_prob_map.png",
-    PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_scaling_null.png",
+    FIG_POP_2020 / "Pop_adjusted_gam_effects.png",
+    FIG_POP_2020 / "Pop_adjusted_gam_distance.png",
+    FIG_POP_2020 / "Pop_adjusted_gam_population.png",
+    FIG_POP_2020 / "Pop_adjusted_mdp_residual_map.png",
+    FIG_POP_2020 / "Pop_adjusted_mdp_excess_prob_map.png",
+    FIG_POP_2020 / "Pop_scaling_null.png",
+    FIG_POP_2020 / "Thinning_sensitivity.png",
+    FIG_POP_2020 / "Thinning_sensitivity_main.png",
+    FIG_POP_2020 / "Spatial_block_bootstrap.png",
+    FIG_POP_2020 / "Capture_year_sensitivity.png",
+    FIG_POP_2020 / "Boundary_exclusion_sensitivity.png",
+    FIG_POP_2020 / "Worldpop_year_sensitivity.png",
+    FIG_POP_2020 / "Spatial_field_sensitivity.png",
+    FIG_POP_2024 / "Pop_adjusted_gam_effects.png",
+    FIG_POP_2024 / "Pop_adjusted_mdp_residual_map.png",
+    FIG_POP_2024 / "Thinning_sensitivity.png",
     PAT_FIG / "HDBSCAN" / "period_stratified_robustness" / "Period_HDBSCAN_comparison.png",
     PAT_FIG / "Signed_distance" / "period_stratified_robustness" / "Period_signed_distance_gam_curve.png",
-    PAT_FIG / "Signed_distance" / "pop_adjusted" / "worldpop_2020" / "Pop_adjusted_gam_effects.png",
     PAT_FIG / "settlement" / "Settlement_by_density_band.png",
 ]
 
@@ -154,30 +177,131 @@ rule plot_signed_distance_gam:
 
 
 # Sensitivity of the signed-distance GAM: does the gradient survive population
-# density and a spatial field? Slow (thin-plate field over ~75k panoramas).
+# density and a spatial field? Manuscript sample (WorldPop unconstrained 2020,
+# the script default). Slow (thin-plate field over ~77k panoramas).
 rule pop_adjusted_gam:
     input:
         COV / "3_Nairobi_sviwaste_points_gsvi_32737.gpkg",
-        PAT_POP / "ken_pop_2024_CN_100m_R2025A_v1.tif",
     output:
-        PAT_POP / "Nairobi_pop_adjusted_model_metrics.csv",
-        PAT_POP / "Nairobi_pop_adjusted_summary.csv",
+        PAT_POP_2020 / "Nairobi_pop_adjusted_model_metrics.csv",
+        PAT_POP_2020 / "Nairobi_pop_adjusted_summary.csv",
+        PAT_POP_2020 / "Nairobi_pop_adjusted_gam_frame.csv",
+        PAT_POP_2020 / "Nairobi_pop_adjusted_curve_population.csv",
+        PAT_POP_2020 / "Nairobi_pop_adjusted_mdp_residuals.csv",
     shell:
         "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/1_pop_adjusted_gam.py"
 
 
 rule plot_pop_adjusted_gam:
     input:
-        PAT_POP / "Nairobi_pop_adjusted_model_metrics.csv",
+        PAT_POP_2020 / "Nairobi_pop_adjusted_model_metrics.csv",
+        PAT_POP_2020 / "Nairobi_pop_adjusted_mdp_residuals.csv",
     output:
-        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_effects.png",
-        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_distance.png",
-        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_gam_population.png",
-        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_mdp_residual_map.png",
-        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_adjusted_mdp_excess_prob_map.png",
+        FIG_POP_2020 / "Pop_adjusted_gam_effects.png",
+        FIG_POP_2020 / "Pop_adjusted_gam_distance.png",
+        FIG_POP_2020 / "Pop_adjusted_gam_population.png",
+        FIG_POP_2020 / "Pop_adjusted_mdp_residual_map.png",
+        FIG_POP_2020 / "Pop_adjusted_mdp_excess_prob_map.png",
     shell:
         "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/2_plot_pop_adjusted_gam.R && "
         "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/3_plot_mdp_residual_map.R"
+
+
+# Label-blind spatial thinning (R1.5 / R3.1): thin all panoramas, refit the
+# nested GAMs, 100 random draws per threshold. Replaces the positive-only check.
+rule thinning_sensitivity:
+    input:
+        PAT_POP_2020 / "Nairobi_pop_adjusted_gam_frame.csv",
+    output:
+        PAT_POP_2020 / "thinning" / "Nairobi_thinning_summary.csv",
+        PAT_POP_2020 / "thinning" / "Nairobi_thinning_curves.csv",
+        PAT_POP_2020 / "thinning" / "Nairobi_thinning_band_rates.csv",
+        PAT_POP_2020 / "thesis_table" / "thinning_sensitivity.csv",
+        FIG_POP_2020 / "Thinning_sensitivity.png",
+        FIG_POP_2020 / "Thinning_sensitivity_main.png",
+    shell:
+        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/2_thinning_sensitivity.py && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/2plot_thinning_sensitivity.R"
+
+
+# Spatial block bootstrap (R1.3 / R3.2): intervals for the settlement ratio and the
+# MDP curve that allow for residual spatial dependence. ~45 min.
+rule spatial_block_bootstrap:
+    input:
+        PAT_POP_2020 / "Nairobi_pop_adjusted_gam_frame.csv",
+    output:
+        PAT_POP_2020 / "block_bootstrap" / "Nairobi_block_bootstrap_summary.csv",
+        PAT_POP_2020 / "thesis_table" / "block_bootstrap_intervals.csv",
+        FIG_POP_2020 / "Spatial_block_bootstrap.png",
+    shell:
+        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/3_spatial_block_bootstrap.py && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/3plot_spatial_block_bootstrap.R"
+
+
+# Capture-year treatment (R1 minor / R3.3): 2015/2019 excluded vs pooled, and
+# early vs late imagery fitted separately. ~30 min.
+rule capture_year_sensitivity:
+    input:
+        PAT_POP_2020 / "Nairobi_pop_adjusted_gam_frame.csv",
+    output:
+        PAT_POP_2020 / "capture_year" / "Nairobi_capture_year_summary.csv",
+        PAT_POP_2020 / "thesis_table" / "capture_year_sensitivity.csv",
+        FIG_POP_2020 / "Capture_year_sensitivity.png",
+    shell:
+        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/4_capture_year_sensitivity.py && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/4plot_capture_year_sensitivity.R"
+
+
+# Boundary uncertainty (R1.4): drop panoramas within 25 / 50 / 100 m of a mapped
+# settlement boundary and recompute the ratio and the GAM. ~30 min.
+rule boundary_exclusion:
+    input:
+        PAT_POP_2020 / "Nairobi_pop_adjusted_gam_frame.csv",
+    output:
+        PAT_POP_2020 / "boundary_exclusion" / "Nairobi_boundary_exclusion_summary.csv",
+        PAT_POP_2020 / "thesis_table" / "boundary_exclusion_sensitivity.csv",
+        FIG_POP_2020 / "Boundary_exclusion_sensitivity.png",
+    shell:
+        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/5_boundary_exclusion.py && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/5plot_boundary_exclusion.R"
+
+
+# WorldPop reference year (R3.3): static 2018 / 2022 and year-matched layers,
+# unconstrained and constrained. Needs the extra rasters in RS/Pop_density. ~75 min.
+rule worldpop_year_sensitivity:
+    input:
+        PAT_POP_2020 / "Nairobi_pop_adjusted_gam_frame.csv",
+    output:
+        PAT_POP_2020 / "worldpop_year" / "Nairobi_worldpop_year_summary.csv",
+        PAT_POP_2020 / "thesis_table" / "worldpop_year_sensitivity.csv",
+        FIG_POP_2020 / "Worldpop_year_sensitivity.png",
+    shell:
+        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/6_worldpop_year_sensitivity.py && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/6plot_worldpop_year_sensitivity.R"
+
+
+# Spatial field (R1.3 / R3.2): does distance still add once a thin-plate field
+# on location is in the model, and how much of the gradient remains? ~50 min.
+rule spatial_field_sensitivity:
+    input:
+        PAT_POP_2020 / "Nairobi_pop_adjusted_gam_frame.csv",
+    output:
+        PAT_POP_2020 / "spatial_field" / "Nairobi_spatial_field_summary.csv",
+        PAT_POP_2020 / "thesis_table" / "spatial_field_sensitivity.csv",
+        FIG_POP_2020 / "Spatial_field_sensitivity.png",
+    shell:
+        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/7_spatial_field_sensitivity.py && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/7plot_spatial_field_sensitivity.R"
+
+
+# 5c sensitivity — the proportional-growth null for the population effect.
+rule plot_pop_scaling_null:
+    input:
+        PAT_POP_2020 / "Nairobi_pop_adjusted_curve_population.csv",
+    output:
+        FIG_POP_2020 / "Pop_scaling_null.png",
+    shell:
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/4plot_pop_scaling_null.R"
 
 
 # --- sensitivity / robustness -------------------------------------------------
@@ -188,6 +312,20 @@ rule hdbscan_param_sweep:
         PAT_HDB / "Nairobi_hdbscan_param_sweep.csv",
     shell:
         "python {SPATIAL_SRC}/HDBSCAN/3b_hdbscan_param_sweep.py"
+
+
+# Same grid as the sweep, compared label-by-label with the primary run: does the
+# count change because hotspots appear/vanish, or because the same areas split/merge?
+rule hdbscan_param_overlap:
+    input:
+        PAT_HDB / "Nairobi_waste_hdbscan_gsvi_32737.gpkg",
+    output:
+        PAT_HDB / "Nairobi_hdbscan_param_overlap.csv",
+        PAT_HDB / "thesis_table" / "hdbscan_param_overlap.csv",
+        PAT_FIG / "HDBSCAN" / "Hdbscan_param_overlap.png",
+    shell:
+        "python {SPATIAL_SRC}/HDBSCAN/3c_hdbscan_param_overlap.py && "
+        "python {SPATIAL_SRC}/HDBSCAN/3c_plot_hdbscan_param_overlap.py"
 
 
 rule period_hdbscan:
@@ -213,31 +351,45 @@ rule period_signed_distance_gam:
         "Rscript {SPATIAL_SRC}/Signed_distance/period_stratified_robustness/2_plot_period_signed_distance_gam.R"
 
 
-# Same nested GAMs against unconstrained WorldPop 2020, to check the population
-# control is not specific to the constrained 2024 raster.
-rule pop_adjusted_gam_worldpop_2020:
+# Same nested GAMs against WorldPop constrained 2024, to check the population
+# control is not specific to the manuscript's unconstrained 2020 raster.
+rule pop_adjusted_gam_worldpop_2024_constrained:
     input:
         COV / "3_Nairobi_sviwaste_points_gsvi_32737.gpkg",
+        PAT_POP / "ken_pop_2024_CN_100m_R2025A_v1.tif",
     output:
-        PAT_POP_2020 / "Nairobi_pop_adjusted_model_metrics.csv",
-        PAT_FIG / "Signed_distance" / "pop_adjusted" / "worldpop_2020" / "Pop_adjusted_gam_effects.png",
+        PAT_POP_2024 / "Nairobi_pop_adjusted_model_metrics.csv",
+        PAT_POP_2024 / "Nairobi_pop_adjusted_gam_frame.csv",
+        FIG_POP_2024 / "Pop_adjusted_gam_effects.png",
+        FIG_POP_2024 / "Pop_adjusted_mdp_residual_map.png",
     shell:
-        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/worldpop_2020/1_pop_adjusted_gam.py && "
-        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/worldpop_2020/2_plot_pop_adjusted_gam.R"
+        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/worldpop_2024_constrained/1_pop_adjusted_gam.py && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/worldpop_2024_constrained/2_plot_pop_adjusted_gam.R"
+
+
+rule thinning_sensitivity_worldpop_2024_constrained:
+    input:
+        PAT_POP_2024 / "Nairobi_pop_adjusted_gam_frame.csv",
+    output:
+        PAT_POP_2024 / "thesis_table" / "thinning_sensitivity.csv",
+        FIG_POP_2024 / "Thinning_sensitivity.png",
+    shell:
+        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/2_thinning_sensitivity.py --data-subdir worldpop_2024_constrained && "
+        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/2plot_thinning_sensitivity.R --data-subdir=worldpop_2024_constrained"
 
 
 # Non-parametric companion to the nested GAMs: within equal-count density bands,
 # does being inside a settlement still raise the waste rate?
 rule settlement_by_density_band:
     input:
-        PAT_POP / "Nairobi_pop_adjusted_gam_frame.csv",
+        PAT_POP_2020 / "Nairobi_pop_adjusted_gam_frame.csv",
     output:
-        PAT_POP / "Nairobi_settlement_by_density_band.csv",
+        PAT_SET / "Nairobi_settlement_by_density_band.csv",
         PAT_SET / "thesis_table" / "settlement_by_density_band.csv",
         PAT_FIG / "settlement" / "Settlement_by_density_band.png",
     shell:
-        "python {SPATIAL_SRC}/Signed_distance/pop_adjusted/4_settlement_by_density_band.py && "
-        "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/4plot_settlement_by_density_band.R"
+        "python {SPATIAL_SRC}/settlement/4_settlement_by_density_band.py && "
+        "Rscript {SPATIAL_SRC}/settlement/4plot_settlement_by_density_band.R"
 
 
 # Descriptive twin of the GAM: the same gradient straight from the raw counts.
@@ -252,13 +404,3 @@ rule proximity_descriptives:
     shell:
         "python {SPATIAL_SRC}/Signed_distance/3_proximity_descriptives.py && "
         "Rscript {SPATIAL_SRC}/Signed_distance/3plot_waste_settlement_proximity.R"
-
-
-# 5c sensitivity — the proportional-growth null for the population effect.
-rule plot_pop_scaling_null:
-    input:
-        PAT_POP / "Nairobi_pop_adjusted_curve_population.csv",
-    output:
-        PAT_FIG / "Signed_distance" / "pop_adjusted" / "Pop_scaling_null.png",
-    shell:
-        "Rscript {REPO_ROOT}/5_spatial_pattern/Signed_distance/pop_adjusted/4plot_pop_scaling_null.R"

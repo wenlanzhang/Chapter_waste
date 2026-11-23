@@ -56,6 +56,12 @@ rates <- bands |>
 
 n_total <- sum(bands$n_outside) + sum(bands$n_inside)
 n_bands_ok <- sum(bands$reportable)
+ok <- filter(bands, reportable)
+dropped <- filter(bands, !reportable)
+omit_note <- if (nrow(dropped) == 0) "" else sprintf(
+  "The %d lowest-density band%s %s omitted from the inside series (%s inside-settlement panoramas in total).",
+  nrow(dropped), if (nrow(dropped) > 1) "s" else "", if (nrow(dropped) > 1) "are" else "is",
+  comma(sum(dropped$n_inside)))
 
 base_theme <- function() {
   theme_minimal(base_size = 11) +
@@ -118,8 +124,9 @@ fig <- (p_rates | p_ratio) +
     ),
     caption = paste0(
       "Non-parametric companion to the nested GAMs: panoramas are grouped into equal-count bands of WorldPop density, ",
-      "then compared inside vs outside a mapped urban-poor settlement.\nThe lowest band is omitted from the inside series ",
-      "(only 15 panoramas). Ratios narrow from 11.1× to 1.6×, so density carries real weight at the top end, ",
+      "then compared inside vs outside a mapped urban-poor settlement.\n", omit_note,
+      sprintf(" Ratios narrow from %.1f× to %.1f×, so density carries real weight at the top end, ",
+              max(ok$rate_ratio), min(ok$rate_ratio)),
       "but never accounts for the association entirely."
     ),
     theme = theme(
