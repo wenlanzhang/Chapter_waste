@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Capture-year treatment and imagery-period sensitivity (R1 minor / R3.3).
+"""Capture-year treatment and imagery-period sensitivity.
 
 The population-adjusted GAM controls capture year with year fixed effects.
 A year with < 200 panoramas or no waste-positive panorama cannot carry its own
 effect, so `lib.gam.assign_year_fe` joins each such year to its nearest usable
-year: 2015 (5 panoramas) to 2017 and 2019 (73) to 2018. The submitted version
-put both into 2018. Reviewer 1 questions the grouping. Reviewer 3 asks
-whether one static population layer represents imagery captured years apart.
+year: 2015 (5 panoramas) to 2017 and 2019 (73) to 2018. This script checks
+whether results depend on that grouping, and whether one static population
+layer represents imagery captured years apart.
 
 Specifications, each fitted with the same nested GAMs (M0, MP, MD, MDP):
 
@@ -31,7 +31,6 @@ Runs on the manuscript sample (worldpop_2020/) by default; --data-subdir picks a
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import sys
 from pathlib import Path
 
@@ -44,17 +43,11 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from lib.gam import BOOT_SEED, PRED_GRID_N, assign_year_fe  # noqa: E402
+from lib.script_loader import load_script  # noqa: E402
 
 
-def _load(name: str, filename: str):
-    spec = importlib.util.spec_from_file_location(name, SCRIPT_DIR / filename)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-pag = _load("pop_adjusted_gam", "1_pop_adjusted_gam.py")
-bb = _load("spatial_block_bootstrap", "3_spatial_block_bootstrap.py")
+pag = load_script(SCRIPT_DIR / "1_pop_adjusted_gam.py")
+bb = load_script(SCRIPT_DIR / "3_spatial_block_bootstrap.py")
 
 BLOCK_M = 2000.0
 N_BOOT = 500  # as 3_spatial_block_bootstrap.py
@@ -68,10 +61,10 @@ SPECS = {
 
 def fit_all(df: pd.DataFrame) -> dict:
     d = assign_year_fe(df.drop(columns=["year_fe"], errors="ignore"), verbose=False)
-    m0, _, _, _ = pag.fit_m0(d)
-    mp, _, _, _ = pag.fit_mp(d)
-    md, _, _, _ = pag.fit_md(d)
-    mdp, cols, _, _ = pag.fit_mdp(d)
+    m0, _ = pag.fit_m0(d)
+    mp, _ = pag.fit_mp(d)
+    md, _ = pag.fit_md(d)
+    mdp, cols = pag.fit_mdp(d)
     lrt_pd = pag.likelihood_ratio_test(mdp, mp, "MP_vs_MDP")
     lrt_0p = pag.likelihood_ratio_test(mp, m0, "M0_vs_MP")
     lrt_dd = pag.likelihood_ratio_test(mdp, md, "MD_vs_MDP")

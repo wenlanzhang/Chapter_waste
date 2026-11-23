@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Positional uncertainty near settlement boundaries (R1.4).
+"""Positional uncertainty near settlement boundaries.
 
 A panorama is placed by its camera position, but the waste it shows can lie a
 few tens of metres away, across a mapped settlement boundary. Near the
@@ -25,7 +25,6 @@ Runs on the manuscript sample (worldpop_2020/) by default; --data-subdir picks a
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import sys
 from pathlib import Path
 
@@ -38,18 +37,12 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from lib.gam import BOOT_SEED, PRED_GRID_N  # noqa: E402
+from lib.script_loader import load_script  # noqa: E402
 
 
-def _load(name: str, filename: str):
-    spec = importlib.util.spec_from_file_location(name, SCRIPT_DIR / filename)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-pag = _load("pop_adjusted_gam", "1_pop_adjusted_gam.py")
-bb = _load("spatial_block_bootstrap", "3_spatial_block_bootstrap.py")
-cy = _load("capture_year_sensitivity", "4_capture_year_sensitivity.py")
+pag = load_script(SCRIPT_DIR / "1_pop_adjusted_gam.py")
+bb = load_script(SCRIPT_DIR / "3_spatial_block_bootstrap.py")
+cy = load_script(SCRIPT_DIR / "4_capture_year_sensitivity.py")
 
 EXCLUSION_M = (0.0, 25.0, 50.0, 100.0)
 BLOCK_M = 2000.0

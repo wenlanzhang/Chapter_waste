@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""WorldPop reference-year sensitivity (R3.3).
+"""WorldPop reference-year sensitivity.
 
 The manuscript's population-adjusted GAM uses one layer, WorldPop
 unconstrained Kenya 2020 (ken_ppp_2020), for imagery captured 2015–2022. This
@@ -35,7 +35,6 @@ Run on the manuscript frame (pop_adjusted/worldpop_2020/).
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import sys
 from pathlib import Path
 
@@ -50,18 +49,12 @@ if str(_REPO_ROOT) not in sys.path:
 
 from chapter_paths import phd_data_root  # noqa: E402
 from lib.gam import BOOT_SEED, PRED_GRID_N  # noqa: E402
+from lib.script_loader import load_script  # noqa: E402
 
 
-def _load(name: str, filename: str):
-    spec = importlib.util.spec_from_file_location(name, SCRIPT_DIR / filename)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-pag = _load("pop_adjusted_gam", "1_pop_adjusted_gam.py")
-bb = _load("spatial_block_bootstrap", "3_spatial_block_bootstrap.py")
-cy = _load("capture_year_sensitivity", "4_capture_year_sensitivity.py")
+pag = load_script(SCRIPT_DIR / "1_pop_adjusted_gam.py")
+bb = load_script(SCRIPT_DIR / "3_spatial_block_bootstrap.py")
+cy = load_script(SCRIPT_DIR / "4_capture_year_sensitivity.py")
 
 POP = phd_data_root() / "RS" / "Pop_density"
 LAYERS = {
@@ -110,7 +103,6 @@ def main() -> None:
     frame = pd.read_csv(base / "Nairobi_pop_adjusted_gam_frame.csv", dtype={"year_fe": str, "panoid": str})
     frame["year"] = pd.to_numeric(frame["year"], errors="coerce").astype(int)
     frame = sample_layers(frame)
-    early = frame["year"] <= EARLY_MAX_YEAR
 
     # how similar are the layers at the panoramas?
     cols = [f"logpop_{k}" for k in LAYERS]

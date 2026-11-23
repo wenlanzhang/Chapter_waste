@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Spatial-field sensitivity (R1.3 / R3.2), from 7_spatial_field_sensitivity.py.
+# Spatial-field sensitivity, from 7_spatial_field_sensitivity.py.
 #   (a) distance curve relative to 2 km, P(d) / P(2 km): MDP against MDPS
 #       (MDP + thin-plate spatial field), 2 km block bootstrap 95% bands
 #   (b) settlement edge ÷ 2 km contrast under each model, with ΔAIC for distance
@@ -23,18 +23,8 @@ args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
 repo_root <- normalizePath(file.path(script_dir, "..", "..", ".."))
-trailing <- commandArgs(trailingOnly = TRUE)
-hit <- grep("^--data-subdir=", trailing, value = TRUE)
-data_subdir <- if (length(hit)) sub("^--data-subdir=", "", hit[[1]]) else "worldpop_2020"
-
-source(file.path(repo_root, "R", "chapter_paths.R"))
-source(file.path(repo_root, "R", "chapter_colours.R"))
-
-SF_DIR <- file.path(chapter_data_root, "5_spatial_pattern", "Signed_distance", "pop_adjusted",
-                    data_subdir, "spatial_field")
-FIG_DIR <- file.path(repo_root, "Figure", "5_spatial_pattern", "Signed_distance", "pop_adjusted",
-                     data_subdir)
-dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
+source(file.path(repo_root, "R", "pop_adjusted_paths.R"))
+SF_DIR <- file.path(POP_DIR, "spatial_field")
 
 summ_path <- file.path(SF_DIR, "Nairobi_spatial_field_summary.csv")
 curve_path <- file.path(SF_DIR, "Nairobi_spatial_field_curves.csv")

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Population-adjusted signed-distance logistic GAMs (panorama unit).
 
-Supplementary robustness for Reviewer 3: after accounting for local population
-density and panorama capture year, does signed distance to an urban-poor
-settlement still explain visible-waste probability?
+After accounting for local population density and panorama capture year, does
+signed distance to an urban-poor settlement still explain visible-waste
+probability?
 
 Nested models (same year FE treatment as Signed_distance/1_signed_distance_gam.py):
 
@@ -84,15 +84,8 @@ STD_SAMPLE_N = 500  # quantiles used when standardising over the other covariate
 
 
 def standardisation_points(values: pd.Series) -> np.ndarray:
-    """STD_SAMPLE_N evenly spaced quantiles of a covariate's distribution.
-
-    The curves average predictions over the other covariate's distribution.
-    This used to be a random sample of 400 values, which made the curve itself
-    noisy: on the WorldPop 2020 sample the adjusted P(waste) at the settlement
-    edge ranged 5.3–6.2% across seeds, and the published draw (6.18%) was the
-    top of that range. Quantiles are deterministic and match averaging over
-    every panorama (5.79%).
-    """
+    """STD_SAMPLE_N evenly spaced quantiles of a covariate, the values a curve is
+    averaged over (deterministic, and equal to averaging over every panorama)."""
     v = values.to_numpy(dtype=float)
     if len(v) <= STD_SAMPLE_N:
         return v
@@ -200,12 +193,10 @@ def _align_exog(exog: pd.DataFrame, col_order: list[str]) -> np.ndarray:
     return out.to_numpy(dtype=float)
 
 
-def _standardize_xy(xy: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _standardize_xy(xy: np.ndarray) -> np.ndarray:
     """Centre/scale UTM metres for a stable spatial field."""
-    mu = xy.mean(axis=0)
     sd = xy.std(axis=0)
-    sd = np.where(sd < 1e-6, 1.0, sd)
-    return (xy - mu) / sd, mu, sd
+    return (xy - xy.mean(axis=0)) / np.where(sd < 1e-6, 1.0, sd)
 
 
 def _spatial_basis(xy: np.ndarray, knots: np.ndarray) -> np.ndarray:
@@ -220,113 +211,76 @@ def _spatial_basis(xy: np.ndarray, knots: np.ndarray) -> np.ndarray:
     return phi / scale
 
 
-def fit_m0(df: pd.DataFrame):
+DIST, POP = "signed_distance_m", "log1p_pop_density"
+MODEL_SMOOTHS = {"M0": [], "MP": [POP], "MD": [DIST], "MDP": [DIST, POP]}
+
+
+def smoother_for(df: pd.DataFrame, cols: list[str]) -> BSplines:
+    k = len(cols)
+    return BSplines(
+        df[cols].astype(float), df=[SPLINE_DF] * k, degree=[SPLINE_DEGREE] * k, variable_names=cols
+    )
+
+
+def fit_gam(
+    df: pd.DataFrame,
+    smooth_cols: list[str],
+    alpha: float | None = None,
+    extra_exog: pd.DataFrame | None = None,
+):
+    """Logistic GAM: constant + year FE (+ extra_exog) + one B-spline per smooth_col.
+
+    Returns (result, year dummy columns). No smooths means a plain GLM (M0).
+    """
     y = df["waste_positive"].to_numpy(dtype=float)
     exog, year_cols = _year_exog(df)
-    model = sm.GLM(y, exog, family=sm.families.Binomial())
-    return model.fit(), year_cols, None, None
+    if extra_exog is not None:
+        exog = pd.concat([exog, extra_exog], axis=1)
+    if not smooth_cols:
+        return sm.GLM(y, exog, family=sm.families.Binomial()).fit(), year_cols
+    kwargs = {"alpha": np.full(len(smooth_cols), float(alpha))} if alpha is not None else {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        result = GLMGam(
+            y, exog=exog, smoother=smoother_for(df, smooth_cols),
+            family=sm.families.Binomial(), **kwargs,
+        ).fit()
+    return result, year_cols
+
+
+def fit_m0(df: pd.DataFrame):
+    return fit_gam(df, MODEL_SMOOTHS["M0"])
 
 
 def fit_mp(df: pd.DataFrame, alpha: float | None = None):
-    y = df["waste_positive"].to_numpy(dtype=float)
-    x_smooth = df[["log1p_pop_density"]].astype(float)
-    smoother = BSplines(
-        x_smooth,
-        df=[SPLINE_DF],
-        degree=[SPLINE_DEGREE],
-        variable_names=["log1p_pop_density"],
-    )
-    exog, year_cols = _year_exog(df)
-    kwargs = {"alpha": np.array([float(alpha)])} if alpha is not None else {}
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        model = GLMGam(
-            y, exog=exog, smoother=smoother, family=sm.families.Binomial(), **kwargs
-        )
-        result = model.fit()
-    return result, year_cols, smoother, None
+    return fit_gam(df, MODEL_SMOOTHS["MP"], alpha)
 
 
 def fit_md(df: pd.DataFrame, alpha: float | None = None):
-    y = df["waste_positive"].to_numpy(dtype=float)
-    x_smooth = df[["signed_distance_m"]].astype(float)
-    smoother = BSplines(
-        x_smooth,
-        df=[SPLINE_DF],
-        degree=[SPLINE_DEGREE],
-        variable_names=["signed_distance_m"],
-    )
-    exog, year_cols = _year_exog(df)
-    kwargs = {"alpha": np.array([float(alpha)])} if alpha is not None else {}
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        model = GLMGam(
-            y, exog=exog, smoother=smoother, family=sm.families.Binomial(), **kwargs
-        )
-        result = model.fit()
-    return result, year_cols, smoother, None
+    return fit_gam(df, MODEL_SMOOTHS["MD"], alpha)
 
 
 def fit_mdp(df: pd.DataFrame, alpha: float | None = None):
-    y = df["waste_positive"].to_numpy(dtype=float)
-    x_smooth = df[["signed_distance_m", "log1p_pop_density"]].astype(float)
-    smoother = BSplines(
-        x_smooth,
-        df=[SPLINE_DF, SPLINE_DF],
-        degree=[SPLINE_DEGREE, SPLINE_DEGREE],
-        variable_names=["signed_distance_m", "log1p_pop_density"],
-    )
-    exog, year_cols = _year_exog(df)
-    kwargs = (
-        {"alpha": np.array([float(alpha), float(alpha)])} if alpha is not None else {}
-    )
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        model = GLMGam(
-            y, exog=exog, smoother=smoother, family=sm.families.Binomial(), **kwargs
-        )
-        result = model.fit()
-    return result, year_cols, smoother, None
+    return fit_gam(df, MODEL_SMOOTHS["MDP"], alpha)
+
+
+def spatial_knots(df: pd.DataFrame) -> np.ndarray:
+    xy = _standardize_xy(df[["x", "y"]].to_numpy(dtype=float))
+    return KMeans(n_clusters=N_SPATIAL_KNOTS, random_state=BOOT_SEED, n_init=10).fit(xy).cluster_centers_
+
+
+def spatial_field(df: pd.DataFrame, knots: np.ndarray) -> pd.DataFrame:
+    """Thin-plate basis columns of the spatial field, one row per panorama."""
+    xy = _standardize_xy(df[["x", "y"]].to_numpy(dtype=float))
+    phi = _spatial_basis(xy, knots)
+    return pd.DataFrame(phi, columns=[f"spatial_rbf_{i}" for i in range(phi.shape[1])], index=df.index)
 
 
 def fit_mdps(df: pd.DataFrame, knots: np.ndarray | None = None):
-    y = df["waste_positive"].to_numpy(dtype=float)
-    x_smooth = df[["signed_distance_m", "log1p_pop_density"]].astype(float)
-    smoother = BSplines(
-        x_smooth,
-        df=[SPLINE_DF, SPLINE_DF],
-        degree=[SPLINE_DEGREE, SPLINE_DEGREE],
-        variable_names=["signed_distance_m", "log1p_pop_density"],
-    )
-    exog, year_cols = _year_exog(df)
-    xy_raw = df[["x", "y"]].to_numpy(dtype=float)
-    xy, _, _ = _standardize_xy(xy_raw)
-    if knots is None:
-        km = KMeans(n_clusters=N_SPATIAL_KNOTS, random_state=BOOT_SEED, n_init=10)
-        knots = km.fit(xy).cluster_centers_
-    phi = _spatial_basis(xy, knots)
-    phi_cols = [f"spatial_rbf_{i}" for i in range(phi.shape[1])]
-    phi_df = pd.DataFrame(phi, columns=phi_cols, index=exog.index)
-    exog_full = pd.concat([exog, phi_df], axis=1)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        model = GLMGam(
-            y,
-            exog=exog_full,
-            smoother=smoother,
-            family=sm.families.Binomial(),
-            alpha=np.array([0.5, 0.5]),
-        )
-        result = model.fit()
-    return result, year_cols, smoother, knots
-
-
-FITTERS = {
-    "M0": fit_m0,
-    "MP": fit_mp,
-    "MD": fit_md,
-    "MDP": fit_mdp,
-}
+    """MDP + spatial field. Returns (result, year dummy columns, knots)."""
+    knots = spatial_knots(df) if knots is None else knots
+    result, year_cols = fit_gam(df, [DIST, POP], alpha=0.5, extra_exog=spatial_field(df, knots))
+    return result, year_cols, knots
 
 
 def _n_params(result) -> float:
@@ -398,31 +352,18 @@ def year_standardisation_weights(df: pd.DataFrame) -> pd.Series:
     return df["year_fe"].astype(str).value_counts(normalize=True).sort_index()
 
 
-def _exog_at_year(
-    grid_n: int, year_cols: list[str], fixed_year: str, extra: np.ndarray | None = None
-) -> np.ndarray:
+def _exog_at_year(grid_n: int, year_cols: list[str], fixed_year: str) -> np.ndarray:
     exog = pd.DataFrame({"const": np.ones(grid_n, dtype=float)})
     for col in year_cols:
         level = col.replace("year_", "", 1)
         exog[col] = 1.0 if level == fixed_year else 0.0
-    mat = exog.to_numpy(dtype=float)
-    if extra is not None:
-        if extra.ndim == 1:
-            extra = np.repeat(extra.reshape(1, -1), grid_n, axis=0)
-        mat = np.hstack([mat, extra])
-    return mat
+    return exog.to_numpy(dtype=float)
 
 
 def _predict_mdp(
-    result,
-    year_cols: list[str],
-    dist: np.ndarray,
-    logpop: np.ndarray,
-    year_level: str,
-    spatial_extra: np.ndarray | None = None,
+    result, year_cols: list[str], dist: np.ndarray, logpop: np.ndarray, year_level: str
 ) -> np.ndarray:
-    n = len(dist)
-    exog = _exog_at_year(n, year_cols, year_level, extra=spatial_extra)
+    exog = _exog_at_year(len(dist), year_cols, year_level)
     xs = np.column_stack([dist, logpop])
     return np.asarray(result.predict(exog=exog, exog_smooth=xs), dtype=float)
 
@@ -476,9 +417,9 @@ def mdp_population_curve(
 def refit_mdp(df: pd.DataFrame):
     """MDP on a (re)sample: year FE reassigned on the rows present, ridge fallback."""
     d = assign_year_fe(df.drop(columns=["year_fe"], errors="ignore"), verbose=False)
-    res, cols, _, _ = fit_mdp(d)
+    res, cols = fit_mdp(d)
     if not np.isfinite(float(res.llf)):
-        res, cols, _, _ = fit_mdp(d, alpha=1.0)
+        res, cols = fit_mdp(d, alpha=1.0)
     return d, res, cols
 
 
@@ -596,16 +537,9 @@ def _curve_frame(
 def standardised_curves(
     df: pd.DataFrame, result, year_cols: list[str]
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    """Both adjusted MDP curves with spatial block bootstrap bands.
-
-    Also returns the population elasticity with its interval from the same
-    replicates.
-
-    The bands are 2.5th–97.5th percentiles over BLOCK_BOOT_B replicates with
-    BLOCK_BOOT_M blocks. They replace the panorama-level bootstrap (B = 40),
-    which treated neighbouring panoramas as independent and was 3–6× too
-    narrow given the residual spatial autocorrelation in MDP.
-    """
+    """Both adjusted MDP curves with 95% spatial block bootstrap bands
+    (BLOCK_BOOT_B replicates, BLOCK_BOOT_M blocks), plus the population
+    elasticity with its interval from the same replicates."""
     d_grid, p_grid = distance_grid(df), population_grid(df)
     mean_d = mdp_distance_curve(df, result, year_cols, d_grid)
     mean_p = mdp_population_curve(df, result, year_cols, p_grid)
@@ -639,20 +573,11 @@ def standardised_curves(
 
 def concurvity_diagnostics(df: pd.DataFrame) -> pd.DataFrame:
     """GAM-style concurvity between distance and population smooth bases."""
-    x = df[["signed_distance_m", "log1p_pop_density"]].astype(float)
-    smoother = BSplines(
-        x,
-        df=[SPLINE_DF, SPLINE_DF],
-        degree=[SPLINE_DEGREE, SPLINE_DEGREE],
-        variable_names=["signed_distance_m", "log1p_pop_density"],
-    )
-    basis = np.asarray(smoother.transform(x.to_numpy(dtype=float)), dtype=float)
-    # First SPLINE_DF-related block is distance; second is population.
-    # With include_intercept=False, each smooth contributes df-1? BSplines uses df per var.
-    n_basis = basis.shape[1]
-    n_each = n_basis // 2
-    b_d = basis[:, :n_each]
-    b_p = basis[:, n_each:]
+    x = df[[DIST, POP]].to_numpy(dtype=float)
+    basis = np.asarray(smoother_for(df, [DIST, POP]).transform(x), dtype=float)
+    # Columns are the distance basis, then the population basis, equal in size.
+    n_each = basis.shape[1] // 2
+    b_d, b_p = basis[:, :n_each], basis[:, n_each:]
 
     def block_r2(target: np.ndarray, other: np.ndarray) -> tuple[float, float]:
         r2s = []
@@ -755,14 +680,6 @@ def mdp_residual_frame(df: pd.DataFrame, result) -> pd.DataFrame:
     return out.reset_index(drop=True)
 
 
-CV_SMOOTH_COLS = {
-    "M0": [],
-    "MP": ["log1p_pop_density"],
-    "MD": ["signed_distance_m"],
-    "MDP": ["signed_distance_m", "log1p_pop_density"],
-}
-
-
 def spatial_blocked_cv(df: pd.DataFrame) -> pd.DataFrame:
     """Out-of-sample Brier score and log-loss under spatially blocked 5-fold CV.
 
@@ -781,15 +698,14 @@ def spatial_blocked_cv(df: pd.DataFrame) -> pd.DataFrame:
         n_clusters=N_CV_FOLDS, random_state=BOOT_SEED, n_init=10
     ).fit_predict(xy)
     rows = []
-    for model_name, fitter in FITTERS.items():
-        smooth_cols = CV_SMOOTH_COLS[model_name]
+    for model_name, smooth_cols in MODEL_SMOOTHS.items():
         y_all: list[np.ndarray] = []
         p_all: list[np.ndarray] = []
         for fold in range(N_CV_FOLDS):
             test_mask = labels == fold
             train, test = df.loc[~test_mask], df.loc[test_mask]
             try:
-                fit, year_cols, _, _ = fitter(train)
+                fit, year_cols = fit_gam(train, smooth_cols)
                 test_year = test["year_fe"].astype(str).to_numpy()
                 exog = np.column_stack(
                     [np.ones(len(test))]
@@ -834,48 +750,6 @@ def spatial_blocked_cv(df: pd.DataFrame) -> pd.DataFrame:
                 }
             )
     return pd.DataFrame(rows)
-
-
-def distance_effect_similarity(
-    df: pd.DataFrame, result_mdp, year_cols_mdp, result_mdps, year_cols_mdps, knots
-) -> dict:
-    """Compare distance-standardised curves from MDP vs MDPS."""
-    # Use median pop, average over years — lightweight similarity check
-    weights = year_standardisation_weights(df)
-    d_min = float(df["signed_distance_m"].quantile(0.01))
-    d_max = float(df["signed_distance_m"].quantile(0.99))
-    grid = np.linspace(d_min, d_max, 100)
-    pop_med = float(df["log1p_pop_density"].median())
-
-    def curve(fit, cols, spatial_zero=None):
-        w = weights / weights.sum()
-        pred = np.zeros(len(grid))
-        for level, wt in w.items():
-            pred += float(wt) * _predict_mdp(
-                fit,
-                cols,
-                grid,
-                np.full(len(grid), pop_med),
-                str(level),
-                spatial_extra=spatial_zero,
-            )
-        return pred
-
-    c_mdp = curve(result_mdp, year_cols_mdp, None)
-    c_mdps = curve(
-        result_mdps, year_cols_mdps, np.zeros(N_SPATIAL_KNOTS, dtype=float)
-    )
-    corr = float(np.corrcoef(c_mdp, c_mdps)[0, 1])
-    mae = float(np.mean(np.abs(c_mdp - c_mdps)))
-    return {
-        "distance_curve_corr_mdp_vs_mdps": corr,
-        "distance_curve_mae_mdp_vs_mdps": mae,
-        "interpretation": (
-            "Signed-distance relationship remains broadly similar after spatial field"
-            if corr >= 0.9
-            else "Signed-distance relationship changes more after absorbing residual space"
-        ),
-    }
 
 
 def configure_paths(
@@ -968,7 +842,7 @@ def run_residuals_only() -> Path:
         f"year_fe={sorted(df['year_fe'].unique().tolist())}"
     )
     print("  Fitting MDP (s(distance) + s(log1p pop) + year)...")
-    res_mdp, _, _, _ = fit_mdp(df)
+    res_mdp, _ = fit_mdp(df)
     resid = mdp_residual_frame(df, res_mdp)
     resid_path = OUTPUT_DIR / "Nairobi_pop_adjusted_mdp_residuals.csv"
     resid.to_csv(resid_path, index=False)
@@ -1012,13 +886,13 @@ def main(argv: list[str] | None = None) -> None:
     df.to_csv(frame_path, index=False)
 
     print("\n  Fitting M0 (year only)...")
-    res_m0, _, _, _ = fit_m0(df)
+    res_m0, _ = fit_m0(df)
     print("  Fitting MP (s(log1p pop) + year)...")
-    res_mp, _, _, _ = fit_mp(df)
+    res_mp, _ = fit_mp(df)
     print("  Fitting MD (s(distance) + year) [S4 specification]...")
-    res_md, year_cols_md, _, _ = fit_md(df)
+    res_md, _ = fit_md(df)
     print("  Fitting MDP (s(distance) + s(log1p pop) + year)...")
-    res_mdp, year_cols_mdp, _, _ = fit_mdp(df)
+    res_mdp, year_cols_mdp = fit_mdp(df)
 
     print("  Writing MDP panorama residuals for excess-occurrence map...")
     resid = mdp_residual_frame(df, res_mdp)
@@ -1076,32 +950,20 @@ def main(argv: list[str] | None = None) -> None:
         f"(k={MORAN_K})"
     )
 
-    sim_info = {}
+    # The distance curve under MDPS is compared in 7_spatial_field_sensitivity.py.
     if moran["meaningful_residual_spatial_structure"]:
         print("\n  Fitting MDPS (MDP + spatial thin-plate field)...")
-        res_mdps, year_cols_mdps, _, knots = fit_mdps(df)
+        res_mdps, _, _ = fit_mdps(df)
         metrics = pd.concat(
             [metrics, pd.DataFrame([_model_metrics(res_mdps, "MDPS", len(df))])],
             ignore_index=True,
         )
         lrt_df = pd.concat(
-            [
-                lrt_df,
-                pd.DataFrame(
-                    [likelihood_ratio_test(res_mdps, res_mdp, "MDP_vs_MDPS")]
-                ),
-            ],
+            [lrt_df, pd.DataFrame([likelihood_ratio_test(res_mdps, res_mdp, "MDP_vs_MDPS")])],
             ignore_index=True,
-        )
-        sim_info = distance_effect_similarity(
-            df, res_mdp, year_cols_mdp, res_mdps, year_cols_mdps, knots
-        )
-        print(
-            f"  MDP vs MDPS distance-curve corr={sim_info['distance_curve_corr_mdp_vs_mdps']:.3f}"
         )
     else:
         print("  Residual spatial structure weak; skipping MDPS.")
-        knots = None
 
     print("\n  Adjusted prediction curves from MDP...")
     curve_d, curve_p, elasticity = standardised_curves(df, res_mdp, year_cols_mdp)
@@ -1148,10 +1010,6 @@ def main(argv: list[str] | None = None) -> None:
         **elasticity,
         "moran_i_mdp_resid": moran["moran_i"],
         "moran_p_mdp_resid": moran["moran_p_sim"],
-        "mdps_fit": int(bool(sim_info)),
-        "distance_curve_corr_mdp_vs_mdps": sim_info.get(
-            "distance_curve_corr_mdp_vs_mdps", np.nan
-        ),
         "unit": "panorama",
         "central_test": "MP vs MDP",
         "conclusion": conclusion,
@@ -1161,31 +1019,25 @@ def main(argv: list[str] | None = None) -> None:
             metrics.loc[metrics["model"] == "MDPS", "aic"].iloc[0]
         )
 
-    # Write outputs
-    metrics_path = OUTPUT_DIR / "Nairobi_pop_adjusted_model_metrics.csv"
-    lrt_path = OUTPUT_DIR / "Nairobi_pop_adjusted_lrt.csv"
-    conc_path = OUTPUT_DIR / "Nairobi_pop_adjusted_concurvity.csv"
-    moran_path = OUTPUT_DIR / "Nairobi_pop_adjusted_moran.csv"
-    curve_d_path = OUTPUT_DIR / "Nairobi_pop_adjusted_curve_distance.csv"
-    curve_p_path = OUTPUT_DIR / "Nairobi_pop_adjusted_curve_population.csv"
-    cv_path = OUTPUT_DIR / "Nairobi_pop_adjusted_spatial_cv.csv"
-    summary_path = OUTPUT_DIR / "Nairobi_pop_adjusted_summary.csv"
-    sim_path = OUTPUT_DIR / "Nairobi_pop_adjusted_mdps_similarity.csv"
-
-    metrics.to_csv(metrics_path, index=False)
-    lrt_df.to_csv(lrt_path, index=False)
-    conc.to_csv(conc_path, index=False)
-    pd.DataFrame([moran]).to_csv(moran_path, index=False)
-    curve_d.to_csv(curve_d_path, index=False)
-    curve_p.to_csv(curve_p_path, index=False)
-    cv.to_csv(cv_path, index=False)
-    pd.DataFrame([summary]).to_csv(summary_path, index=False)
-    if sim_info:
-        pd.DataFrame([sim_info]).to_csv(sim_path, index=False)
+    outputs = {
+        "model_metrics": metrics,
+        "lrt": lrt_df,
+        "concurvity": conc,
+        "moran": pd.DataFrame([moran]),
+        "curve_distance": curve_d,
+        "curve_population": curve_p,
+        "spatial_cv": cv,
+        "summary": pd.DataFrame([summary]),
+    }
+    print(f"\nWrote {frame_path}\nWrote {resid_path}")
+    for name, table in outputs.items():
+        path = OUTPUT_DIR / f"Nairobi_pop_adjusted_{name}.csv"
+        table.to_csv(path, index=False)
+        print(f"Wrote {path}")
 
     thesis = pd.DataFrame(
         [
-            ("Role", "Population-adjusted signed-distance robustness (Reviewer 3)", ""),
+            ("Role", "Population-adjusted signed-distance robustness", ""),
             ("Population data", POP_SHORT, ""),
             ("Panoramas in GAM", f"{summary['n_panoids']:,}", ""),
             ("Waste-positive panoramas", f"{summary['n_waste_positive']:,}", ""),
@@ -1246,17 +1098,6 @@ def main(argv: list[str] | None = None) -> None:
     )
     thesis_path = TABLE_DIR / THESIS_NAME
     thesis.to_csv(thesis_path, index=False)
-
-    print(f"\nWrote {frame_path}")
-    print(f"Wrote {resid_path}")
-    print(f"Wrote {metrics_path}")
-    print(f"Wrote {lrt_path}")
-    print(f"Wrote {conc_path}")
-    print(f"Wrote {moran_path}")
-    print(f"Wrote {curve_d_path}")
-    print(f"Wrote {curve_p_path}")
-    print(f"Wrote {cv_path}")
-    print(f"Wrote {summary_path}")
     print(f"Wrote {thesis_path}")
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# WorldPop reference-year sensitivity (R3.3), from 6_worldpop_year_sensitivity.py.
+# WorldPop reference-year sensitivity, from 6_worldpop_year_sensitivity.py.
 #   (a) MDP distance curve, manuscript product (unconstrained): 2020 / 2018 / year-matched
 #   (b) MDP distance curve, WorldPop R2025A constrained: 2018 / 2022 / year-matched (+ 2020 bridge)
 #   (c) settlement edge ÷ 2 km contrast (2 km block bootstrap 95%) and ΔAIC for distance
@@ -20,15 +20,8 @@ args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
 repo_root <- normalizePath(file.path(script_dir, "..", "..", ".."))
-
-source(file.path(repo_root, "R", "chapter_paths.R"))
-source(file.path(repo_root, "R", "chapter_colours.R"))
-
-WY_DIR <- file.path(chapter_data_root, "5_spatial_pattern", "Signed_distance", "pop_adjusted",
-                    "worldpop_2020", "worldpop_year")
-FIG_DIR <- file.path(repo_root, "Figure", "5_spatial_pattern", "Signed_distance", "pop_adjusted",
-                     "worldpop_2020")
-dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
+source(file.path(repo_root, "R", "pop_adjusted_paths.R"))
+WY_DIR <- file.path(POP_DIR, "worldpop_year")
 
 summ_path <- file.path(WY_DIR, "Nairobi_worldpop_year_summary.csv")
 curve_path <- file.path(WY_DIR, "Nairobi_worldpop_year_curves.csv")

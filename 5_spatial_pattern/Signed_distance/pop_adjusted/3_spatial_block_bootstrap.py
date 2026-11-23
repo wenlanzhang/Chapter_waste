@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Spatial block bootstrap for the settlement ratio and the MDP curve (R1.3 / R3.2).
+"""Spatial block bootstrap for the settlement ratio and the MDP curve.
 
 The population-adjusted GAM (MDP) leaves small but significant residual spatial
 autocorrelation (Moran's I ≈ 0.06, k = 8). Nearby panoramas are therefore not
@@ -17,7 +17,7 @@ and only changes how its uncertainty is estimated.
     independent. B = 250, 500, 1,000, 2,000 and 4,000 m.
 
   Reference: the same procedure with single panoramas as the unit (``iid``),
-  which reproduces what the original intervals assume.
+  which assumes panoramas are independent.
 
 Per replicate:
   - inside/outside settlement prevalence ratio and odds ratio
@@ -39,7 +39,6 @@ Runs on the manuscript sample (worldpop_2020/, 76,578 panoramas) by default;
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import sys
 import time
 from pathlib import Path
@@ -55,17 +54,11 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from lib.gam import BOOT_SEED, assign_year_fe  # noqa: E402
+from lib.script_loader import load_script  # noqa: E402
 
 
-def _load(name: str, filename: str):
-    spec = importlib.util.spec_from_file_location(name, SCRIPT_DIR / filename)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-pag = _load("pop_adjusted_gam", "1_pop_adjusted_gam.py")
-thin = _load("thinning_sensitivity", "2_thinning_sensitivity.py")
+pag = load_script(SCRIPT_DIR / "1_pop_adjusted_gam.py")
+thin = load_script(SCRIPT_DIR / "2_thinning_sensitivity.py")
 
 BLOCK_SIZES_M = (250.0, 500.0, 1000.0, 2000.0, 4000.0)
 N_BOOT = 500
@@ -119,7 +112,7 @@ def curve_stats(df: pd.DataFrame, grid: np.ndarray, seed: int = 0) -> tuple[np.n
 def residual_correlogram(df: pd.DataFrame, seed: int) -> pd.DataFrame:
     """Correlation of MDP Pearson residuals between panorama pairs, by distance band."""
     d = assign_year_fe(df.drop(columns=["year_fe"], errors="ignore"), verbose=False)
-    res, _, _, _ = pag.fit_mdp(d)
+    res, _ = pag.fit_mdp(d)
     r = np.asarray(res.resid_pearson, dtype=float)
     r = (r - r.mean()) / r.std()
     rng = np.random.default_rng(seed)

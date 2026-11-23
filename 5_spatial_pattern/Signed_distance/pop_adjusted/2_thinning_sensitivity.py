@@ -1,23 +1,10 @@
 #!/usr/bin/env python3
-"""Spatial-thinning sensitivity for the population-adjusted GAM (R1.5 / R3.1).
+"""Spatial-thinning sensitivity for the population-adjusted GAM.
 
-The earlier check (``dedup_sensitivity``, since removed from 1_pop_adjusted_gam.py) thinned
-**waste-positive panoramas only**: positives were grouped with DBSCAN
-(eps = 50 / 100 m, min_samples = 1, i.e. chained single-linkage components),
-one positive was kept per group, and **every negative was retained**. Because
-which panoramas are dropped depends on the outcome, that lowers prevalence
-(3.6% → 2.8% / 1.9%) and changes the positive-to-negative ratio near
-settlements, where positives cluster most. It is not a neutral test.
-
-This script redoes the check **label-blind**: thinning is applied to the
-complete panorama frame, and the outcome is never consulted.
-
-  Label-blind minimum-distance thinning
-    Visit all panoramas in a random order; keep a panorama unless a panorama
-    already kept lies within d metres; then block every panorama within d of
-    it. No two retained panoramas are closer than d, whatever their label.
-    Repeated over N_REPS random orders per threshold, because a single draw
-    is one arbitrary realisation.
+Label-blind minimum-distance thinning: visit all panoramas in a random order
+and keep one unless a kept panorama lies within d metres, so no two retained
+panoramas are closer than d, whatever their label. Repeated over N_REPS random
+orders per threshold.
 
 For each thinned frame the same nested GAMs are refitted (MP, MD, MDP, with
 year FE reassigned on the retained data), and the following are recomputed on
@@ -28,21 +15,15 @@ the retained panoramas only:
   - observed positive rate by signed-distance band
   - the pop- and year-standardised MDP signed-distance curve
 
-The original positive-only scheme is reproduced alongside, so the table shows
-baseline / original / revised side by side.
+For comparison, the table also shows thinning of waste-positive panoramas only
+(DBSCAN groups, one positive kept per group, every negative kept). That scheme
+depends on the outcome, so it lowers prevalence and is not a neutral test.
 
-Which sample: the GAM frame of one population-raster variant, read from its
-Nairobi_pop_adjusted_gam_frame.csv. ``--data-subdir worldpop_2020`` uses the
-unconstrained WorldPop 2020 frame (76,578 panoramas), which is the sample in
-the submitted manuscript. With no subdir it uses the constrained 2024 frame
-(74,882), whose raster has no value outside built-up areas, so 1,720 remote,
-all-negative panoramas drop out. Every rate is retained positives / retained
-panoramas in that scheme.
+Runs on the manuscript sample (worldpop_2020/) by default; --data-subdir picks another run.
 """
 
 from __future__ import annotations
 
-import importlib.util
 import sys
 from pathlib import Path
 
@@ -57,12 +38,9 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from lib.gam import BOOT_SEED, PRED_GRID_N, assign_year_fe  # noqa: E402
+from lib.script_loader import load_script  # noqa: E402
 
-_spec = importlib.util.spec_from_file_location(
-    "pop_adjusted_gam", SCRIPT_DIR / "1_pop_adjusted_gam.py"
-)
-pag = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(pag)
+pag = load_script(SCRIPT_DIR / "1_pop_adjusted_gam.py")
 
 THRESHOLDS_M = (25.0, 50.0, 75.0, 100.0)
 N_REPS = 100
@@ -108,7 +86,7 @@ def thin_label_blind(xy: np.ndarray, tree: cKDTree, dist_m: float, seed: int) ->
 
 
 def thin_positive_only(df: pd.DataFrame, dist_m: float, seed: int) -> pd.DataFrame:
-    """The superseded scheme: one waste+ panorama per DBSCAN group, every negative kept.
+    """Outcome-dependent comparison: one waste+ panorama per DBSCAN group, every negative kept.
 
     The selection depends on the outcome, so it is biased. It is reproduced
     here only so the table can set it beside the label-blind scheme.
@@ -182,9 +160,9 @@ def fit_models(df: pd.DataFrame) -> dict:
     df = assign_year_fe(df.drop(columns=["year_fe"], errors="ignore"), verbose=False)
 
     def stable(fitter):
-        res, cols, _, _ = fitter(df)
+        res, cols = fitter(df)
         if not np.isfinite(float(res.llf)):
-            res, cols, _, _ = fitter(df, alpha=1.0)
+            res, cols = fitter(df, alpha=1.0)
         return res, cols
 
     m_p, _ = stable(pag.fit_mp)

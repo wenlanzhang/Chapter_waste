@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Spatial block bootstrap (R1.3 / R3.2), from 3_spatial_block_bootstrap.py.
+# Spatial block bootstrap, from 3_spatial_block_bootstrap.py.
 #   (a) residual correlogram of the MDP Pearson residuals, block sizes marked
 #   (b) settlement prevalence ratio: 95% interval by method
 #   (c) MDP signed-distance curve: panorama-level band vs 2 km and 4 km block bands
@@ -21,21 +21,8 @@ args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
 repo_root <- normalizePath(file.path(script_dir, "..", "..", ".."))
-trailing <- commandArgs(trailingOnly = TRUE)
-hit <- grep("^--data-subdir=", trailing, value = TRUE)
-data_subdir <- if (length(hit)) sub("^--data-subdir=", "", hit[[1]]) else "worldpop_2020"
-
-source(file.path(repo_root, "R", "chapter_paths.R"))
-source(file.path(repo_root, "R", "chapter_colours.R"))
-
-POP_DIR <- file.path(chapter_data_root, "5_spatial_pattern", "Signed_distance", "pop_adjusted")
-FIG_DIR <- file.path(repo_root, "Figure", "5_spatial_pattern", "Signed_distance", "pop_adjusted")
-if (nzchar(data_subdir)) {
-  POP_DIR <- file.path(POP_DIR, data_subdir)
-  FIG_DIR <- file.path(FIG_DIR, data_subdir)
-}
+source(file.path(repo_root, "R", "pop_adjusted_paths.R"))
 BB_DIR <- file.path(POP_DIR, "block_bootstrap")
-dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 
 need <- file.path(BB_DIR, c(
   "Nairobi_block_bootstrap_summary.csv",
@@ -45,7 +32,7 @@ need <- file.path(BB_DIR, c(
 if (!all(file.exists(need))) {
   stop("Missing block-bootstrap outputs in ", BB_DIR,
        ". Run 3_spatial_block_bootstrap.py",
-       if (nzchar(data_subdir)) paste0(" --data-subdir ", data_subdir) else "")
+       " --data-subdir ", data_subdir)
 }
 summ <- read.csv(need[1], stringsAsFactors = FALSE)
 curves <- read.csv(need[2], stringsAsFactors = FALSE)

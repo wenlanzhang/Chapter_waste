@@ -115,38 +115,11 @@ def parse_qwen_yes_no(text: object) -> str | None:
     return None
 
 
-def metrics_binary(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
-    tp = int(np.sum((y_true == 1) & (y_pred == 1)))
-    fp = int(np.sum((y_true == 0) & (y_pred == 1)))
-    tn = int(np.sum((y_true == 0) & (y_pred == 0)))
-    fn = int(np.sum((y_true == 1) & (y_pred == 0)))
-    n = tp + fp + tn + fn
-    accuracy = (tp + tn) / n if n else 0.0
-    precision = tp / (tp + fp) if (tp + fp) else 0.0
-    recall = tp / (tp + fn) if (tp + fn) else 0.0
-    f1 = (
-        2 * precision * recall / (precision + recall)
-        if (precision + recall) > 0
-        else 0.0
-    )
-    return {
-        "accuracy": accuracy,
-        "precision": precision,
-        "recall": recall,
-        "f1": f1,
-        "tp": tp,
-        "fp": fp,
-        "tn": tn,
-        "fn": fn,
-    }
-
-
 def metrics_from_counts(tp, fp, tn, fn) -> dict[str, np.ndarray]:
     """Accuracy / precision / recall / F1 from confusion counts (scalars or arrays).
 
-    An undefined ratio (empty denominator) is 0, as in metrics_binary. F1 is
-    written as 2TP / (2TP + FP + FN), which equals 2PR / (P + R) whenever that
-    is defined.
+    An undefined ratio (empty denominator) is 0. F1 is written as
+    2TP / (2TP + FP + FN), which equals 2PR / (P + R) whenever that is defined.
     """
     tp, fp, tn, fn = (np.asarray(x, dtype=float) for x in (tp, fp, tn, fn))
 
@@ -159,6 +132,17 @@ def metrics_from_counts(tp, fp, tn, fn) -> dict[str, np.ndarray]:
         "recall": ratio(tp, tp + fn),
         "f1": ratio(2 * tp, 2 * tp + fp + fn),
     }
+
+
+def metrics_binary(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+    """Confusion counts and the four metrics for one set of predictions."""
+    counts = {
+        "tp": int(np.sum((y_true == 1) & (y_pred == 1))),
+        "fp": int(np.sum((y_true == 0) & (y_pred == 1))),
+        "tn": int(np.sum((y_true == 0) & (y_pred == 0))),
+        "fn": int(np.sum((y_true == 1) & (y_pred == 0))),
+    }
+    return {**{m: float(v) for m, v in metrics_from_counts(**counts).items()}, **counts}
 
 
 def stage_metrics(
@@ -254,14 +238,6 @@ def write_csv(df: pd.DataFrame, name: str) -> Path:
     THESIS_TABLE_DIR.mkdir(parents=True, exist_ok=True)
     path = THESIS_TABLE_DIR / name
     df.to_csv(path, index=False)
-    print(f"Wrote {path}")
-    return path
-
-
-def write_text(text: str, name: str) -> Path:
-    THESIS_TABLE_DIR.mkdir(parents=True, exist_ok=True)
-    path = THESIS_TABLE_DIR / name
-    path.write_text(text, encoding="utf-8")
     print(f"Wrote {path}")
     return path
 
@@ -588,15 +564,15 @@ def write_main_heldout_tables(stages: list[dict]) -> None:
         "F1",
         "95% CI",
     ]
-    ci_text = ",".join(header) + "\n" + "\n".join(",".join(row) for row in ci_rows) + "\n"
+    ci_table = pd.DataFrame(ci_rows, columns=header)
 
     print(
         "\nMain held-out comparison (Qwen = mean of per-run metrics; class-stratified "
         f"paired panorama bootstrap 95% CI, B = {BOOT_B}):"
     )
-    print(pd.DataFrame(ci_rows, columns=header).to_string(index=False))
+    print(ci_table.to_string(index=False))
     write_csv(pd.DataFrame(display_rows), "table_2_yolo_qwen_heldout.csv")
-    write_text(ci_text, "table_2_yolo_qwen_heldout_ci.csv")
+    write_csv(ci_table, "table_2_yolo_qwen_heldout_ci.csv")
     write_csv(pd.DataFrame(detail_rows), "table_2_yolo_qwen_heldout_detail.csv")
 
     # Paired differences, cascade minus YOLO, on the same bootstrap replicates
@@ -652,80 +628,43 @@ def write_stability_table(
     n_yolo = int(yolo.sum())
     source = f"qwen_labels_{headline}.csv"
 
-    yolo_m = metrics_binary(y_true, yolo)
-    rows = [
-        {
-            "setting": "YOLO only",
-            "role": "baseline",
-            "n_yolo_pos": n_yolo,
-            "qwen_yes_among_yolo": None,
-            "qwen_no_among_yolo": None,
-            "accuracy_pct": round(100 * yolo_m["accuracy"], 1),
-            "precision_pct": round(100 * yolo_m["precision"], 1),
-            "recall_pct": round(100 * yolo_m["recall"], 1),
-            "f1_pct": round(100 * yolo_m["f1"], 1),
-            "tp": yolo_m["tp"],
-            "fp": yolo_m["fp"],
-            "tn": yolo_m["tn"],
-            "fn": yolo_m["fn"],
-            "note": f"Image-level prediction from the held-out YOLO val run ({headline})",
-        }
-    ]
+    def row(setting: str, role: str, votes: list[str | None] | None, note: str) -> dict:
+        """One table_3 row: YOLO alone (votes None) or YOLO filtered by these votes."""
+        pred = yolo if votes is None else cascade_pred(yolo, votes)
+        m = metrics_binary(y_true, pred)
 
-    for col in replicates:
-        votes = voted[col].tolist()
-        n_yes = sum(1 for yp, v in zip(yolo, votes) if yp == 1 and v == "yes")
-        n_no = sum(1 for yp, v in zip(yolo, votes) if yp == 1 and v == "no")
-        m = metrics_binary(y_true, cascade_pred(yolo, votes))
-        rows.append(
-            {
-                "setting": f"YOLO → {col}",
-                "role": "replicate",
-                "n_yolo_pos": n_yolo,
-                "qwen_yes_among_yolo": n_yes,
-                "qwen_no_among_yolo": n_no,
-                "accuracy_pct": round(100 * m["accuracy"], 1),
-                "precision_pct": round(100 * m["precision"], 1),
-                "recall_pct": round(100 * m["recall"], 1),
-                "f1_pct": round(100 * m["f1"], 1),
-                "tp": m["tp"],
-                "fp": m["fp"],
-                "tn": m["tn"],
-                "fn": m["fn"],
-                "note": (
-                    "Single independent Qwen replicate on all YOLO positives "
-                    f"(stability analysis). Source: {source}"
-                ),
-            }
-        )
+        def among_yolo(label: str) -> int | None:
+            if votes is None:
+                return None
+            return sum(1 for yp, v in zip(yolo, votes) if yp == 1 and v == label)
+
+        return {
+            "setting": setting,
+            "role": role,
+            "n_yolo_pos": n_yolo,
+            "qwen_yes_among_yolo": among_yolo("yes"),
+            "qwen_no_among_yolo": among_yolo("no"),
+            **{f"{k}_pct": round(100 * m[k], 1) for k in METRICS},
+            **{k: m[k] for k in ("tp", "fp", "tn", "fn")},
+            "note": note,
+        }
 
     majority = [
         majority_yes_no([voted[c].iloc[i] for c in replicates]) for i in range(len(voted))
     ]
-    n_yes_m = sum(1 for yp, v in zip(yolo, majority) if yp == 1 and v == "yes")
-    n_no_m = sum(1 for yp, v in zip(yolo, majority) if yp == 1 and v == "no")
-    maj_m = metrics_binary(y_true, cascade_pred(yolo, majority))
-    rows.append(
-        {
-            "setting": f"YOLO → {len(replicates)}-run majority",
-            "role": "majority_summary",
-            "n_yolo_pos": n_yolo,
-            "qwen_yes_among_yolo": n_yes_m,
-            "qwen_no_among_yolo": n_no_m,
-            "accuracy_pct": round(100 * maj_m["accuracy"], 1),
-            "precision_pct": round(100 * maj_m["precision"], 1),
-            "recall_pct": round(100 * maj_m["recall"], 1),
-            "f1_pct": round(100 * maj_m["f1"], 1),
-            "tp": maj_m["tp"],
-            "fp": maj_m["fp"],
-            "tn": maj_m["tn"],
-            "fn": maj_m["fn"],
-            "note": (
-                f"Descriptive {len(replicates)}-run majority Yes/No on YOLO+ "
-                f"(not the headline cascade). Source: {source}"
-            ),
-        }
-    )
+    rows = [
+        row("YOLO only", "baseline", None,
+            f"Image-level prediction from the held-out YOLO val run ({headline})"),
+        *(
+            row(f"YOLO → {col}", "replicate", voted[col].tolist(),
+                "Single independent Qwen replicate on all YOLO positives "
+                f"(stability analysis). Source: {source}")
+            for col in replicates
+        ),
+        row(f"YOLO → {len(replicates)}-run majority", "majority_summary", majority,
+            f"Descriptive {len(replicates)}-run majority Yes/No on YOLO+ "
+            f"(not the headline cascade). Source: {source}"),
+    ]
 
     # Agreement among the replicates, over YOLO-positive images only
     pos = voted[voted["pred_waste"] == 1]

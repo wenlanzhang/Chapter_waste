@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Does the distance gradient survive a residual spatial field? (R1.3 / R3.2)
+"""Does the distance gradient survive a residual spatial field?
 
 The spatial block bootstrap (3_spatial_block_bootstrap.py) keeps MDP as it is
 and widens its intervals. This script changes the model instead: MDPS adds a
@@ -31,16 +31,12 @@ Runs on the manuscript sample (worldpop_2020/) by default; --data-subdir picks a
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import sys
 import time
-import warnings
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
-from statsmodels.gam.api import BSplines, GLMGam
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = next(p for p in SCRIPT_DIR.parents if (p / "chapter_paths.py").is_file())
@@ -48,16 +44,10 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from lib.gam import assign_year_fe  # noqa: E402
+from lib.script_loader import load_script  # noqa: E402
 
 
-def _load(name: str, filename: str):
-    spec = importlib.util.spec_from_file_location(name, SCRIPT_DIR / filename)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-pag = _load("pop_adjusted_gam", "1_pop_adjusted_gam.py")
+pag = load_script(SCRIPT_DIR / "1_pop_adjusted_gam.py")
 
 BLOCK_M = pag.BLOCK_BOOT_M
 N_BOOT = 500  # as 3_spatial_block_bootstrap.py
@@ -67,40 +57,23 @@ EDGE_M = 0.0
 COMPARE_MAX_M = 5000.0  # the range the figures show; the spline tail beyond is sparse
 
 
-def field_design(df: pd.DataFrame, knots: np.ndarray) -> tuple[pd.DataFrame, list[str]]:
+def field_design(df: pd.DataFrame, knots: np.ndarray) -> pd.DataFrame:
     """Parametric design of the field models: constant, year dummies, spatial basis."""
-    exog, year_cols = pag._year_exog(df)
-    xy, _, _ = pag._standardize_xy(df[["x", "y"]].to_numpy(dtype=float))
-    phi = pag._spatial_basis(xy, knots)
-    cols = [f"spatial_rbf_{i}" for i in range(phi.shape[1])]
-    return pd.concat([exog, pd.DataFrame(phi, columns=cols, index=exog.index)], axis=1), year_cols
+    exog, _ = pag._year_exog(df)
+    return pd.concat([exog, pag.spatial_field(df, knots)], axis=1)
 
 
 def fit_mps(df: pd.DataFrame, knots: np.ndarray):
     """MDPS without the distance term (same field, same penalty)."""
-    smoother = BSplines(
-        df[["log1p_pop_density"]].astype(float),
-        df=[pag.SPLINE_DF],
-        degree=[pag.SPLINE_DEGREE],
-        variable_names=["log1p_pop_density"],
-    )
-    exog, _ = field_design(df, knots)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return GLMGam(
-            df["waste_positive"].to_numpy(dtype=float),
-            exog=exog,
-            smoother=smoother,
-            family=sm.families.Binomial(),
-            alpha=np.array([0.5]),
-        ).fit()
+    result, _ = pag.fit_gam(df, [pag.POP], alpha=0.5, extra_exog=pag.spatial_field(df, knots))
+    return result
 
 
 def mdps_distance_curve(
     df: pd.DataFrame, result, knots: np.ndarray, grid: np.ndarray, n_std: int = N_STD
 ) -> np.ndarray:
     """MDPS P(waste+) over `grid`, each panorama keeping its own pop, year and location."""
-    exog, _ = field_design(df, knots)
+    exog = field_design(df, knots)
     pop = df["log1p_pop_density"].to_numpy(dtype=float)
     n = min(n_std, len(df))
     idx = np.argsort(pop, kind="stable")[((np.arange(n) + 0.5) / n * len(df)).astype(int)]
@@ -115,7 +88,7 @@ def mdps_distance_curve(
 def both_curves(df: pd.DataFrame, knots: np.ndarray, grid: np.ndarray) -> dict[str, np.ndarray]:
     """MDP and MDPS distance curves on one (re)sample, year FE reassigned."""
     d, res, cols = pag.refit_mdp(df)
-    res_s, _, _, _ = pag.fit_mdps(d, knots=knots)
+    res_s, _, _ = pag.fit_mdps(d, knots=knots)
     return {
         "MDP": pag.mdp_distance_curve(d, res, cols, grid),
         "MDPS": mdps_distance_curve(d, res_s, knots, grid),
@@ -145,9 +118,9 @@ def main() -> None:
 
     # ------------------------------------------------------------- full sample
     print("Full-sample fits (MP, MDP, MPS, MDPS)...")
-    res_mp, _, _, _ = pag.fit_mp(df)
-    res_mdp, cols_mdp, _, _ = pag.fit_mdp(df)
-    res_mdps, _, _, knots = pag.fit_mdps(df)
+    res_mp, _ = pag.fit_mp(df)
+    res_mdp, cols_mdp = pag.fit_mdp(df)
+    res_mdps, _, knots = pag.fit_mdps(df)
     res_mps = fit_mps(df, knots)
     tests = pd.DataFrame([
         pag.likelihood_ratio_test(res_mdp, res_mp, "MP_vs_MDP"),

@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Positional uncertainty near settlement boundaries (R1.4), from 5_boundary_exclusion.py.
+# Positional uncertainty near settlement boundaries, from 5_boundary_exclusion.py.
 #   (a) inside / outside prevalence ratio after excluding panoramas within d m of a
 #       mapped boundary, with 2 km spatial block bootstrap 95% intervals
 #   (b) MDP signed-distance curve refitted on each reduced sample (excluded band greyed)
@@ -20,27 +20,14 @@ args_cli <- commandArgs(trailingOnly = FALSE)
 file_arg <- grep("^--file=", args_cli, value = TRUE)
 script_dir <- if (length(file_arg)) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
 repo_root <- normalizePath(file.path(script_dir, "..", "..", ".."))
-trailing <- commandArgs(trailingOnly = TRUE)
-hit <- grep("^--data-subdir=", trailing, value = TRUE)
-data_subdir <- if (length(hit)) sub("^--data-subdir=", "", hit[[1]]) else "worldpop_2020"
-
-source(file.path(repo_root, "R", "chapter_paths.R"))
-source(file.path(repo_root, "R", "chapter_colours.R"))
-
-POP_DIR <- file.path(chapter_data_root, "5_spatial_pattern", "Signed_distance", "pop_adjusted")
-FIG_DIR <- file.path(repo_root, "Figure", "5_spatial_pattern", "Signed_distance", "pop_adjusted")
-if (nzchar(data_subdir)) {
-  POP_DIR <- file.path(POP_DIR, data_subdir)
-  FIG_DIR <- file.path(FIG_DIR, data_subdir)
-}
+source(file.path(repo_root, "R", "pop_adjusted_paths.R"))
 BE_DIR <- file.path(POP_DIR, "boundary_exclusion")
-dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 
 summ_path <- file.path(BE_DIR, "Nairobi_boundary_exclusion_summary.csv")
 curve_path <- file.path(BE_DIR, "Nairobi_boundary_exclusion_curves.csv")
 if (!file.exists(summ_path) || !file.exists(curve_path)) {
   stop("Missing boundary-exclusion outputs in ", BE_DIR, ". Run 5_boundary_exclusion.py",
-       if (nzchar(data_subdir)) paste0(" --data-subdir ", data_subdir) else "")
+       " --data-subdir ", data_subdir)
 }
 summ <- read.csv(summ_path, stringsAsFactors = FALSE)
 cur <- read.csv(curve_path, stringsAsFactors = FALSE)

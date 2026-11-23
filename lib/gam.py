@@ -29,10 +29,6 @@ def assign_year_fe(
     own, into the nearest year that has neither problem; a tie goes to the
     earlier year. In the GSVI frame that sends 2015 (5 panoramas) to 2017 and
     2019 (73) to 2018.
-
-    This replaces an earlier rule that first pooled all sparse years into one
-    "other" level and then moved that level as a block, which placed 2015 in
-    2018 only because it had been pooled with 2019.
     """
     out = df.copy()
     by_year = out.groupby(year_col)[outcome_col].agg(["size", "sum"])

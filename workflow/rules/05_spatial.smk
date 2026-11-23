@@ -207,7 +207,7 @@ rule plot_pop_adjusted_gam:
         "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/3_plot_mdp_residual_map.R"
 
 
-# Label-blind spatial thinning (R1.5 / R3.1): thin all panoramas, refit the
+# Label-blind spatial thinning: thin all panoramas, refit the
 # nested GAMs, 100 random draws per threshold. Replaces the positive-only check.
 rule thinning_sensitivity:
     input:
@@ -224,7 +224,7 @@ rule thinning_sensitivity:
         "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/2plot_thinning_sensitivity.R"
 
 
-# Spatial block bootstrap (R1.3 / R3.2): intervals for the settlement ratio and the
+# Spatial block bootstrap: intervals for the settlement ratio and the
 # MDP curve that allow for residual spatial dependence. ~45 min.
 rule spatial_block_bootstrap:
     input:
@@ -238,7 +238,7 @@ rule spatial_block_bootstrap:
         "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/3plot_spatial_block_bootstrap.R"
 
 
-# Capture-year treatment (R1 minor / R3.3): 2015/2019 excluded vs pooled, and
+# Capture-year treatment: 2015/2019 excluded vs pooled, and
 # early vs late imagery fitted separately. ~30 min.
 rule capture_year_sensitivity:
     input:
@@ -252,7 +252,7 @@ rule capture_year_sensitivity:
         "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/4plot_capture_year_sensitivity.R"
 
 
-# Boundary uncertainty (R1.4): drop panoramas within 25 / 50 / 100 m of a mapped
+# Boundary uncertainty: drop panoramas within 25 / 50 / 100 m of a mapped
 # settlement boundary and recompute the ratio and the GAM. ~30 min.
 rule boundary_exclusion:
     input:
@@ -266,7 +266,7 @@ rule boundary_exclusion:
         "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/5plot_boundary_exclusion.R"
 
 
-# WorldPop reference year (R3.3): static 2018 / 2022 and year-matched layers,
+# WorldPop reference year: static 2018 / 2022 and year-matched layers,
 # unconstrained and constrained. Needs the extra rasters in RS/Pop_density. ~75 min.
 rule worldpop_year_sensitivity:
     input:
@@ -280,7 +280,7 @@ rule worldpop_year_sensitivity:
         "Rscript {SPATIAL_SRC}/Signed_distance/pop_adjusted/6plot_worldpop_year_sensitivity.R"
 
 
-# Spatial field (R1.3 / R3.2): does distance still add once a thin-plate field
+# Spatial field: does distance still add once a thin-plate field
 # on location is in the model, and how much of the gradient remains? ~50 min.
 rule spatial_field_sensitivity:
     input:
